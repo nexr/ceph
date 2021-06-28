@@ -64,7 +64,9 @@ void ActivePyModules::dump_server(const std::string &hostname,
   std::string ceph_version;
 
   for (const auto &i : dmc) {
+    PyThreadState *tstate = PyEval_SaveThread();
     std::lock_guard l(i.second->lock);
+    PyEval_RestoreThread(tstate);
     const auto &key = i.first;
     const std::string &str_type = key.first;
     const std::string &svc_name = key.second;
@@ -136,7 +138,9 @@ PyObject *ActivePyModules::get_metadata_python(
     Py_RETURN_NONE;
   }
 
+  PyThreadState *tstate = PyEval_SaveThread();
   std::lock_guard l(metadata->lock);
+  PyEval_RestoreThread(tstate);
   PyFormatter f;
   f.dump_string("hostname", metadata->hostname);
   for (const auto &i : metadata->metadata) {
@@ -155,8 +159,9 @@ PyObject *ActivePyModules::get_daemon_status_python(
     derr << "Requested missing service " << svc_type << "." << svc_id << dendl;
     Py_RETURN_NONE;
   }
-
+  PyThreadState *tstate = PyEval_SaveThread();
   std::lock_guard l(metadata->lock);
+  PyEval_RestoreThread(tstate);
   PyFormatter f;
   for (const auto &i : metadata->service_status) {
     f.dump_string(i.first.c_str(), i.second);
@@ -200,7 +205,6 @@ PyObject *ActivePyModules::get_python(const std::string &what)
     });
     return f.get();
   } else if (what == "modified_config_options") {
-    PyEval_RestoreThread(tstate);
     auto all_daemons = daemon_state.get_all();
     set<string> names;
     for (auto& [key, daemon] : all_daemons) {
@@ -209,6 +213,7 @@ PyObject *ActivePyModules::get_python(const std::string &what)
 	names.insert(name);
       }
     }
+    PyEval_RestoreThread(tstate);
     f.open_array_section("options");
     for (auto& name : names) {
       f.dump_string("name", name);
@@ -241,17 +246,19 @@ PyObject *ActivePyModules::get_python(const std::string &what)
     return f.get();
   } else if (what == "osd_metadata") {
     auto dmc = daemon_state.get_by_service("osd");
-    PyEval_RestoreThread(tstate);
 
     for (const auto &i : dmc) {
       std::lock_guard l(i.second->lock);
+      PyEval_RestoreThread(tstate);
       f.open_object_section(i.first.second.c_str());
       f.dump_string("hostname", i.second->hostname);
       for (const auto &j : i.second->metadata) {
         f.dump_string(j.first.c_str(), j.second);
       }
       f.close_section();
+      tstate = PyEval_SaveThread();
     }
+    PyEval_RestoreThread(tstate);
     return f.get();
   } else if (what == "pg_summary") {
     cluster_state.with_pgmap(
@@ -715,7 +722,9 @@ PyObject* ActivePyModules::with_perf_counters(
 
   auto metadata = daemon_state.get(DaemonKey(svc_name, svc_id));
   if (metadata) {
+    tstate = PyEval_SaveThread();
     std::lock_guard l2(metadata->lock);
+    PyEval_RestoreThread(tstate);
     if (metadata->perf_counters.instances.count(path)) {
       auto counter_instance = metadata->perf_counters.instances.at(path);
       auto counter_type = metadata->perf_counters.types.at(path);
@@ -824,8 +833,9 @@ PyObject* ActivePyModules::get_perf_schema_python(
       std::ostringstream daemon_name;
       daemon_name << key.first << "." << key.second;
       f.open_object_section(daemon_name.str().c_str());
-
+      tstate = PyEval_SaveThread();
       std::lock_guard l(state->lock);
+      PyEval_RestoreThread(tstate);
       for (auto ctr_inst_iter : state->perf_counters.instances) {
         const auto &counter_name = ctr_inst_iter.first;
 	f.open_object_section(counter_name.c_str());
