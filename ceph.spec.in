@@ -296,7 +296,11 @@ BuildRequires:  python%{_python_buildid}-pyOpenSSL
 BuildRequires:	python%{_python_buildid}-cherrypy
 BuildRequires:	python%{_python_buildid}-jwt
 BuildRequires:	python%{_python_buildid}-routes
-BuildRequires:  python%{_python_buildid}-scipy
+%if 0%{?_python_buildid} == 3
+BuildRequires:  python36-scipy
+%else
+BuildRequires:  python27-scipy
+%endif
 BuildRequires:	python%{_python_buildid}-werkzeug
 %endif
 %if 0%{?suse_version}
