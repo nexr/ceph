@@ -40,7 +40,6 @@
 %bcond_without libradosstriper
 %bcond_without ocf
 %bcond_without kafka_endpoint
-%global _remote_tarball_prefix https://download.ceph.com/tarballs/
 %endif
 %if 0%{?suse_version}
 %bcond_with selinux
