@@ -58,7 +58,6 @@ from .plugins import feature_toggles, debug  # noqa # pylint: disable=unused-imp
 
 PLUGIN_MANAGER.hook.init()
 
-
 # cherrypy likes to sys.exit on error.  don't let it take us down too!
 # pylint: disable=W0613
 def os_exit_noop(*args):
@@ -151,7 +150,7 @@ class CherryPyConfig(object):
             # SSL initialization
             cert = self.get_store("crt")
             if cert is not None:
-                self.cert_tmp = tempfile.NamedTemporaryFile()
+                self.cert_tmp = tempfile.NamedTemporaryFile(delete=False)
                 self.cert_tmp.write(cert.encode('utf-8'))
                 self.cert_tmp.flush()  # cert_tmp must not be gc'ed
                 cert_fname = self.cert_tmp.name
@@ -160,7 +159,7 @@ class CherryPyConfig(object):
 
             pkey = self.get_store("key")
             if pkey is not None:
-                self.pkey_tmp = tempfile.NamedTemporaryFile()
+                self.pkey_tmp = tempfile.NamedTemporaryFile(delete=False)
                 self.pkey_tmp.write(pkey.encode('utf-8'))
                 self.pkey_tmp.flush()  # pkey_tmp must not be gc'ed
                 pkey_fname = self.pkey_tmp.name
@@ -180,7 +179,7 @@ class CherryPyConfig(object):
 
         uri = "{0}://{1}:{2}{3}/".format(
             'https' if ssl else 'http',
-            socket.getfqdn(server_addr if server_addr != '::' else ''),
+            server_addr if server_addr != '::' else socket.getfqdn(''),
             server_port,
             self.url_prefix
         )
