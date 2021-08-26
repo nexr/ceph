@@ -104,6 +104,7 @@ readonly PROGRAM=`basename "$0"`
 readonly VERSION=0.2
 
 OLD_PWD="`pwd`"
+OLD_PWD_BASE=$(basename $OLD_PWD)
 TMPDIR=`mktemp -d "${TMPDIR:-/tmp}/$PROGRAM.XXXXXX"`
 TMPFILE=`mktemp "$TMPDIR/$PROGRAM.XXXXXX"` # Create a place to store our work's progress
 TOARCHIVE=`mktemp "$TMPDIR/$PROGRAM.toarchive.XXXXXX"`
@@ -117,6 +118,7 @@ FORMAT=tar
 PREFIX=
 TREEISH=HEAD
 IGNORE=
+REMOTE=0
 
 # RETURN VALUES/EXIT STATUS CODES
 readonly E_BAD_OPTION=254
@@ -125,6 +127,11 @@ readonly E_UNKNOWN=255
 # Process command-line arguments.
 while test $# -gt 0; do
     case $1 in
+        --remote )
+            shift
+            REMOTE=1
+            ;;
+
         --format )
             shift
             FORMAT="$1"
@@ -200,11 +207,43 @@ fi
 if [ $VERBOSE -eq 1 ]; then
     echo -n "creating superproject archive..."
 fi
-git archive --format=$FORMAT --prefix="$PREFIX" $TREEISH > $TMPDIR/$(basename "$(pwd)").$FORMAT
+
+if [ $REMOTE -eq 1 ]; then
+  if [ "x$PREFIX" == "x" ];then
+    git archive --format=$FORMAT $TREEISH > $TMPDIR/$OLD_PWD_BASE.$FORMAT
+  else
+    git archive --format=$FORMAT --prefix="$PREFIX/" $TREEISH > $TMPDIR/$OLD_PWD_BASE.$FORMAT
+  fi
+else
+  if [ "x$FORMAT" == "xtar" ]; then
+    dir_prefix=${PREFIX:-$OLD_PWD_BASE}
+
+    cp -rf $OLD_PWD $TMPDIR/$dir_prefix
+
+    pushd $TMPDIR > /dev/null
+    $TARCMD --exclude="RPMS" --exclude=".*.sw*" --exclude="tags" --exclude="*.pyc" --exclude="*.pyo" -cf ./$OLD_PWD_BASE.$FORMAT $dir_prefix
+    popd > /dev/null
+
+    git_dir_included=$(tar tf $TMPDIR/$OLD_PWD_BASE.$FORMAT |grep "$dir_prefix/.git/$" |wc -l)
+    if [ $git_dir_included -gt 0 ]; then
+      $TARCMD --delete $dir_prefix/.git  -vf $TMPDIR/$OLD_PWD_BASE.$FORMAT
+    fi
+
+    build_dir_included=$(tar tf $TMPDIR/$OLD_PWD_BASE.$FORMAT |grep "$dir_prefix/build/$" |wc -l)
+    if [ $build_dir_included -gt 0 ]; then
+      $TARCMD --delete $dir_prefix/build  -vf $TMPDIR/$OLD_PWD_BASE.$FORMAT
+    fi
+  else
+    echo "failed.."
+    echo "'$FORMAT' is not supprted. Only 'tar' format supported for local archiving"
+    exit
+  fi
+fi
+
 if [ $VERBOSE -eq 1 ]; then
     echo "done"
 fi
-echo $TMPDIR/$(basename "$(pwd)").$FORMAT >| $TMPFILE # clobber on purpose
+echo $TMPDIR/$OLD_PWD_BASE.$FORMAT >| $TMPFILE # clobber on purpose
 superfile=`head -n 1 $TMPFILE`
 
 if [ $VERBOSE -eq 1 ]; then
@@ -237,10 +276,10 @@ fi
 while read path; do
     TREEISH=$(git submodule | grep "^ .*${path%/} " | cut -d ' ' -f 2) # git submodule does not list trailing slashes in $path
     cd "$path"
-    git archive --format=$FORMAT --prefix="${PREFIX}$path" ${TREEISH:-HEAD} > "$TMPDIR"/"$(echo "$path" | sed -e 's/\//./g')"$FORMAT
+    git archive --format=$FORMAT --prefix="${PREFIX}/$path" ${TREEISH:-HEAD} > "$TMPDIR"/"$(echo "$path" | sed -e 's/\//./g')"$FORMAT
     if [ $FORMAT == 'zip' ]; then
         # delete the empty directory entry; zipped submodules won't unzip if we don't do this
-        zip -d "$(tail -n 1 $TMPFILE)" "${PREFIX}${path%/}" >/dev/null # remove trailing '/'
+        zip -d "$(tail -n 1 $TMPFILE)" "${PREFIX}/${path%/}" >/dev/null # remove trailing '/'
     fi
     echo "$TMPDIR"/"$(echo "$path" | sed -e 's/\//./g')"$FORMAT >> $TMPFILE
     cd "$OLD_PWD"
