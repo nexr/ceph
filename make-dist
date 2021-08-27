@@ -105,7 +105,7 @@ rm -f $outfile*
 
 # build new tarball
 echo "building tarball..."
-bin/git-archive-all.sh --prefix ceph-$version/ \
+bin/git-archive-all.sh --prefix ceph-$version \
 		       --verbose \
 		       --ignore corpus \
 		       $outfile.tar
