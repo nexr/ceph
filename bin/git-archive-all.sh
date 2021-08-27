@@ -224,13 +224,11 @@ else
     $TARCMD --exclude="RPMS" --exclude=".*.sw*" --exclude="tags" --exclude="*.pyc" --exclude="*.pyo" -cf ./$OLD_PWD_BASE.$FORMAT $dir_prefix
     popd > /dev/null
 
-    git_dir_included=$(tar tf $TMPDIR/$OLD_PWD_BASE.$FORMAT |grep "$dir_prefix/.git/$" |wc -l)
-    if [ $git_dir_included -gt 0 ]; then
+    if [ $(tar tf $TMPDIR/$OLD_PWD_BASE.$FORMAT |grep "$dir_prefix/.git/$" |wc -l) -gt 0 ]; then
       $TARCMD --delete $dir_prefix/.git  -f $TMPDIR/$OLD_PWD_BASE.$FORMAT
     fi
 
-    build_dir_included=$(tar tf $TMPDIR/$OLD_PWD_BASE.$FORMAT |grep "$dir_prefix/build/$" |wc -l)
-    if [ $build_dir_included -gt 0 ]; then
+    if [ $(tar tf $TMPDIR/$OLD_PWD_BASE.$FORMAT |grep "$dir_prefix/build/$" |wc -l) -gt 0 ]; then
       $TARCMD --delete $dir_prefix/build  -f $TMPDIR/$OLD_PWD_BASE.$FORMAT
     fi
   else
