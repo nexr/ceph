@@ -15,7 +15,7 @@ from ..controllers.rbd_mirroring import (
 from ..controllers.iscsi import Iscsi, IscsiTarget
 from ..controllers.cephfs import CephFS
 from ..controllers.rgw import Rgw, RgwDaemon, RgwBucket, RgwUser
-
+from ..controllers.nfsganesha import NFSGanesha, NFSGaneshaService, NFSGaneshaExports
 
 class Features(Enum):
     RBD = 'rbd'
@@ -23,6 +23,7 @@ class Features(Enum):
     ISCSI = 'iscsi'
     CEPHFS = 'cephfs'
     RGW = 'rgw'
+    NFS = 'nfs'
 
 
 PREDISABLED_FEATURES = set()
@@ -35,6 +36,7 @@ Feature2Controller = {
     Features.ISCSI: [Iscsi, IscsiTarget],
     Features.CEPHFS: [CephFS],
     Features.RGW: [Rgw, RgwDaemon, RgwBucket, RgwUser],
+    Features.NFS: [NFSGanesha, NFSGaneshaService, NFSGaneshaExports],
 }
 
 

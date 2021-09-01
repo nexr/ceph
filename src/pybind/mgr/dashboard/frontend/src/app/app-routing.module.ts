@@ -223,7 +223,7 @@ const routes: Routes = [
   {
     path: 'nfs',
     canActivate: [AuthGuardService],
-    canActivateChild: [AuthGuardService, ModuleStatusGuardService],
+    canActivateChild: [FeatureTogglesGuardService, AuthGuardService, ModuleStatusGuardService],
     data: {
       moduleStatusGuardConfig: {
         apiPath: 'nfs-ganesha',
