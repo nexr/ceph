@@ -30,9 +30,16 @@ atlassian_statuspage 모듈을 사용하기 위해서는 활용 가능한 smtp �
 ```bash
 $ ceph config set mgr mgr/atlassian_statuspage/interval <check_interval seconds>
 
+$ ceph config set mgr mgr/atlassian_statuspage/page_id <page_id of statuspage>
 $ ceph config set mgr mgr/atlassian_statuspage/component_id <component_id of statuspage>
 
-# smtp config
+$ ceph config set mgr mgr/atlassian_statuspage/automation_mode [email|rest]
+
+# if automation_mode == rest, RestAPI config
+$ ceph config set mgr mgr/atlassian_statuspage/rest_token <auth token for statuspage>
+$ ceph config set mgr mgr/atlassian_statuspage/rest_url <endpoint of target statuspage>
+
+# if automation_mode == email, smtp config
 $ ceph config set mgr mgr/atlassian_statuspage/smtp_host <smtp host ip>
 $ ceph config set mgr mgr/atlassian_statuspage/smtp_port <smtp port>
 $ ceph config set mgr mgr/atlassian_statuspage/smtp_ssl <true|false>
