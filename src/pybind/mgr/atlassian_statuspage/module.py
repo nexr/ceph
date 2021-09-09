@@ -9,6 +9,9 @@ import errno
 import json
 import smtplib
 import subprocess
+import requests
+from datetime import datetime
+import re
 
 class AtlassianStatuspage(MgrModule):
     COMMANDS = [
@@ -24,12 +27,38 @@ class AtlassianStatuspage(MgrModule):
             'runtime': True,
         },
         {
-            'name': 'component_id',
-            'default': '',
-            'desc': 'Component UUID of Atlassian statuspage.',
+            'name': 'automation_mode',
+            'default': 'email',
+            'desc': 'method of statuspage automation. one of email or rest',
+            'enum_allowed': ['email', 'rest'],
             'runtime': True,
         },
-        # smtp
+        {
+            'name': 'page_id',
+            'default': '',
+            'desc': 'page ID of Atlassian statuspage. (used only rest mode)',
+            'runtime': True,
+        },
+        {
+            'name': 'component_id',
+            'default': '',
+            'desc': 'Component ID of Atlassian statuspage.',
+            'runtime': True,
+        },
+        # rest API server (only vaild when automation_mode is 'rest')
+        {
+            'name': 'rest_token',
+            'default': '',
+            'desc': 'auth token for target statuspage',
+            'runtime': True,
+        },
+        {
+            'name': 'rest_url',
+            'default': 'https://api.statuspage.io',
+            'desc': 'endpoint of target statuspage',
+            'runtime': True,
+        },
+        # smtp (only vaild when automation_mode is 'email')
         {
             'name': 'smtp_host',
             'desc': 'SMTP server',
@@ -87,6 +116,8 @@ class AtlassianStatuspage(MgrModule):
         self.run = True
         self.event = Event()
 
+        self.mgr_keyring = self.get_ceph_option('mgr_data') + "/keyring"
+
         # ensure config options members are initialized; see config_notify()
         self.config_notify()
 
@@ -112,6 +143,20 @@ class AtlassianStatuspage(MgrModule):
                     self.get_ceph_option(opt))
             self.log.debug(' native option %s = %s', opt, getattr(self, opt))
 
+        comp_name = self.component_id
+        if self.automation_mode == 'rest':
+            response = requests.get(
+                self.rest_url + "/v1/pages/%s/components/%s" % (self.page_id, self.component_id),
+                headers= { 'Authorization':"'OAuth %s" % self.rest_token }
+            )
+            if response.status_code == 200:
+                try: response_json = json.loads(response.text.encode('utf8'))
+                except Exception as e: response_json = {}
+
+                if 'name' in response_json: comp_name = response_json['name']
+
+        self.incident_name = '[mgr integration] status report(%s)' % comp_name
+
         if self.interval < 10: self.interval = 10
 
 
@@ -124,6 +169,26 @@ class AtlassianStatuspage(MgrModule):
             retval=ret,   # exit code
             stdout=out,   # stdout
             stderr=err)
+
+    def _health_check_msg(self, code, summary, detail='', severity='warning'):
+        hc_code = code.upper()
+        if hc_code == "": hc_code = "UNKNOWN"
+        if not hc_code.startswith("ATLASSIAN_STATUSPAGE"): hc_code = "ATLASSIAN_STATUSPAGE_" + hc_code
+
+        hc_summary = summary
+        if hc_summary == "": hc_summary = "empty_summary"
+
+        hc_detail = detail
+        if hc_detail == "": hc_detail = hc_summary
+
+        return {
+            hc_code: {
+                'severity': severity,
+                'summary' : "[Module 'atlassian_statuspage'] " + summary,
+                'detail'  : [ hc_detail ],
+                'count'   : 1,
+            }
+        }
 
     def _diff(self, last, new):
         d = {}
@@ -154,8 +219,131 @@ class AtlassianStatuspage(MgrModule):
             msg += '        {}\n'.format(detail['message'])
         return msg
 
-    def _send_msg_to_atlassian_statuspage(self, status, diff):
-        self.log.debug('_send_msg_to_atlassian_statuspage')
+    def _msg_format_contents(self, status, diff):
+        msg = ""
+
+        if 'new' in diff:
+            msg += ('\n--- New ---\n')
+            for code, stat in diff['new'].items():
+                msg += self._msg_format_stat(code, stat)
+        if 'updated' in diff:
+            msg += ('\n--- Updated ---\n')
+            for code, stat in diff['updated'].items():
+                msg += self._msg_format_stat(code, stat)
+        if 'cleared' in diff:
+            msg += ('\n--- Cleared ---\n')
+            for code, stat in diff['cleared'].items():
+                msg += self._msg_format_stat(code, stat)
+
+        msg += ('\n\n=== Full health status ===\n')
+        for code, stat in status['checks'].items():
+            msg += self._msg_format_stat(code, stat)
+
+        return msg
+
+    def _send_msg_to_atlassian_statuspage_through_rest(self, status, diff):
+        self.log.debug('_send_msg_to_atlassian_statuspage_through_rest')
+
+        if not re.match("^\w{12}$", self.component_id):
+            return self._health_check_msg(
+                'CONFIG_INVALID',
+                "The 'component_id' have invalid value.",
+                "The 'component_id' config is invaild: %s. It must be '^\w{12}$' form" % self.component_id)
+
+        if self.rest_url == '':
+            return self._health_check_msg(
+                'CONFIG_INVALID',
+                "The 'rest_url' have invalid value.",
+                "The 'rest_url' config is empty")
+
+        if self.rest_token == "":
+            return self._health_check_msg(
+                'CONFIG_INVALID',
+                "The 'rest_token' have invalid value.",
+                "The 'rest_token' config is empty")
+
+        headers = {'Authorization':"'OAuth %s" % self.rest_token}
+
+        search_response = requests.get(
+            self.rest_url + "/v1/pages/%s/incidents/unresolved" % (self.page_id),
+            headers = headers,
+        )
+        search_response_text = search_response.text.encode('utf8')
+        if 400 <= search_response.status_code < 600:
+            return self._health_check_msg(
+                'REST_ERROR',
+                'unable to send status info to statuspage component',
+                "%s (status code %d)" % (search_response_text, search_response.status_code))
+
+        try:
+            search_response_json = json.loads(search_response_text)
+        except Exception as e:
+            return self._health_check_msg(
+                'DISORDER',
+                "The json loading failure occur!",
+                "The json loading failure occur when parsing search response")
+
+        incident_id = ''
+        for each_incident in search_response_json:
+            if self.incident_name not in each_incident['name']: continue
+
+            incident_id = each_incident['id']
+            self.log.debug("The existing incident found: (%s) -> %s" % (incident_id, json.dumps(each_incident)))
+            break
+
+
+        cluster_status = status['status']
+        comp_status = "UNKNOWN"
+        if   cluster_status == "HEALTH_OK"   : comp_status = "operational"
+        elif cluster_status == "HEALTH_WARN" : comp_status = "degraded_performance"
+        elif cluster_status == "HEALTH_ERR"  : comp_status = "partial_outage"
+        elif cluster_status == "HEALTH_DOWN" : comp_status = "major_outage"
+
+        if comp_status == "UNKNOWN":
+            return self._health_check_msg(
+                'DISORDER',
+                "The status is unknown!",
+                "The status is unknown (ceph_status: %s, comp_status: %s)" % (cluster_status, comp_status))
+
+        incident_status = "investigating"
+        if comp_status == "operational" : incident_status = "resolved"
+
+        data = {
+            'incident': {
+                'components': { self.component_id: comp_status },
+                'component_ids': [ self.component_id ],
+                'status': incident_status,
+                'body': self._msg_format_contents(status, diff),
+            }
+        }
+
+        if incident_id == '':
+            request_url = self.rest_url + "/v1/pages/%s/incidents" % (self.page_id)
+            data['incident']['name'] = self.incident_name + " " + datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            response = requests.post(request_url, headers=headers, json=data)
+        else:
+            request_url = self.rest_url + "/v1/pages/%s/incidents/%s" % (self.page_id, incident_id)
+            response = requests.put(request_url, headers=headers, json=data)
+
+        self.log.debug("request url is '%s'" % request_url)
+        self.log.debug("response of rest: [%d] %s" % (response.status_code, response.text.encode('utf8')))
+
+        if 400 <= response.status_code < 600:
+            return self._health_check_msg(
+                'REST_ERROR',
+                'unable to send status info to statuspage component',
+                "%s (status code %d)" % (response.text.encode('utf8'), response.status_code))
+
+        return None
+
+    def _send_msg_to_atlassian_statuspage_through_email(self, status, diff):
+        self.log.debug('_send_msg_to_atlassian_statuspage_through_email')
+
+        if not re.match("^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}$", self.component_id):
+            return self._health_check_msg(
+                'CONFIG_INVALID',
+                "The 'component_id' have invalid value.",
+                "The 'component_id' config is invaild: %s. It must be '^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}$' form" % self.component_id)
 
         cluster_status = status['status']
         subject = cluster_status
@@ -187,22 +375,7 @@ class AtlassianStatuspage(MgrModule):
                        status=cluster_status,
                        target=comp_destination))
 
-        if 'new' in diff:
-            message += ('\n--- New ---\n')
-            for code, stat in diff['new'].items():
-                message += self._msg_format_stat(code, stat)
-        if 'updated' in diff:
-            message += ('\n--- Updated ---\n')
-            for code, stat in diff['updated'].items():
-                message += self._msg_format_stat(code, stat)
-        if 'cleared' in diff:
-            message += ('\n--- Cleared ---\n')
-            for code, stat in diff['cleared'].items():
-                message += self._msg_format_stat(code, stat)
-
-        message += ('\n\n=== Full health status ===\n')
-        for code, stat in status['checks'].items():
-            message += self._msg_format_stat(code, stat)
+        message += self._msg_format_contents(status, diff)
 
         self.log.debug('message: %s' % message)
 
@@ -216,26 +389,37 @@ class AtlassianStatuspage(MgrModule):
                 server.login(self.smtp_user, self.smtp_password)
             server.sendmail(self.smtp_sender, comp_destination, message)
         except Exception as e:
-            return {
-                'ATLASSIAN_STATUSPAGE_SMTP_ERROR': {
-                    'severity': 'warning',
-                    'summary': 'unable to send status info to statuspage component',
-                    'count': 1,
-                    'detail': [ str(e) ]
-                }
-            }
+            return self._health_check_msg('SMTP_ERROR', 'unable to send status info to statuspage component', str(e))
+
         self.log.debug('Sent email to %s' % comp_destination)
+
         return None
+
+    def _send_msg_to_atlassian_statuspage(self, status, diff):
+        if self.component_id == '':
+            return self._health_check_msg(
+                'CONFIG_INVALID',
+                "The 'component_id' have invalid value.",
+                "The 'component_id' config is empty")
+
+        if self.automation_mode == 'email':
+            return self._send_msg_to_atlassian_statuspage_through_email(status, diff)
+        elif self.automation_mode == 'rest':
+            return self._send_msg_to_atlassian_statuspage_through_rest(status, diff)
+        else:
+            return self._health_check_msg(
+                'CONFIG_INVALID',
+                "The 'automation_mode' have invalid value.",
+                "The 'automation_mode' config is invaild: %s" % self.automation_mode)
 
     def _send_msg(self, status, diff):
         checks = {}
         is_send_success = True
-        if self.component_id:
-            r = self._send_msg_to_atlassian_statuspage(status, diff)
-            if r:
-                is_send_success = False
-                for code, alert in r.items():
-                    checks[code] = alert
+        r = self._send_msg_to_atlassian_statuspage(status, diff)
+        if r:
+            is_send_success = False
+            for code, alert in r.items():
+                checks[code] = alert
         self.set_health_checks(checks)
         return is_send_success
 
@@ -244,7 +428,7 @@ class AtlassianStatuspage(MgrModule):
         if timeout_sec < 5: timeout_sec = 5
         elif timeout_sec > 15: timeout_sec = 15
 
-        cmd = ['timeout', str(timeout_sec), 'ceph', '--name', "mgr.%s" % self.get_mgr_id(),'status']
+        cmd = ['timeout', str(timeout_sec), 'ceph', '--name', "mgr.%s" % self.get_mgr_id(), '--keyring', self.mgr_keyring, 'status']
         checker = subprocess.Popen(cmd)
         checker.communicate()
 
@@ -256,7 +440,17 @@ class AtlassianStatuspage(MgrModule):
         used for any background activity.
         """
         self.log.info("Starting")
-        last_status = {}
+        last_status = {
+            'status': 'HEALTH_UKNOWN',
+            'checks': {
+                'MANAGER_NEWLY_ACTIVATE': {
+                    'detail': [ { 'message': 'New mgr(%s) have been activated!' % self.get_mgr_id() } ],
+                    'severity': 'HEALTH_UNKNOWN',
+                    'summary': { 'message': 'New mgr have been activated!' }
+                }
+            }
+        }
+
         while self.run:
             # Do some useful background work here.
             if self._is_ceph_conn_live():
