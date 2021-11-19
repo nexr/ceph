@@ -1123,6 +1123,8 @@ public:
   int get_data_cb(bufferlist& bl, off_t bl_ofs, off_t bl_len);
   int get_data(const off_t fst, const off_t lst, bufferlist& bl);
 
+  string get_etag() { return etag; }
+
   virtual int get_params() = 0;
   virtual int get_data(bufferlist& bl) = 0;
   void send_response() override = 0;
@@ -1179,6 +1181,9 @@ public:
   }
   virtual int get_params() = 0;
   virtual int get_data(ceph::bufferlist& bl, bool& again) = 0;
+
+  string get_etag() { return etag; }
+
   void send_response() override = 0;
   const char* name() const override { return "post_obj"; }
   RGWOpType get_type() override { return RGW_OP_POST_OBJ; }
@@ -1408,6 +1413,9 @@ public:
 
   virtual int init_dest_policy() { return 0; }
   virtual int get_params() = 0;
+
+  string get_etag() { return etag; }
+
   virtual void send_partial_response(off_t ofs) {}
   void send_response() override = 0;
   const char* name() const override { return "copy_obj"; }
@@ -1664,6 +1672,9 @@ protected:
   string version_id;
   bufferlist data;
 
+  long     total_size;
+  uint64_t total_accounted_size;
+
   struct MPSerializer {
     librados::IoCtx ioctx;
     rados::cls::lock::Lock lock;
@@ -1695,6 +1706,13 @@ public:
   void complete() override;
 
   virtual int get_params() = 0;
+
+  string get_etag() { return etag; }
+  bufferlist get_data() { return data; }
+  long get_total_size(bool accounted = true) {
+    return (accounted) ? total_accounted_size : total_size;
+  }
+
   void send_response() override = 0;
   const char* name() const override { return "complete_multipart"; }
   RGWOpType get_type() override { return RGW_OP_COMPLETE_MULTIPART; }
@@ -1853,6 +1871,9 @@ public:
   void execute() override;
 
   virtual int get_params() = 0;
+
+  bufferlist get_data() { return data; }
+
   virtual void send_status() = 0;
   virtual void begin_response() = 0;
   virtual void send_partial_response(rgw_obj_key& key, bool delete_marker,

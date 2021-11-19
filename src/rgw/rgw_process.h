@@ -12,6 +12,8 @@
 #include "rgw_op.h"
 #include "rgw_rest.h"
 
+#include "rgw_lineage.h"
+
 #include "include/ceph_assert.h"
 
 #include "common/WorkQueue.h"
@@ -131,6 +133,9 @@ public:
 
 class RGWFCGXProcess : public RGWProcess {
   int max_connections;
+
+  std::unique_ptr<RGWLineageManager> rgw_lineage_man;
+
 public:
 
   /* have a bit more connections than threads so that requests are
@@ -141,6 +146,10 @@ public:
                  RGWFrontendConfig* const conf)
     : RGWProcess(cct, pe, num_threads, conf),
       max_connections(num_threads + (num_threads >> 3)) {
+    
+    if (cct->_conf->rgw_lineage_enable) {
+      rgw_lineage_man.reset(new RGWLineageManager(cct));
+    }
   }
 
   void run() override;
@@ -182,6 +191,7 @@ extern int process_request(RGWRados* store,
                            OpsLogSocket* olog,
                            optional_yield y,
                            rgw::dmclock::Scheduler *scheduler,
+                           RGWLineageManager* rgw_lm = nullptr,
                            int* http_ret = nullptr);
 
 extern int rgw_process_authenticated(RGWHandler_REST* handler,

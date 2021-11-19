@@ -246,6 +246,17 @@ if(WITH_RADOSGW_BEAST_FRONTEND)
     rgw_dmclock_async_scheduler.cc)
 endif()
 
+list(APPEND radosgw_srcs rgw_lineage_interfaces.cc
+  rgw_lineage.cc
+  rgw_lineage_atlas.cc
+  rgw_lineage_atlas_rest.cc
+  rgw_lineage_atlas_kafka.cc)
+
+install(DIRECTORY
+  lineage_defs
+  DESTINATION ${CEPH_INSTALL_DATADIR}/rgw
+  REGEX "\\..+\\.sw*" EXCLUDE)
+
 add_library(radosgw_a STATIC ${radosgw_srcs}
   $<TARGET_OBJECTS:civetweb_common_objs>)
 target_link_libraries(radosgw_a PRIVATE ${rgw_libs})

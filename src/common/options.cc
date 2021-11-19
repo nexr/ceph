@@ -7188,6 +7188,87 @@ std::vector<Option> get_rgw_options() {
     .add_see_also("rgw_dmclock_metadata_res")
     .add_see_also("rgw_dmclock_metadata_wgt"),
 
+    Option("rgw_lineage_enable", Option::TYPE_BOOL, Option::LEVEL_DEV)
+    .set_default(false)
+    .set_description("Enable lineage integration")
+    .set_flag(Option::FLAG_STARTUP)
+    .add_see_also("rgw_lineage_backend"),
+
+    Option("rgw_lineage_manager_interval", Option::TYPE_INT, Option::LEVEL_DEV)
+    .set_default(3)
+    .set_description("Interval for lineage manager to fetch lineage request")
+    .set_flag(Option::FLAG_STARTUP),
+
+    Option("rgw_lineage_manager_retries", Option::TYPE_INT, Option::LEVEL_DEV)
+    .set_default(5)
+    .set_description("The number of retries for failed lineage request")
+    .set_flag(Option::FLAG_STARTUP),
+
+    Option("rgw_lineage_init_definition", Option::TYPE_BOOL, Option::LEVEL_DEV)
+    .set_default(true)
+    .set_description("Enable init_definition step")
+    .set_flag(Option::FLAG_STARTUP),
+
+    Option("rgw_lineage_record_getobj", Option::TYPE_BOOL, Option::LEVEL_DEV)
+    .set_default(false)
+    .set_description("Enable GET_OBJ recoding to atlas")
+    .set_flag(Option::FLAG_STARTUP),
+
+    Option("rgw_lineage_record_external_in", Option::TYPE_BOOL, Option::LEVEL_DEV)
+    .set_default(true)
+    .set_description("Enable external_in recoding to atlas")
+    .set_flag(Option::FLAG_STARTUP),
+
+    Option("rgw_lineage_record_external_out", Option::TYPE_BOOL, Option::LEVEL_DEV)
+    .set_default(false)
+    .set_description("Enable external_out recoding to atlas")
+    .set_flag(Option::FLAG_STARTUP),
+
+    Option("rgw_lineage_backend", Option::TYPE_STR, Option::LEVEL_DEV)
+    .set_default("atlas")
+    .set_description("Type of backend lineage system")
+    .set_long_description("Type of backend linenage system. Supported type: atlas")
+    .set_flag(Option::FLAG_STARTUP),
+
+    Option("rgw_lineage_atlas_mode", Option::TYPE_STR, Option::LEVEL_DEV)
+    .set_default("rest")
+    .set_description("Atlas connect method")
+    .set_long_description("Method to connect backend atlas. Supported type: rest, kafka(not_impl)")
+    .set_flag(Option::FLAG_STARTUP),
+
+    Option("rgw_lineage_atlas_rest_url", Option::TYPE_STR, Option::LEVEL_DEV)
+    .set_default("")
+    .set_description("Atlas url address")
+    .set_long_description("The atlas url address with protocol and port. ex) http[s]://x.x.x.x:yy")
+    .set_flag(Option::FLAG_RUNTIME),
+
+    Option("rgw_lineage_atlas_rest_url_prefix", Option::TYPE_STR, Option::LEVEL_DEV)
+    .set_default("api/atlas")
+    .set_description("Atlas url prefix")
+    .set_long_description("The atlas url prefix. ex) api/atlas")
+    .set_flag(Option::FLAG_RUNTIME),
+
+    Option("rgw_lineage_atlas_rest_version", Option::TYPE_STR, Option::LEVEL_DEV)
+    .set_default("v2")
+    .set_description("Atlas rest api version")
+    .set_long_description("The atlas api version. ex) v2")
+    .set_flag(Option::FLAG_RUNTIME),
+
+    Option("rgw_lineage_atlas_rest_admin_user", Option::TYPE_STR, Option::LEVEL_DEV)
+    .set_default("admin")
+    .set_description("Atlas admin user")
+    .set_flag(Option::FLAG_RUNTIME),
+
+    Option("rgw_lineage_atlas_rest_admin_password", Option::TYPE_STR, Option::LEVEL_DEV)
+    .set_default("")
+    .set_description("Atlas admin password")
+    .set_flag(Option::FLAG_RUNTIME),
+
+    Option("rgw_lineage_atlas_rest_admin_password_path", Option::TYPE_STR, Option::LEVEL_DEV)
+    .set_default("")
+    .set_description("Path to a file containing the Atlas admin password.")
+    .set_flag(Option::FLAG_RUNTIME),
+
   });
 }
 

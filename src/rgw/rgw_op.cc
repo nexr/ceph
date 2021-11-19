@@ -6027,6 +6027,8 @@ void RGWCompleteMultipart::execute()
            "-%lld", (long long)parts->parts.size());
   etag = final_etag_str;
   ldpp_dout(this, 10) << "calculated etag: " << final_etag_str << dendl;
+  total_size = ofs;
+  total_accounted_size = accounted_size;
 
   etag_bl.append(final_etag_str, strlen(final_etag_str));
 

@@ -1575,3 +1575,28 @@ OPTION(rgw_sts_token_introspection_url, OPT_STR)  // url for introspecting web t
 OPTION(rgw_sts_client_id, OPT_STR) // Client Id
 OPTION(rgw_sts_client_secret, OPT_STR) // Client Secret
 OPTION(debug_allow_any_pool_priority, OPT_BOOL)
+
+OPTION(rgw_lineage_enable, OPT_BOOL) // Enable lineage integration
+
+OPTION(rgw_lineage_manager_interval, OPT_INT) // Interval for lineage manager to fetch lineage request
+OPTION(rgw_lineage_manager_retries, OPT_INT) // The number of retries for failed lineage request
+
+OPTION(rgw_lineage_init_definition, OPT_BOOL) // Enable init_definition step
+
+OPTION(rgw_lineage_record_getobj, OPT_BOOL) // Enable GET_OBJ recoding to atlas
+OPTION(rgw_lineage_record_external_in, OPT_BOOL) // Enable external_in recoding to atlas
+OPTION(rgw_lineage_record_external_out, OPT_BOOL) // Enable external_out recoding to atlas
+
+OPTION(rgw_lineage_backend, OPT_STR) // Type of backend lineage system
+
+OPTION(rgw_lineage_atlas_mode, OPT_STR) // Atlas connect method
+
+OPTION(rgw_lineage_atlas_rest_version, OPT_STR) // Atlas url api version
+
+OPTION(rgw_lineage_atlas_rest_url, OPT_STR) // Atlas url address
+OPTION(rgw_lineage_atlas_rest_url_prefix, OPT_STR) // rgw_lineage_atlas_url_prefix
+
+OPTION(rgw_lineage_atlas_rest_admin_user, OPT_STR) // Atlas admin user
+OPTION(rgw_lineage_atlas_rest_admin_password, OPT_STR) // Atlas admin password
+OPTION(rgw_lineage_atlas_rest_admin_password_path, OPT_STR) // Path to a file containing the Atlas admin password
+

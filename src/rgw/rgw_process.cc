@@ -175,6 +175,7 @@ int process_request(RGWRados* const store,
                     OpsLogSocket* const olog,
                     optional_yield yield,
 		    rgw::dmclock::Scheduler *scheduler,
+                    RGWLineageManager* rgw_lm,
                     int* http_ret)
 {
   int ret = client_io->init(g_ceph_context);
@@ -285,6 +286,10 @@ int process_request(RGWRados* const store,
     abort_early(s, op, -ERR_INVALID_SECRET_KEY, handler);
   }
 
+  if (rgw_lm != nullptr) {
+    rgw_lm->enqueue(s, op);
+  }
+
 done:
   try {
     client_io->complete_request();
@@ -321,3 +326,4 @@ done:
 
   return (ret < 0 ? ret : s->err.ret);
 } /* process_request */
+
