@@ -44,6 +44,9 @@ RGWCivetWebFrontend::RGWCivetWebFrontend(RGWProcessEnv& env,
 					   dmc::AtLimit::Reject));
   }
 
+  if (cct()->_conf->rgw_lineage_enable) {
+    rgw_lineage_man.reset(new RGWLineageManager(cct()));
+  }
 }
 
 static int civetweb_callback(struct mg_connection* conn)
@@ -70,7 +73,7 @@ int RGWCivetWebFrontend::process(struct mg_connection*  const conn)
   //assert (scheduler != nullptr);
   int ret = process_request(env.store, env.rest, &req, env.uri_prefix,
                             *env.auth_registry, &client_io, env.olog,
-                            null_yield, scheduler.get() ,&http_ret);
+                            null_yield, scheduler.get(), rgw_lineage_man.get(), &http_ret);
   if (ret < 0) {
     /* We don't really care about return code. */
     dout(20) << "process_request() returned " << ret << dendl;
@@ -119,6 +122,10 @@ int RGWCivetWebFrontend::run()
   std::string uid_string = g_ceph_context->get_set_uid_string();
   if (! uid_string.empty()) {
     conf_map.emplace("run_as_user", std::move(uid_string));
+  }
+
+  if (rgw_lineage_man != nullptr) {
+    rgw_lineage_man->start();
   }
 
   /* Prepare options for CivetWeb. */

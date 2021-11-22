@@ -105,6 +105,8 @@ class RGWCivetWebFrontend : public RGWFrontend {
   std::unique_ptr<rgw::dmclock::SyncScheduler> scheduler;
   std::unique_ptr<rgw::dmclock::ClientConfig> client_config;
 
+  std::unique_ptr<RGWLineageManager> rgw_lineage_man;
+
   void set_conf_default(std::multimap<std::string, std::string>& m,
                         const std::string& key,
 			const std::string& def_val) {
@@ -128,6 +130,10 @@ public:
   int process(struct mg_connection* conn);
 
   void stop() override {
+    if (rgw_lineage_man != nullptr) {
+      rgw_lineage_man->stop();
+    }
+
     if (ctx) {
       mg_stop(ctx);
     }
