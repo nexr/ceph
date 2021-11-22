@@ -178,6 +178,17 @@ set(rgw_a_srcs
   rgw_sts.cc
   rgw_rest_sts.cc)
 
+list(APPEND rgw_a_srcs rgw_lineage_interfaces.h
+  rgw_lineage.cc
+  rgw_lineage_atlas.cc
+  rgw_lineage_atlas_rest.cc
+  rgw_lineage_atlas_kafka.cc)
+
+install(DIRECTORY
+  lineage_defs
+  DESTINATION ${CEPH_INSTALL_DATADIR}/rgw
+  REGEX "\\..+\\.sw*" EXCLUDE)
+
 gperf_generate(${CMAKE_SOURCE_DIR}/src/rgw/rgw_iam_policy_keywords.gperf
   rgw_iam_policy_keywords.frag.cc)
 set_source_files_properties(rgw_iam_policy.cc PROPERTIES
@@ -245,17 +256,6 @@ if(WITH_RADOSGW_BEAST_FRONTEND)
     rgw_asio_frontend.cc
     rgw_dmclock_async_scheduler.cc)
 endif()
-
-list(APPEND radosgw_srcs rgw_lineage_interfaces.cc
-  rgw_lineage.cc
-  rgw_lineage_atlas.cc
-  rgw_lineage_atlas_rest.cc
-  rgw_lineage_atlas_kafka.cc)
-
-install(DIRECTORY
-  lineage_defs
-  DESTINATION ${CEPH_INSTALL_DATADIR}/rgw
-  REGEX "\\..+\\.sw*" EXCLUDE)
 
 add_library(radosgw_a STATIC ${radosgw_srcs}
   $<TARGET_OBJECTS:civetweb_common_objs>)
