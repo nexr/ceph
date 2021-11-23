@@ -14,7 +14,7 @@ How it works
            | Ceph Object Gateway |
            |   +-----------------+  data flow info  +---------------------+
            |   | Lineage Manager +----------------->+ Lineage MGMT System |
-           +---------------------+                  +---------------------+
+           +---+-----------------+                  +---------------------+
 
 The Ceph Object Gateway record request process information in particular data structures.
 The Lineage Manager read the data structures, and send data flow to the backend lineage management system.
