@@ -95,6 +95,8 @@ The following parameters in the Ceph configuration file are related to the apach
 - ``rgw_lineage_atlas_rest_admin_password``: Atlas admin password. The password take the form of plane text. 
 - ``rgw_lineage_atlas_rest_admin_password_path``: Path to a file containing the Atlas admin password.
 
+.. note:: If ``rgw_lineage_atlas_rest_admin_password`` and ``rgw_lineage_atlas_rest_admin_password_path`` were both set up, ``rgw_lineage_atlas_rest_admin_password_path`` overrides ``rgw_lineage_atlas_rest_admin_password``.
+
 
 Apache atlas config example
 ---------------------------
