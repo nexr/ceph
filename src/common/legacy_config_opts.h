@@ -1583,9 +1583,9 @@ OPTION(rgw_lineage_manager_retries, OPT_INT) // The number of retries for failed
 
 OPTION(rgw_lineage_init_definition, OPT_BOOL) // Enable init_definition step
 
-OPTION(rgw_lineage_record_getobj, OPT_BOOL) // Enable GET_OBJ recoding to atlas
-OPTION(rgw_lineage_record_external_in, OPT_BOOL) // Enable external_in recoding to atlas
-OPTION(rgw_lineage_record_external_out, OPT_BOOL) // Enable external_out recoding to atlas
+OPTION(rgw_lineage_record_getobj, OPT_BOOL) // Enable GET_OBJ recoding to the lineage management system
+OPTION(rgw_lineage_record_external_in, OPT_BOOL) // Enable external_in recoding to the lineage management system
+OPTION(rgw_lineage_record_external_out, OPT_BOOL) // Enable external_out recoding to the lineage management system
 
 OPTION(rgw_lineage_backend, OPT_STR) // Type of backend lineage system
 
