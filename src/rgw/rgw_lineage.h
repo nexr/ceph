@@ -2,10 +2,17 @@
 #include "common/Thread.h"
 
 class RGWLineageManager: public Thread {
+public:
+  enum BackendType {
+    LINEAGE_BACKEND_TYPE_ATLAS = 0,
+  };
+
 private:
   CephContext* const cct;
   RGWLineage* rgw_lineage;
   queue<lineage_req> lr_queue;
+
+  BackendType backend_type;
 
   string thread_name = "rgw_lineage_man";
   bool down_flag = false;
@@ -28,6 +35,8 @@ public:
   RGWLineageManager(CephContext* const _cct);
 
   ~RGWLineageManager();
+
+  BackendType get_backend_type() { return backend_type; }
 
   void enqueue(req_state* rs, RGWOp * op = NULL);
 

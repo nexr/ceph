@@ -7,7 +7,8 @@ RGWLineageManager::RGWLineageManager(CephContext* const _cct): cct(_cct)
   string backend_type = cct->_conf->rgw_lineage_backend;
 
   if (backend_type.compare("atlas") == 0) {
-    rgw_lineage = new RGWLineageAtlas(cct);
+    rgw_lineage  = new RGWLineageAtlas(cct);
+    backend_type = RGWLineage::BackendType::LINEAGE_BACKEND_TYPE_ATLAS;
   }
   else {
     rgw_lineage = nullptr;
@@ -267,8 +268,6 @@ void * RGWLineageManager::entry()
         ret = 200;
     }
 
-    need_wait = false;
-
     if (ret != 200 && tries < retries) {
       dout(20) << __func__ << "(): Failed to handle " << lr->op_type_str
                            << " (ret: " << ret << ")"
@@ -279,6 +278,8 @@ void * RGWLineageManager::entry()
       tries++;
       continue;
     }
+
+    need_wait = false;
 
     tries = 0;
     lr_queue.pop();
