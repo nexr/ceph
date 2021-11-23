@@ -4,10 +4,17 @@ Lineage Integration
 
 .. versionadded:: Apex (nes)
 
-You can record the Ceph Object Gateway data flows to lineage management system (e.g. atlas).
+You can record the Ceph Object Gateway data flows to lineage management system (e.g. apache atlas).
 
 How it works
 ============
+
+.. ditaa::
+           +---------------------+
+           | Ceph Object Gateway |
+           |   +-----------------+  data flow info  +---------------------+
+           |   | Lineage Manager +----------------->+ Lineage MGMT System |
+           +---------------------+                  +---------------------+
 
 The Ceph Object Gateway record request process information in particular data structures.
 The Lineage Manager read the data structures, and send data flow to the backend lineage management system.
@@ -15,7 +22,7 @@ In the lineage management system, we can see the data flow with graphical image 
 
 You can use the apache atlas as backend lineage management system.
 Currently, Lineage Manager support only apache atlas.
-The kind of backend lineage management system is expanded some day.
+The kind of backend lineage management system would be expanded some day.
 
 There are two mothod to connect to apache atlas: "rest API" and "kafka".
 But, "kafka" method is not implemented now.
@@ -37,12 +44,14 @@ Apache Atlas define custom model like this.
 
 ::
 
+  // Copy custom definition file to backend apache atlas.
   [user@ceph-rgw]# scp -r /usr/share/ceph/rgw/lineage_defs/atlas/models ${atlas_host}:${atlas_server_dir}
 
+  // Resart the apache atlas server.
   [user@atlas]# su atlas -c ${atlas_server_dir}/bin/atlas_stop.py 
   [user@atlas]# su atlas -c ${atlas_server_dir}/bin/atlas_start.py 
 
-.. note:: custom model define step can be replaced with "rgw_lineage_init_definition" configuration.
+.. note:: Custom model definition step can be replaced with "rgw_lineage_init_definition" configuration.
 
 Configuring the Ceph Object Gateway to use Lineage Integration
 ==============================================================
@@ -54,7 +63,7 @@ The following parameters in the Ceph configuration file are related to the Linea
 - ``rgw_lineage_manager_retries``: The number of retries for failed lineage request. The default value is 5 tries.
 - ``rgw_lineage_init_definition``: Enable init_definition step. The default value is "false".
   If true, define custom model to backend lineage management system automatically.
-  It alternates :ref:`the "custom model define" step<Define Ceph Object Gateway customed models>`.
+  It alternates the "Define Ceph Object Gateway customed models" step.
 - ``rgw_lineage_record_getobj``: Enable GET_OBJ recoding to the backend system. The default value is "false".
 - ``rgw_lineage_record_external_in``: Enable external_in recoding to the backend system. The default value is "true".
 - ``rgw_lineage_record_external_out``: Enable external_out recoding to the backend system. The default value is "false".
@@ -85,7 +94,6 @@ The following parameters in the Ceph configuration file are related to the apach
 - ``rgw_lineage_atlas_rest_admin_user``: Atlas admin user.
 - ``rgw_lineage_atlas_rest_admin_password``: Atlas admin password. The password take the form of plane text. 
 - ``rgw_lineage_atlas_rest_admin_password_path``: Path to a file containing the Atlas admin password.
-  The file contents take the form of plane text.
 
 
 Apache atlas config example
