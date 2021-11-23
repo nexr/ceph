@@ -47,7 +47,7 @@ Apache Atlas define custom model like this.
   // Copy custom definition file to backend apache atlas.
   [user@ceph-rgw]# scp -r /usr/share/ceph/rgw/lineage_defs/atlas/models ${atlas_host}:${atlas_server_dir}
 
-  // Resart the apache atlas server.
+  // Restart the apache atlas server.
   [user@atlas]# su atlas -c ${atlas_server_dir}/bin/atlas_stop.py 
   [user@atlas]# su atlas -c ${atlas_server_dir}/bin/atlas_start.py 
 
