@@ -8,7 +8,7 @@ RGWLineageManager::RGWLineageManager(CephContext* const _cct): cct(_cct)
 
   if (backend_type.compare("atlas") == 0) {
     rgw_lineage  = new RGWLineageAtlas(cct);
-    backend_type = RGWLineage::BackendType::LINEAGE_BACKEND_TYPE_ATLAS;
+    backend_type = RGWLineageManager::BackendType::LINEAGE_BACKEND_TYPE_ATLAS;
   }
   else {
     rgw_lineage = nullptr;
