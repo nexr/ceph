@@ -48,6 +48,9 @@ typedef struct {
 
 class RGWLineage
 {
+protected:
+  CephContext* cct;
+
 public:
   virtual ~RGWLineage(){};
 

@@ -11,7 +11,6 @@ public:
 private:
   RGWLineageAtlasImpl * impl;
   ImplType impl_type;
-  CephContext* cct;
 
 public:
   RGWLineageAtlas(CephContext* const _cct);
