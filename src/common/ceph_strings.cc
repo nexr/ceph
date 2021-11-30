@@ -73,6 +73,8 @@ const char *ceph_osd_state_name(int s)
 const char *ceph_release_name(int r)
 {
 	switch (r) {
+	case CEPH_RELEASE_APEX:
+		return "apex";
 	case CEPH_RELEASE_ARGONAUT:
 		return "argonaut";
 	case CEPH_RELEASE_BOBTAIL:
@@ -112,6 +114,9 @@ int ceph_release_from_name(const char *s)
 {
 	if (!s) {
 		return -1;
+	}
+	if (strcmp(s, "apex") == 0) {
+		return CEPH_RELEASE_APEX;
 	}
 	if (strcmp(s, "nautilus") == 0) {
 		return CEPH_RELEASE_NAUTILUS;
