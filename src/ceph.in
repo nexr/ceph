@@ -910,7 +910,7 @@ def main():
     parser, parsed_args, childargs = parse_cmdargs()
 
     if parsed_args.version:
-        print('ne-storage version {0} ({1}) {2} ({3})'.format(
+        print('ceph version {0} ({1}) {2} ({3})'.format(
             CEPH_GIT_NICE_VER,
             CEPH_GIT_VER,
             CEPH_RELEASE_NAME,
