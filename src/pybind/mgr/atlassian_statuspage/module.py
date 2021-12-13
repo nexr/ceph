@@ -328,10 +328,9 @@ class AtlassianStatuspage(MgrModule):
         self.log.debug("request url is '%s'" % request_url)
         self.log.debug("response of rest: [%d] %s" % (response.status_code, response.text.encode('utf8')))
 
-        if response.status_code == 422: # Too many incident updates
+        if incident_id != '' and response.status_code == 422: # Too many incident updates
             data['incident']['status'] = "resolved"
             data['incident'][ 'body' ] = "Too many updates in incident. Relsolve this incident and continue in new incident."
-            request_url = self.rest_url + "/v1/pages/%s/incidents/%s" % (self.page_id, incident_id)
             response = requests.put(request_url, headers=headers, json=data)
             if 400 <= response.status_code < 600:
                 return self._health_check_msg(
