@@ -272,7 +272,7 @@ class AtlassianStatuspage(MgrModule):
         if 400 <= search_response.status_code < 600:
             return self._health_check_msg(
                 'REST_ERROR',
-                'unable to get unresolved component incidents from the statuspage',
+                'unable to get unresolved incidents from the statuspage',
                 "%s (status code %d)" % (search_response_text, search_response.status_code))
 
         try:
