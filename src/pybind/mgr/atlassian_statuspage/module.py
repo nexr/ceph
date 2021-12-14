@@ -272,7 +272,7 @@ class AtlassianStatuspage(MgrModule):
         if 400 <= search_response.status_code < 600:
             return self._health_check_msg(
                 'REST_ERROR',
-                'unable to send status info to statuspage component',
+                'unable to get unresolved incidents from the statuspage',
                 "%s (status code %d)" % (search_response_text, search_response.status_code))
 
         try:
@@ -328,7 +328,20 @@ class AtlassianStatuspage(MgrModule):
         self.log.debug("request url is '%s'" % request_url)
         self.log.debug("response of rest: [%d] %s" % (response.status_code, response.text.encode('utf8')))
 
-        if 400 <= response.status_code < 600:
+        if incident_id != '' \
+          and response.status_code == 422 \
+          and "Too many incident updates" in response.text.encode('utf8'):
+            data['incident']['status'] = "resolved"
+            data['incident'][ 'body' ] = "Too many updates in incident. Relsolve this incident and continue in new incident."
+            response = requests.put(request_url, headers=headers, json=data)
+            if 400 <= response.status_code < 600:
+                return self._health_check_msg(
+                    'REST_ERROR',
+                    'unable to resolve incident',
+                    "%s (status code %d)" % (response.text.encode('utf8'), response.status_code))
+            else:
+                return self._send_msg_to_atlassian_statuspage_through_rest(status, diff)
+        elif 400 <= response.status_code < 600:
             return self._health_check_msg(
                 'REST_ERROR',
                 'unable to send status info to statuspage component',
