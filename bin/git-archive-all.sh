@@ -221,7 +221,15 @@ else
     cp -rf $OLD_PWD $TMPDIR/$dir_prefix
 
     pushd $TMPDIR > /dev/null
-    $TARCMD --exclude="RPMS" --exclude=".*.sw*" --exclude="tags" --exclude="*.pyc" --exclude="*.pyo" -cf ./$OLD_PWD_BASE.$FORMAT $dir_prefix
+    $TARCMD \
+        --exclude="src/pybind/mgr/dashboard/frontend/node_modules" \
+        --exclude="RPMS"   \
+        --exclude=".*.sw*" \
+        --exclude="tags"   \
+        --exclude="*.pyc"  \
+        --exclude="*.pyo"  \
+        -cf ./$OLD_PWD_BASE.$FORMAT $dir_prefix
+
     popd > /dev/null
 
     if [ $(tar tf $TMPDIR/$OLD_PWD_BASE.$FORMAT |grep "$dir_prefix/.git/$" |wc -l) -gt 0 ]; then
