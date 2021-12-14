@@ -34,6 +34,13 @@ class AtlassianStatuspage(MgrModule):
             'runtime': True,
         },
         {
+            'name': 'include_detail',
+            'type': 'bool',
+            'default': False,
+            'desc': 'Whether message contents include detail or not',
+            'runtime': True,
+        },
+        {
             'name': 'page_id',
             'default': '',
             'desc': 'page ID of Atlassian statuspage. (used only rest mode)',
@@ -215,8 +222,11 @@ class AtlassianStatuspage(MgrModule):
             code=code,
             sev=stat['severity'].split('_')[1],
             summary=stat['summary']['message'])
-        for detail in stat['detail']:
-            msg += '        {}\n'.format(detail['message'])
+
+        if self.include_detail:
+            for detail in stat['detail']:
+                msg += '        {}\n'.format(detail['message'])
+
         return msg
 
     def _msg_format_contents(self, status, diff):
