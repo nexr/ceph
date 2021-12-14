@@ -166,7 +166,7 @@
       <!-- NFS -->
       <li routerLinkActive="active"
           class="tc_menuitem tc_menuitem_nfs"
-          *ngIf="permissions?.nfs?.read">
+          *ngIf="enabledFeature.nfs && permissions?.nfs?.read">
         <a i18n
            routerLink="/nfs">NFS</a>
       </li>

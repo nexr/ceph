@@ -15,6 +15,8 @@
 # Please submit bugfixes or comments via http://tracker.ceph.com/
 #
 
+%define _binaries_in_noarch_packages_terminate_build   0
+
 #################################################################################
 # conditional build section
 #
@@ -1589,6 +1591,7 @@ fi
 %{_bindir}/ceph-mgr
 %dir %{_datadir}/ceph/mgr
 %{_datadir}/ceph/mgr/alerts
+%{_datadir}/ceph/mgr/atlassian_statuspage
 %{_datadir}/ceph/mgr/ansible
 %{_datadir}/ceph/mgr/balancer
 %{_datadir}/ceph/mgr/crash
