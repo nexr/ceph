@@ -313,7 +313,7 @@ class AtlassianStatuspage(MgrModule):
                 'components': { self.component_id: comp_status },
                 'component_ids': [ self.component_id ],
                 'status': incident_status,
-                'body': self._msg_format_contents(status, diff),
+                'body': self._msg_format_contents(status, diff)[:24999], # body length limit is '25000'
             }
         }
 
