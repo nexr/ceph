@@ -308,12 +308,16 @@ class AtlassianStatuspage(MgrModule):
         incident_status = "investigating"
         if comp_status == "operational" : incident_status = "resolved"
 
+        data_body = self._msg_format_contents(status, diff)
+        if len(data_body) > 24999: # body length limit is '25000'
+            data_body = data_body[:24995] + " ..."
+
         data = {
             'incident': {
                 'components': { self.component_id: comp_status },
                 'component_ids': [ self.component_id ],
                 'status': incident_status,
-                'body': self._msg_format_contents(status, diff)[:24999], # body length limit is '25000'
+                'body': data_body,
             }
         }
 
