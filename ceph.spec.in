@@ -15,8 +15,6 @@
 # Please submit bugfixes or comments via http://tracker.ceph.com/
 #
 
-%define _binaries_in_noarch_packages_terminate_build   0
-
 #################################################################################
 # conditional build section
 #

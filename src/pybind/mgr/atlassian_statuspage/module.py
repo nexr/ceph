@@ -34,6 +34,13 @@ class AtlassianStatuspage(MgrModule):
             'runtime': True,
         },
         {
+            'name': 'include_detail',
+            'type': 'bool',
+            'default': False,
+            'desc': 'Whether message contents include detail or not',
+            'runtime': True,
+        },
+        {
             'name': 'page_id',
             'default': '',
             'desc': 'page ID of Atlassian statuspage. (used only rest mode)',
@@ -215,8 +222,11 @@ class AtlassianStatuspage(MgrModule):
             code=code,
             sev=stat['severity'].split('_')[1],
             summary=stat['summary']['message'])
-        for detail in stat['detail']:
-            msg += '        {}\n'.format(detail['message'])
+
+        if self.include_detail:
+            for detail in stat['detail']:
+                msg += '        {}\n'.format(detail['message'])
+
         return msg
 
     def _msg_format_contents(self, status, diff):
@@ -272,7 +282,7 @@ class AtlassianStatuspage(MgrModule):
         if 400 <= search_response.status_code < 600:
             return self._health_check_msg(
                 'REST_ERROR',
-                'unable to send status info to statuspage component',
+                'unable to get unresolved incidents from the statuspage',
                 "%s (status code %d)" % (search_response_text, search_response.status_code))
 
         try:
@@ -308,12 +318,16 @@ class AtlassianStatuspage(MgrModule):
         incident_status = "investigating"
         if comp_status == "operational" : incident_status = "resolved"
 
+        data_body = self._msg_format_contents(status, diff)
+        if len(data_body) > 24999: # body length limit is '25000'
+            data_body = data_body[:24995] + " ..."
+
         data = {
             'incident': {
                 'components': { self.component_id: comp_status },
                 'component_ids': [ self.component_id ],
                 'status': incident_status,
-                'body': self._msg_format_contents(status, diff),
+                'body': data_body,
             }
         }
 
@@ -328,7 +342,20 @@ class AtlassianStatuspage(MgrModule):
         self.log.debug("request url is '%s'" % request_url)
         self.log.debug("response of rest: [%d] %s" % (response.status_code, response.text.encode('utf8')))
 
-        if 400 <= response.status_code < 600:
+        if incident_id != '' \
+          and response.status_code == 422 \
+          and "Too many incident updates" in response.text.encode('utf8'):
+            data['incident']['status'] = "resolved"
+            data['incident'][ 'body' ] = "Too many updates in incident. Relsolve this incident and continue in new incident."
+            response = requests.put(request_url, headers=headers, json=data)
+            if 400 <= response.status_code < 600:
+                return self._health_check_msg(
+                    'REST_ERROR',
+                    'unable to resolve incident',
+                    "%s (status code %d)" % (response.text.encode('utf8'), response.status_code))
+            else:
+                return self._send_msg_to_atlassian_statuspage_through_rest(status, diff)
+        elif 400 <= response.status_code < 600:
             return self._health_check_msg(
                 'REST_ERROR',
                 'unable to send status info to statuspage component',

@@ -914,7 +914,7 @@ def main():
             CEPH_GIT_NICE_VER,
             CEPH_GIT_VER,
             CEPH_RELEASE_NAME,
-            CEPH_RELEASE_TYPE))  # noqa
+            CEPH_RELEASE_TYPE))   # noqa
         return 0
 
     global verbose
