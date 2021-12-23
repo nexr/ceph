@@ -1591,10 +1591,7 @@ OPTION(rgw_lineage_backend, OPT_STR) // Type of backend lineage system
 
 OPTION(rgw_lineage_atlas_mode, OPT_STR) // Atlas connect method
 
-OPTION(rgw_lineage_atlas_rest_version, OPT_STR) // Atlas url api version
-
 OPTION(rgw_lineage_atlas_rest_url, OPT_STR) // Atlas url address
-OPTION(rgw_lineage_atlas_rest_url_prefix, OPT_STR) // rgw_lineage_atlas_url_prefix
 
 OPTION(rgw_lineage_atlas_rest_admin_user, OPT_STR) // Atlas admin user
 OPTION(rgw_lineage_atlas_rest_admin_password, OPT_STR) // Atlas admin password

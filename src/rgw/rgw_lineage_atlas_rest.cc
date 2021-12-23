@@ -35,15 +35,11 @@ static inline std::string read_secret(const std::string& file_path)
 int RGWLineageAtlasRest::send_curl(const string& method, const string& path, bufferlist * const ret_body_bl, const string& data, bool versioned)
 {
   string rest_endpoint = cct->_conf->rgw_lineage_atlas_rest_url;
-  string rest_prefix   = cct->_conf->rgw_lineage_atlas_rest_url_prefix;
-  string rest_version  = cct->_conf->rgw_lineage_atlas_rest_version;
 
   string url;
   url  = rest_endpoint;
-  url += "/";
-  url += rest_prefix;
-  url += "/";
-  url += (versioned) ? rest_version + "/" : "";
+  url += "/api/atlas/";
+  url += (versioned) ? "v2/" : "";
   url += path;
   url  = regex_replace(url, regex("/+"), "/");
   url  = regex_replace(url, regex(":/"), "://");

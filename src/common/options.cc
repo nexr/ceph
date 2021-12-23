@@ -7250,20 +7250,6 @@ std::vector<Option> get_rgw_options() {
     .set_default("")
     .set_description("Atlas url address")
     .set_long_description("The atlas url address with protocol and port. ex) http[s]://x.x.x.x:yy")
-    .set_flag(Option::FLAG_RUNTIME)
-    .add_see_also("rgw_lineage_atlas_rest_url_perfix")
-    .add_see_also("rgw_lineage_atlas_rest_version"),
-
-    Option("rgw_lineage_atlas_rest_url_prefix", Option::TYPE_STR, Option::LEVEL_ADVANCED)
-    .set_default("api/atlas")
-    .set_description("Atlas url prefix")
-    .set_long_description("The atlas url prefix. ex) api/atlas")
-    .set_flag(Option::FLAG_RUNTIME),
-
-    Option("rgw_lineage_atlas_rest_version", Option::TYPE_STR, Option::LEVEL_ADVANCED)
-    .set_default("v2")
-    .set_description("Atlas rest api version")
-    .set_long_description("The atlas api version. ex) v2")
     .set_flag(Option::FLAG_RUNTIME),
 
     Option("rgw_lineage_atlas_rest_admin_user", Option::TYPE_STR, Option::LEVEL_ADVANCED)

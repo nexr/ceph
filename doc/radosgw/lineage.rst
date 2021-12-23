@@ -89,8 +89,6 @@ The following parameters in the Ceph configuration file are related to the apach
 
 - ``rgw_lineage_atlas_rest_url``: Atlas url address of atlas endpoint.
   The atlas url address with protocol and port. ex) http[s]://x.x.x.x:yy.
-- ``rgw_lineage_atlas_rest_url_prefix``: The atlas url prefix. The default value is "api/atlas".
-- ``rgw_lineage_atlas_rest_version``: The atlas api version. The default value is "v2".
 - ``rgw_lineage_atlas_rest_admin_user``: Atlas admin user.
 - ``rgw_lineage_atlas_rest_admin_password``: Atlas admin password. The password take the form of plane text. 
 - ``rgw_lineage_atlas_rest_admin_password_path``: Path to a file containing the Atlas admin password. This overrides ``rgw_lineage_atlas_rest_admin_password``.
