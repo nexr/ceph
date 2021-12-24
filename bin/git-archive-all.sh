@@ -228,6 +228,11 @@ else
         --exclude="tags"   \
         --exclude="*.pyc"  \
         --exclude="*.pyo"  \
+        --exclude="src/.git_version" \
+        --exclude="ceph.spec" \
+        --exclude="alpine/APKBUILD" \
+        --exclude="*.tar.bz2" \
+        --exclude="dashboard_frontend.tar" \
         -cf ./$OLD_PWD_BASE.$FORMAT $dir_prefix
 
     popd > /dev/null
