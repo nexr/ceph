@@ -1,0 +1,136 @@
+{
+  "enumDefs": [],
+  "structDefs": [],
+  "classificationDefs": [],
+  "entityDefs": [
+    {
+      "superTypes": [ "Infrastructure" ],
+      "name": "aws_s3_server",
+      "category": "ENTITY",
+      "serviceType": "aws",
+      "description": "a type definition for server machine",
+      "typeVersion": "1.0",
+      "attributeDefs": [
+        {
+          "name": "server_name",
+          "typeName": "string",
+          "isOptional": false,
+          "cardinality": "SINGLE",
+          "valuesMinCount": 1,
+          "valuesMaxCount": 1,
+          "isUnique": true,
+          "isIndexable": true
+        },
+        {
+          "name": "ip_address",
+          "typeName": "string",
+          "isOptional": false,
+          "cardinality": "SINGLE",
+          "valuesMinCount": 1,
+          "valuesMaxCount": 1,
+          "isUnique": false,
+          "isIndexable": true
+        },
+        {
+          "name": "server_host",
+          "typeName": "string",
+          "isOptional": true,
+          "cardinality": "SINGLE",
+          "valuesMinCount": 1,
+          "valuesMaxCount": 1,
+          "isUnique": false,
+          "isIndexable": true
+        },
+        {
+          "name": "server_fsid",
+          "typeName": "string",
+          "isOptional": true,
+          "cardinality": "SINGLE",
+          "valuesMinCount": 1,
+          "valuesMaxCount": 1,
+          "isUnique": false,
+          "isIndexable": true
+        }
+      ]
+    },
+    {
+      "superTypes": [ "Process" ],
+      "name": "aws_s3_request",
+      "category": "ENTITY",
+      "serviceType": "aws",
+      "description": "a type definition for AWS tools",
+      "typeVersion": "1.0",
+      "attributeDefs": [
+        {
+          "name": "operation",
+          "typeName": "string",
+          "isOptional": true,
+          "cardinality": "SINGLE",
+          "valuesMinCount": 1,
+          "valuesMaxCount": 1,
+          "isUnique": false,
+          "isIndexable": false
+        },
+        {
+          "name": "run_as",
+          "typeName": "string",
+          "isOptional": false,
+          "cardinality": "SINGLE",
+          "valuesMinCount": 1,
+          "valuesMaxCount": 1,
+          "isUnique": false,
+          "isIndexable": true
+        },
+        {
+          "name": "request_time",
+          "typeName": "date",
+          "isOptional": false,
+          "cardinality": "SINGLE",
+          "valuesMinCount": 1,
+          "valuesMaxCount": 1,
+          "isUnique": false,
+          "isIndexable": true
+        },
+        {
+          "name": "request_agent",
+          "typeName": "string",
+          "isOptional": true,
+          "cardinality": "SINGLE",
+          "valuesMinCount": 1,
+          "valuesMaxCount": 1,
+          "isUnique": false,
+          "isIndexable": true
+        },
+        {
+          "name": "requester_address",
+          "typeName": "string",
+          "isOptional": true,
+          "cardinality": "SINGLE",
+          "valuesMinCount": 1,
+          "valuesMaxCount": 1,
+          "isUnique": false,
+          "isIndexable": true
+        }
+      ]
+    }
+  ],
+  "relationshipDefs": [
+    {
+      "name": "aws_s3_request_server",
+      "serviceType": "aws",
+      "typeVersion": "1.0",
+      "relationshipCategory": "ASSOCIATION",
+      "endDef1": {
+        "name": "requests",
+        "type": "aws_s3_server",
+        "cardinality": "SET"
+      },
+      "endDef2": {
+        "name": "server",
+        "type": "aws_s3_request",
+        "cardinality": "SINGLE"
+      },
+      "propagateTags": "NONE"
+    }
+  ]
+}

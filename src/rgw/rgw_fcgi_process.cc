@@ -88,6 +88,10 @@ void RGWFCGXProcess::run()
     qr.enqueue(fcgx);
   }
 
+  if (rgw_lineage_man != nullptr) {
+    rgw_lineage_man->start();
+  }
+
   for (;;) {
     RGWFCGXRequest* req = new RGWFCGXRequest(store->get_new_req_id(), &qr);
     dout(10) << "allocated request req=" << hex << req << dec << dendl;
@@ -100,6 +104,10 @@ void RGWFCGXProcess::run()
       break;
     }
     req_wq.queue(req);
+  }
+
+  if (rgw_lineage_man != nullptr) {
+    rgw_lineage_man->stop();
   }
 
   m_tp.drain(&req_wq);
@@ -126,7 +134,7 @@ void RGWFCGXProcess::handle_request(RGWRequest* r)
  
   int ret = process_request(store, rest, req, uri_prefix,
                             *auth_registry, &client_io, olog,
-                            null_yield, nullptr);
+                            null_yield, nullptr, rgw_lineage_man.get());
   if (ret < 0) {
     /* we don't really care about return code */
     dout(20) << "process_request() returned " << ret << dendl;

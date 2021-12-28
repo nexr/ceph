@@ -91,7 +91,8 @@ void handle_connection(boost::asio::io_context& context,
                        SharedMutex& pause_mutex,
                        rgw::dmclock::Scheduler *scheduler,
                        boost::system::error_code& ec,
-                       boost::asio::yield_context yield)
+                       boost::asio::yield_context yield,
+                       RGWLineageManager* rgw_lineage_man)
 {
   // limit header to 4k, since we read it all into a single flat_buffer
   static constexpr size_t header_limit = 4096;
@@ -165,7 +166,7 @@ void handle_connection(boost::asio::io_context& context,
       RGWRestfulIO client(cct, &real_client_io);
       auto y = optional_yield{context, yield};
       process_request(env.store, env.rest, &req, env.uri_prefix,
-                      *env.auth_registry, &client, env.olog, y, scheduler);
+                      *env.auth_registry, &client, env.olog, y, scheduler, rgw_lineage_man);
     }
 
     if (!parser.keep_alive()) {
@@ -268,6 +269,8 @@ class AsioFrontend {
   std::vector<std::thread> threads;
   std::atomic<bool> going_down{false};
 
+  std::unique_ptr<RGWLineageManager> rgw_lineage_man;
+
   CephContext* ctx() const { return env.store->ctx(); }
   std::optional<dmc::ClientCounters> client_counters;
   std::unique_ptr<dmc::ClientConfig> client_config;
@@ -291,9 +294,13 @@ class AsioFrontend {
     case dmc::scheduler_t::none:
       lderr(ctx()) << "Got invalid scheduler type for beast, defaulting to throttler" << dendl;
       [[fallthrough]];
-    case dmc::scheduler_t::throttler:
+    case dmc::scheduler_t::throttler: //default
       scheduler.reset(new dmc::SimpleThrottler(ctx()));
 
+    }
+
+    if (ctx()->_conf->rgw_lineage_enable) {
+      rgw_lineage_man.reset(new RGWLineageManager(ctx()));
     }
   }
 
@@ -618,7 +625,7 @@ void AsioFrontend::accept(Listener& l, boost::system::error_code ec)
         }
         buffer->consume(bytes);
         handle_connection(context, env, stream, *buffer, true, pause_mutex,
-                          scheduler.get(), ec, yield);
+                          scheduler.get(), ec, yield, rgw_lineage_man.get());
         if (!ec) {
           // ssl shutdown (ignoring errors)
           stream.async_shutdown(yield[ec]);
@@ -636,7 +643,7 @@ void AsioFrontend::accept(Listener& l, boost::system::error_code ec)
         auto buffer = std::make_unique<parse_buffer>();
         boost::system::error_code ec;
         handle_connection(context, env, s, *buffer, false, pause_mutex,
-                          scheduler.get(), ec, yield);
+                          scheduler.get(), ec, yield, rgw_lineage_man.get());
         s.shutdown(tcp::socket::shutdown_both, ec);
       });
   }
@@ -662,6 +669,11 @@ int AsioFrontend::run()
       context.run(ec);
     });
   }
+
+  if (rgw_lineage_man != nullptr) {
+    rgw_lineage_man->start();
+  }
+
   return 0;
 }
 
@@ -679,6 +691,10 @@ void AsioFrontend::stop()
   // close all connections
   connections.close(ec);
   pause_mutex.cancel();
+
+  if (rgw_lineage_man != nullptr) {
+    rgw_lineage_man->stop();
+  }
 }
 
 void AsioFrontend::join()
