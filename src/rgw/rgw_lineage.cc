@@ -20,6 +20,8 @@ RGWLineageManager::RGWLineageManager(CephContext* const _cct): cct(_cct)
   retries  = cct->_conf->rgw_lineage_manager_retries;
 
   can_init = cct->_conf->rgw_lineage_init_definition;
+
+  user_tenancy = cct->_conf->rgw_lineage_user_tenancy;
 }
 
 RGWLineageManager::~RGWLineageManager()
@@ -179,9 +181,15 @@ void RGWLineageManager::enqueue(req_state* rs, RGWOp* op)
   lr.src_bucket = rs->src_bucket_name;
   lr.src_object = rs->src_object.name;
 
+  lr.tenant = (user_tenancy) ? lr.bucket_owner_id : "";
+
   lr.data = get_data(op);
 
   lr_queue.push(lr);
+  dout(10) << __func__ << "(): " << lr.op_type_str << " lineage request enqueued. "
+           << "tenant: " << lr.tenant << ", "
+           << "bucket: " << lr.bucket << ", "
+           << "object: " << lr.object << dendl;
 }
 
 void RGWLineageManager::start()
@@ -205,13 +213,9 @@ void * RGWLineageManager::entry()
     return NULL;
   }
 
-  if (can_init) {
-    rgw_lineage->apply_lineage_init_definition();
-  }
-
   bool need_wait = false;
   int tries = 0;
-  
+
   while (true)
   {
     if (need_wait) { sleep(wait_sec); }
@@ -223,6 +227,12 @@ void * RGWLineageManager::entry()
     dout(20) << __func__ << "(): lr_queue size = " << lr_queue.size() << dendl;
 
     lineage_req * lr = &(lr_queue.front());
+    string tenant = lr->tenant;
+
+    if (can_init && tenant_init.find(tenant) != tenant_init.end()) {
+      rgw_lineage->apply_lineage_init_definition(tenant);
+      tenant_init.insert({tenant, true});
+    }
 
     if (lr->op_type_str.compare("UNKNOWN_OP") == 0) {
       need_wait = false;
@@ -230,39 +240,39 @@ void * RGWLineageManager::entry()
       continue;
     }
 
-    if (!rgw_lineage->is_lineage_health_ok()) {
+    if (!rgw_lineage->is_lineage_health_ok(tenant)) {
       if (down_flag) { break; } else { continue; }
     }
-  
+
     int ret = -1;
     switch (lr->op_type) {
       case RGW_OP_CREATE_BUCKET:
-        ret = rgw_lineage->apply_lineage_bucket_creation(lr);
+        ret = rgw_lineage->apply_lineage_bucket_creation(lr, tenant);
         break;
       case RGW_OP_DELETE_BUCKET:
-        ret = rgw_lineage->apply_lineage_bucket_deletion(lr);
+        ret = rgw_lineage->apply_lineage_bucket_deletion(lr, tenant);
         break;
       case RGW_OP_PUT_OBJ:
       case RGW_OP_POST_OBJ:
       case RGW_OP_COMPLETE_MULTIPART:
-        ret = rgw_lineage->apply_lineage_object_creation(lr);
+        ret = rgw_lineage->apply_lineage_object_creation(lr, tenant);
         break;
       case RGW_OP_GET_OBJ:
         if (record_getobj) {
-          ret = rgw_lineage->apply_lineage_object_gotten(lr);
+          ret = rgw_lineage->apply_lineage_object_gotten(lr, tenant);
         }
         else {
           ret = 200;
         }
         break;
       case RGW_OP_DELETE_OBJ:
-        ret = rgw_lineage->apply_lineage_object_deletion(lr);
+        ret = rgw_lineage->apply_lineage_object_deletion(lr, tenant);
         break;
       case RGW_OP_COPY_OBJ:
-        ret = rgw_lineage->apply_lineage_object_copy(lr);
+        ret = rgw_lineage->apply_lineage_object_copy(lr, tenant);
         break;
       case RGW_OP_DELETE_MULTI_OBJ:
-        ret = rgw_lineage->apply_lineage_object_multi_deletion(lr);
+        ret = rgw_lineage->apply_lineage_object_multi_deletion(lr, tenant);
         break;
       default:
         ret = 200;
