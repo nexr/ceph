@@ -2,17 +2,17 @@
 
 class RGWLineageAtlasRest: public RGWLineageAtlasImpl {
 private:
-  int send_curl(const string owner,
+  int send_curl(const string tenant,
     const string method,
     const string path,
     bufferlist * const ret_body_bl = NULL,
     const string data = string(),
     bool versioned = true);
-  int send_curl(const string owner, const string method, const string path, const string data, bool versioned = true) {
-    return send_curl(owner, method, path, NULL, data, versioned);
+  int send_curl(const string tenant, const string method, const string path, const string data, bool versioned = true) {
+    return send_curl(tenant, method, path, NULL, data, versioned);
   };
-  int send_curl(const string owner, const string method, const string path, bool versioned) {
-    return send_curl(owner, method, path, NULL, string(), versioned);
+  int send_curl(const string tenant, const string method, const string path, bool versioned) {
+    return send_curl(tenant, method, path, NULL, string(), versioned);
   };
 
   int search_entities(
