@@ -229,7 +229,7 @@ void * RGWLineageManager::entry()
     lineage_req * lr = &(lr_queue.front());
     string tenant = lr->tenant;
 
-    if (can_init && tenant_init.find(tenant) != tenant_init.end()) {
+    if (can_init && tenant_init.find(tenant) == tenant_init.end()) {
       rgw_lineage->apply_lineage_init_definition(tenant);
       tenant_init.insert({tenant, true});
     }
