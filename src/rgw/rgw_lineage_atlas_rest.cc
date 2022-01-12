@@ -11,13 +11,13 @@ static inline std::string read_secret(const std::string& file_path)
   string s;
 
   s.reserve(size);
-  FILE* pFile = fopen(file_path.c_str(), "r"); //read mode 
+  FILE* pFile = fopen(file_path.c_str(), "r"); //read mode
   if(pFile == NULL)
   {
     dout(10) << __func__ << "(): The passwd file is not exists. passwd file = " << file_path << dendl;
     return "";
   }
-    
+
   fgets(buf, size, pFile);
   fclose(pFile);
 
@@ -86,19 +86,16 @@ int RGWLineageAtlasRest::send_curl(const string& method, const string& path, buf
   return http_tx.get_http_status();
 }
 
-int RGWLineageAtlasRest::search_entities(vector<string> & out, const string qname, const string type_name, bool execlude_deleted_entities)
+int RGWLineageAtlasRest::search_entities(vector<string> & out, const string qname, const string type_name, bool exclude_deleted_entities)
 {
-  int count;
-
   string path;
-  path  = "search/basic";
-  path += "?query=" + qname;
+  path  = "search/dsl";
+  path += "?query="+ url_encode("where qualifiedName='" + qname + "'");
+  path += (exclude_deleted_entities)? url_encode(" and __state='ACTIVE'") : "";
   path += (type_name.empty()) ? "" : "&typeName=" + type_name;
-  path += "&excludeDeletedEntities=";
-  path += (execlude_deleted_entities) ? "true" : "false";
-  
+
   dout(25) << __func__ << "(): query path = " << path << dendl;
-  
+
   bufferlist search_ret_body;
   int ret = send_curl("GET", path, &search_ret_body);
 
@@ -113,31 +110,21 @@ int RGWLineageAtlasRest::search_entities(vector<string> & out, const string qnam
     return -1;
   }
 
-  JSONObjIter count_iter = jp.find_first("approximateCount");
-  if (count_iter.end()) {
-    dout(10) << __func__ << "(): 'approximateCount' is not exist in search result" << dendl;
-    return -1;
-  }
-
-  decode_json_obj(count, *count_iter);
-  if (count == 0) return count;
-
-
   JSONObjIter entity_iter = jp.find_first("entities");
   if (entity_iter.end() || !(*entity_iter)->is_array()) {
     dout(15) << __func__ << "(): Invalid entities of search result" << dendl;
-    count = 0;
+    return -1;
   }
 
   out = (*entity_iter)->get_array_elements();
 
-  return count;
+  return out.size();
 }
 
-bool RGWLineageAtlasRest::is_entity_exist_with_qname(const string qualified_name, const string type_name, bool execlude_deleted_entities)
+bool RGWLineageAtlasRest::is_entity_exist_with_qname(const string qualified_name, const string type_name, bool exclude_deleted_entities)
 {
   vector<string> entities;
-  int count = search_entities(entities, qualified_name, type_name, execlude_deleted_entities);
+  int count = search_entities(entities, qualified_name, type_name, exclude_deleted_entities);
 
   return (count > 0);
 }
@@ -166,10 +153,10 @@ const string RGWLineageAtlasRest::extract_guid_from_entity(const string entity_s
   return guid;
 }
 
-int RGWLineageAtlasRest::query_guid_first_with_qname(string& guid, const string qualified_name, const string type_name, bool execlude_deleted_entities)
+int RGWLineageAtlasRest::query_guid_first_with_qname(string& guid, const string qualified_name, const string type_name, bool exclude_deleted_entities)
 {
   vector<string> entities;
-  int count = search_entities(entities, qualified_name, type_name, execlude_deleted_entities);
+  int count = search_entities(entities, qualified_name, type_name, exclude_deleted_entities);
 
   if (count == 0) {
     dout(20) << __func__ << "(): The search entity not exists." << dendl;
@@ -318,9 +305,9 @@ int RGWLineageAtlasRest::record_request(lineage_req * const lr, JSONFormattable*
     }
 
     jf.flush(ss);
-  
+
     ret = send_curl("POST", "/entity", ss.str());
-  
+
     if (ret != 200) {
       dout(10) << __func__ << "(): Failed to create server entity" << dendl;
       return ret;
@@ -718,13 +705,13 @@ int RGWLineageAtlasRest::atlas_init_definition()
     }
     jf.close_section(); // json
   }
-  
+
   stringstream ss;
   jf.flush(ss);
 
   ret = send_curl("POST", "/types/typedefs", ss.str());
 
-  if (ret == 409) { ret = 200; } //* return 409 if already exist*/ 
+  if (ret == 409) { ret = 200; } //* return 409 if already exist*/
 
   if (ret != 200) {
     dout(10) << __func__ << "(): Failed to initialize atlas entity definition" << dendl;
@@ -865,10 +852,10 @@ int RGWLineageAtlasRest::atlas_object_gotten(lineage_req * const lr)
       }
       jf.close_section(); // json
     }
-  
+
     stringstream ss;
     jf.flush(ss);
-  
+
     ret = send_curl("POST", "/entity", ss.str());
     if (ret != 200) {
       dout(10) << __func__ << "(): Failed to create 'external_out' entity" << dendl;
@@ -977,7 +964,7 @@ int RGWLineageAtlasRest::atlas_object_multi_deletion(lineage_req * const lr)
     each_lr.object = (*iter).name;
 
     ret = atlas_object_deletion(&each_lr);
-    if (ret != 200) { 
+    if (ret != 200) {
       dout(10) << __func__ << "(): Failed to delete '"
                            << each_lr.object << "' object" << dendl;
       continue;
