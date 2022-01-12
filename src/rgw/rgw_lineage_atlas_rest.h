@@ -18,12 +18,12 @@ private:
     vector<string> & out,
     const string qualified_name,
     const string type_name = string(),
-    bool execlude_deleted_entities = true);
+    bool exclude_deleted_entities = true);
 
   bool is_entity_exist_with_qname(
     const string qualified_name,
     const string type_name = string(),
-    bool execlude_deleted_entities = true);
+    bool exclude_deleted_entities = true);
 
   const string extract_guid_from_entity(const string entity_str);
 
@@ -31,7 +31,7 @@ private:
     string& guid,
     const string qualified_name,
     const string type_name = string(),
-    bool execlude_deleted_entities = true);
+    bool exclude_deleted_entities = true);
 
   int query_attribute_value(
     string& value,
@@ -48,7 +48,7 @@ private:
   int create_object(lineage_req * const lr);
 
 public:
-  RGWLineageAtlasRest(CephContext* const _cct): RGWLineageAtlasImpl(_cct) {} 
+  RGWLineageAtlasRest(CephContext* const _cct): RGWLineageAtlasImpl(_cct) {}
 
   int atlas_init_definition() override;
   int atlas_bucket_creation(lineage_req * const lr) override;
