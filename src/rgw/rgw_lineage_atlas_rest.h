@@ -20,13 +20,13 @@ private:
     const string tenant,
     const string qualified_name,
     const string type_name = string(),
-    bool execlude_deleted_entities = true);
+    bool exclude_deleted_entities = true);
 
   bool is_entity_exist_with_qname(
     const string tenant,
     const string qualified_name,
     const string type_name = string(),
-    bool execlude_deleted_entities = true);
+    bool exclude_deleted_entities = true);
 
   const string extract_guid_from_entity(const string entity_str);
 
@@ -35,7 +35,7 @@ private:
     const string tenant,
     const string qualified_name,
     const string type_name = string(),
-    bool execlude_deleted_entities = true);
+    bool exclude_deleted_entities = true);
 
   int query_attribute_value(
     string& value,
