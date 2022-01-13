@@ -1,0 +1,100 @@
+@startuml
+class RGWOp <"Store operation info"> {
+ # struct req_state *s
+ # RGWHandler *dialect_handler
+ # RGWRados *store
+ # RGWCORSConfiguration bucket_cors
+ # bool cors_exist
+ # RGWQuotaInfo bucket_quota
+ # RGWQuotaInfo user_quota
+ # int op_ret
+ # int do_aws4_auth_completion()
+ # {abstract} {virtual} int init_quota()
+ + RGWOp()
+ + {abstract} {virtual} ~RGWOp()
+ + {const} int get_ret()
+ + {abstract} {virtual} int init_processing()
+ + {abstract} {virtual} void init(RGWRados *store, struct req_state *s, RGWHandler *dialect_handler)
+ + int read_bucket_cors()
+ + bool generate_cors_headers(string& origin, string& method, string& headers, string& exp_headers, unsigned *max_age)
+ + {abstract} {virtual} int verify_params()
+ + {abstract} {virtual} bool prefetch_data()
+ + {abstract} {virtual} int verify_requester(const rgw::auth::StrategyRegistry& auth_registry)
+ + {abstract} {virtual} int verify_permission()
+ + {abstract} {virtual} int verify_op_mask()
+ + {abstract} {virtual} void pre_exec()
+ + {abstract} {virtual} void execute()
+ + {abstract} {virtual} void send_response()
+ + {abstract} {virtual} void complete()
+ + {abstract} {virtual} {const} const char* name()
+ + {abstract} {virtual} RGWOpType get_type()
+ + {abstract} {virtual} uint32_t op_mask()
+ + {abstract} {virtual} int error_handler(int err_no, string *error_content)
+ + {const} {override} ostream& gen_prefix(ostream& out)
+ + {const} {override} oCephContext* get_cct()
+ + {const} {override} ounsigned get_subsys()
+ + {abstract} {virtual} dmc::client_id dmclock_client()
+ + {abstract} {virtual} dmc::Cost dmclock_cost()
+}
+RGWOp <|-up- DoutPrefixProvider
+
+class RGWPutObj {
+ # string etag
+ # ...
+---
+ + string get_etag()
+ + ...
+}
+
+class RGWPostObj {
+ # string etag
+ # ...
+---
+ + string get_etag()
+ + ...
+}
+
+class RGWCopyObj {
+ # string etag
+ # ...
+---
+ + string get_etag()
+ + ...
+}
+
+class RGWCompleteMultipart {
+ # string etag
+ # long     total_size
+ # uint64_t total_accounted_size
+ # bufferlist data
+ # ...
+---
+ + string get_etag()
+ + bufferlist get_data()
+ + long get_total_size(bool accounted = true)
+ + ...
+}
+
+class RGWDeleteMultiObj {
+ # bufferlist data
+ # ...
+---
+ + bufferlist get_data()
+ + ...
+}
+
+
+RGWOp --|> RGWGetObj
+RGWOp --|> RGWCreateBucket
+RGWOp --|> RGWDeleteBucket
+RGWOp --|> RGWPutObj
+RGWOp --|> RGWPostObj
+RGWOp --|> RGWDeleteObj
+RGWOp --|> RGWCopyObj
+RGWOp --|> RGWCompleteMultipart
+RGWOp --|> RGWDeleteMultiObj
+
+RGWOp --|> RGWXxx
+
+
+@enduml

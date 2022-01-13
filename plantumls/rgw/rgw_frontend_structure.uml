@@ -1,0 +1,70 @@
+@startuml
+class RGWFrontend {
+ + {abstract} {virtual} ~RGWFrontend()
+ + {abstract} {virtual} int init()
+ + {abstract} {virtual} int run()
+ + {abstract} {virtual} void stop()
+ + {abstract} {virtual} void join()
+ + {abstract} {virtual} void pause_for_new_config()
+ + {abstract} {virtual} void unpause_with_new_config(RGWRados* store, rgw_auth_registry_ptr_t auth_registry)
+}
+
+class RGWAsioFrontend {
+ - std::unique_ptr<Impl> impl
+ + RGWAsioFrontend(const RGWProcessEnv& env, RGWFrontendConfig* conf, rgw::dmclock::SchedulerCtx& sched_ctx)
+ + {override} ~RGWAsioFrontend()
+ + {override} int init()
+ + {override} int run()
+ + {override} void stop()
+ + {override} void join()
+ + {override} void pause_for_new_config()
+ + {override} void unpause_with_new_config(RGWRados *store, rgw_auth_registry_ptr_t auth_registry)
+}
+RGWAsioFrontend <|-up- RGWFrontend
+
+class RGWCivetWebFrontend {
+ - RGWFrontendConfig* conf
+ - struct mg_context* ctx
+ - RGWMongooseEnv env
+ - std::unique_ptr<rgw::dmclock::SyncScheduler> scheduler
+ - std::unique_ptr<rgw::dmclock::ClientConfig> client_config
+ - void set_conf_default(std::multimap<std::string, std::string>& m, const std::string& key, const std::string& def_val)
+ - {const} CephContext* cct()
+ + RGWCivetWebFrontend(RGWProcessEnv& env, RGWFrontendConfig *conf, rgw::dmclock::SchedulerCtx& sched_ctx)
+ + int process(struct mg_connection* conn)
+ + {override} int init()
+ + {override} int run()
+ + {override} void stop()
+ + {override} void join()
+ + {override} void pause_for_new_config()
+ + {override} void unpause_with_new_config(RGWRados* const store, rgw_auth_registry_ptr_t auth_registry)
+}
+RGWCivetWebFrontend <|-up- RGWFrontend
+
+class RGWProcessFrontend{
+ # RGWFrontendConfig* conf
+ # RGWProcess* pprocess
+ # RGWProcessEnv env
+ # RGWProcessControlThread* thread
+ + RGWProcessFrontend(RGWProcessEnv& pe, RGWFrontendConfig* _conf)
+ + {override} ~RGWProcessFrontend()
+ + {override} int run()
+ + {override} void stop()
+ + {override} void join()
+ + {override} void pause_for_new_config()
+ + {override} void unpause_with_new_config(RGWRados* const store, rgw_auth_registry_ptr_t auth_registry)
+}
+RGWProcessFrontend <|-right- RGWFrontend
+
+class RGWXxxFrontend{
+ - ...
+ + RGWXxxFrontend(...)
+ + {override} ~RGWXxxFrontend()
+ + {override} int run()
+ + {override} void stop()
+ + {override} void join()
+ + {override} void pause_for_new_config()
+ + {override} void unpause_with_new_config(RGWRados* const store, rgw_auth_registry_ptr_t auth_registry)
+}
+RGWXxxFrontend <|-left- RGWFrontend
+@enduml

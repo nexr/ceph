@@ -1,0 +1,106 @@
+@startuml
+class req_state <"Store all the state necessary to complete and respond to an HTTP request"> << (S,orchid) >> {
+ + CephContext *cct
+ + rgw::io::BasicClient *cio{nullptr}
+ + http_op op{OP_UNKNOWN}
+ + RGWOpType op_type{}
+ + bool content_started{false}
+ + int format{0}
+ + ceph::Formatter *formatter{nullptr}
+ + string decoded_uri
+ + string relative_uri
+ + const char *length{nullptr}
+ + int64_t content_length{0}
+ + map<string, string> generic_attrs
+ + rgw_err err
+ + bool expect_cont{false}
+ + uint64_t obj_size{0}
+ + bool enable_ops_log
+ + bool enable_usage_log
+ + uint8_t defer_to_bucket_acls
+ + uint32_t perm_mask{0}
+ + string account_name
+ + string bucket_tenant
+ + string bucket_name
+ + rgw_bucket bucket
+ + rgw_obj_key object
+ + string src_tenant_name
+ + string src_bucket_name
+ + rgw_obj_key src_object
+ + ACLOwner bucket_owner
+ + ACLOwner owner
+ + string zonegroup_name
+ + string zonegroup_endpoint
+ + string bucket_instance_id
+ + int bucket_instance_shard_id{-1}
+ + string redirect_zone_endpoint
+ + string redirect
+ + RGWBucketInfo bucket_info
+ + real_time bucket_mtime
+ + std::map<std::string, ceph::bufferlist> bucket_attrs
+ + bool bucket_exists{false}
+ + rgw_placement_rule dest_placement
+ + bool has_bad_meta{false}
+ + RGWUserInfo *user
+ + std::unique_ptr<RGWAccessControlPolicy> user_acl
+ + std::unique_ptr<RGWAccessControlPolicy> bucket_acl
+ + std::unique_ptr<RGWAccessControlPolicy> object_acl
+ + rgw::IAM::Environment env
+ + boost::optional<rgw::IAM::Policy> iam_policy
+ + vector<rgw::IAM::Policy> iam_user_policies
+ + bool system_request{false}
+ + string canned_acl
+ + bool has_acl_header{false}
+ + bool local_source{false}
+ + int prot_flags{0}
+ + string host_id
+ + req_info info
+ + req_init_state init_state
+ + using Clock = ceph::coarse_real_clock
+ + Clock::time_point time
+ + {const} Clock::duration time_elapsed() { return Clock::now() - time; }
+ + RGWObjectCtx *obj_ctx{nullptr}
+ + RGWSysObjectCtx *sysobj_ctx{nullptr}
+ + string dialect
+ + string req_id
+ + string trans_id
+ + uint64_t id
+ + RGWObjTags tagset
+ + bool mfa_verified{false}
+ + optional_yield yield{null_yield}
+ + req_state(CephContext* _cct, RGWEnv* e, RGWUserInfo* u, uint64_t id)
+ + ~req_state()
+ + {const} bool is_err()
+ + {const} {override} std::ostream& gen_prefix(std::ostream& out)
+ + {const} {override} CephContext* get_cct()
+ + {const} {override} unsigned get_subsys()
+ + struct auth
+ + class content_disp
+}
+req_state <|-up- DoutPrefixProvider
+
+
+class req_state::auth << (S,orchid) >> {
+ + unique_ptr<rgw::auth::Identity> identity
+ + shared_ptr<rgw::auth::Completer> completer
+ + class s3_postobj_creds
+}
+req_state::auth *-left- req_state
+
+class req_state::auth::s3_postobj_creds <"friend class RGWPostObj_ObjStore_S3, rgw::auth::s3::AWSBrowserUploadAbstractor"> {
+ + string access_key
+ + string signature
+ + string x_amz_algorithm
+ + string x_amz_credential
+ + string x_amz_date
+ + string x_amz_security_token
+ + bufferlist encoded_policy
+}
+req_state::auth::s3_postobj_creds *-up- req_state::auth
+
+class req_state::content_disp << (S,orchid) >> {
+  string override;
+  string fallback;
+}
+req_state::content_disp *-right- req_state
+@enduml

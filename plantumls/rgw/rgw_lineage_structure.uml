@@ -1,0 +1,201 @@
+@startuml
+
+class lineage_req << (S,orchid) >> {
+ + using time = ceph::coarse_real_clock::time_point
+ + string req_id
+ + time   req_time
+ + string req_addr
+ + string req_agent
+ + RGWOpType op_type
+ + string op_type_str
+ + string server_id
+ + string server_addr
+ + string server_host
+ + string server_owner
+ + string server_fsid
+ + string account
+ + string zonegroup
+ + string bucket
+ + string bucket_owner_id
+ + string bucket_owner_name
+ + string object
+ + string object_etag
+ + long   object_size
+ + string object_owner_id
+ + string object_owner_name
+ + string src_bucket
+ + string src_object
+ + string tenant
+ + bufferlist data
+}
+
+class RGWLineage
+{
+ # CephContext* cct
+ + {abstract} {virtual} ~RGWLineage()
+ + {abstract} {virtual} int apply_lineage_init_definition(const string tenant)
+ + {abstract} {virtual} int apply_lineage_bucket_creation(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} int apply_lineage_bucket_deletion(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} int apply_lineage_object_creation(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} int apply_lineage_object_gotten(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} int apply_lineage_object_deletion(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} int apply_lineage_object_multi_deletion(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} int apply_lineage_object_copy(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} bool is_lineage_health_ok(const string tenant)
+}
+
+class RGWLineageAtlasImpl
+{
+ # CephContext* cct
+ # bool record_external_in
+ # bool record_external_out
+ # const string make_s3_qname(const string bucket, const string object)
+ + {abstract} {virtual} ~RGWLineageAtlasImpl()
+ + {abstract} {virtual} int atlas_init_definition(const string tenant)
+ + {abstract} {virtual} int atlas_bucket_creation(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} int atlas_bucket_deletion(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} int atlas_object_creation(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} int atlas_object_gotten(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} int atlas_object_deletion(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} int atlas_object_multi_deletion(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} int atlas_object_copy(lineage_req * const lr, const string tenant)
+ + {abstract} {virtual} bool is_atlas_health_ok(const string tenant)
+}
+
+enum RGWLineageManager::BackendType {
+ LINEAGE_BACKEND_TYPE_ATLAS
+ LINEAGE_BACKEND_TYPE_XXX
+ ...
+}
+
+class RGWLineageManager <<Thread>> {
+ - CephContext* const cct
+ - RGWLineage* rgw_lineage
+ - deque<lineage_req> lr_queue
+ - BackendType backend_type
+ - string thread_name
+ - bool down_flag
+ - int retries
+ - int wait_sec
+ - bool can_init
+ - bool user_tenancy
+ - map<string, bool> tenant_init
+ - const string optype_to_string(RGWOpType op_type)
+ - const string get_etag(RGWOp * op)
+ - const bufferlist get_data(RGWOp* op)
+ - long get_size(req_state* rs, RGWOp * op)
+ - {override} void * entry()
+ + RGWLineageManager(CephContext* const _cct)
+ + ~RGWLineageManager()
+ + BackendType get_backend_type()
+ + void enqueue(req_state* rs, RGWOp * op)
+ + void start()
+ + void stop()
+}
+RGWLineageManager --o RGWLineage
+RGWLineageManager -left-* RGWLineageManager::BackendType
+
+class RGWLineageXXX
+{
+ - ...
+ + {override} ~RGWLineageXXX()
+ + {override} int apply_lineage_init_definition(const string tenant)
+ + {override} int apply_lineage_bucket_creation(lineage_req * const lr, const string tenant)
+ + {override} int apply_lineage_bucket_deletion(lineage_req * const lr, const string tenant)
+ + {override} int apply_lineage_object_creation(lineage_req * const lr, const string tenant)
+ + {override} int apply_lineage_object_gotten(lineage_req * const lr, const string tenant)
+ + {override} int apply_lineage_object_deletion(lineage_req * const lr, const string tenant)
+ + {override} int apply_lineage_object_multi_deletion(lineage_req * const lr, const string tenant)
+ + {override} int apply_lineage_object_copy(lineage_req * const lr, const string tenant)
+ + {override} bool is_lineage_health_ok(const string tenant)
+}
+RGWLineageXXX <|-left- RGWLineage
+
+enum RGWLineageAtlas::ImplType {
+ ATLAS_IMPL_TYPE_REST
+ ATLAS_IMPL_TYPE_KAFKA
+ ATLAS_IMPL_TYPE_XXX
+ ...
+}
+
+class RGWLineageAtlas
+{
+ - RGWLineageAtlasImpl * impl
+ - ImplType impl_type
+ + RGWLineageAtlas(CephContext* const _cct)
+ + {override} ~RGWLineageAtlas()
+ + ImplType get_impl_type()
+ + {override} int apply_lineage_init_definition(const string tenant)
+ + {override} int apply_lineage_bucket_creation(lineage_req * const lr, const string tenant)
+ + {override} int apply_lineage_bucket_deletion(lineage_req * const lr, const string tenant)
+ + {override} int apply_lineage_object_creation(lineage_req * const lr, const string tenant)
+ + {override} int apply_lineage_object_gotten(lineage_req * const lr, const string tenant)
+ + {override} int apply_lineage_object_deletion(lineage_req * const lr, const string tenant)
+ + {override} int apply_lineage_object_multi_deletion(lineage_req * const lr, const string tenant)
+ + {override} int apply_lineage_object_copy(lineage_req * const lr, const string tenant)
+ + {override} bool is_lineage_health_ok(const string tenant)
+}
+RGWLineageAtlas <|-up- RGWLineage
+RGWLineageAtlas -left-* RGWLineageAtlas::ImplType
+RGWLineageAtlas --o RGWLineageAtlasImpl
+
+class RGWLineageAtlasXXX {
+ - ...
+ + RGWLineageAtlasXXX(...)
+ + {override} ~RGWLineageAtlasXXX()
+ + {override} int atlas_init_definition(const string tenant)
+ + {override} int atlas_bucket_creation(lineage_req * const lr, const string tenant)
+ + {override} int atlas_bucket_deletion(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_creation(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_gotten(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_deletion(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_multi_deletion(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_copy(lineage_req * const lr, const string tenant)
+ + {override} bool is_atlas_health_ok(const string tenant)
+}
+RGWLineageAtlasXXX <|-left- RGWLineageAtlasImpl
+
+class RGWLineageAtlasRest {
+ - int send_curl(const string tenant, const string method, const string path, bufferlist * const ret_body_bl, const string data, bool versioned)
+ - int send_curl(const string tenant, const string method, const string path, const string data, bool versioned)
+ - int send_curl(const string tenant, const string method, const string path, bool versioned)
+ - int search_entities(vector<string> & out, const string tenant, const string qualified_name, const string type_name, bool exclude_deleted_entities)
+ - bool is_entity_exist_with_qname(const string tenant, const string qualified_name, const string type_name, bool exclude_deleted_entities)
+ - const string extract_guid_from_entity(const string entity_str)
+ - int query_guid_first_with_qname(string& guid, const string tenant, const string qualified_name, const string type_name, bool exclude_deleted_entities)
+ - int query_attribute_value(string& value, const string tenant, const string guid, const string attr)
+ - long time_to_long_msec(lineage_req::time & t)
+ - int record_request(const string tenant, lineage_req * const lr, JSONFormattable* in, JSONFormattable* out)
+ - int create_bucket(lineage_req * const lr, const string tenant)
+ - int create_object(lineage_req * const lr, const string tenant)
+ + RGWLineageAtlasRest(CephContext* const _cct)
+ + {override} ~RGWLineageAtlasRest()
+ + {override} int atlas_init_definition(const string tenant)
+ + {override} int atlas_bucket_creation(lineage_req * const lr, const string tenant)
+ + {override} int atlas_bucket_deletion(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_creation(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_gotten(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_deletion(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_multi_deletion(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_copy(lineage_req * const lr, const string tenant)
+ + {override} bool is_atlas_health_ok(const string tenant)
+}
+RGWLineageAtlasRest <|-up- RGWLineageAtlasImpl
+
+class RGWLineageAtlasKafka {
+ - int send_kafka_msg(...)
+ - ...
+ + RGWLineageAtlasKafka(CephContext* const _cct)
+ + {override} ~RGWLineageAtlasKafka()
+ + {override} int atlas_init_definition(const string tenant)
+ + {override} int atlas_bucket_creation(lineage_req * const lr, const string tenant)
+ + {override} int atlas_bucket_deletion(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_creation(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_gotten(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_deletion(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_multi_deletion(lineage_req * const lr, const string tenant)
+ + {override} int atlas_object_copy(lineage_req * const lr, const string tenant)
+ + {override} bool is_atlas_health_ok(const string tenant)
+}
+RGWLineageAtlasKafka <|-up- RGWLineageAtlasImpl
+@enduml
