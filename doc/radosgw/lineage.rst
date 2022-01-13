@@ -71,7 +71,7 @@ The following parameters in the Ceph configuration file are related to the Linea
 - ``rgw_lineage_record_external_out``: Enable external_out recoding to the backend system. The default value is "false".
 - ``rgw_lineage_backend``: Type of backend linenage system. Supported type: atlas. The default value is "atlas".
 
-Using apache atlas as backend lineage management systeg
+Using apache atlas as backend lineage management system
 =================================================
 
 When ``rgw_lineage_backend`` is "atlas", the apache atlas could be a backend lineage management system.
