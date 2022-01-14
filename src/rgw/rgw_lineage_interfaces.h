@@ -40,6 +40,8 @@ typedef struct {
   string src_bucket;
   string src_object;
 
+  string tenant;
+
   // body content
   bufferlist data;
 
@@ -54,16 +56,16 @@ protected:
 public:
   virtual ~RGWLineage(){};
 
-  virtual int apply_lineage_init_definition() = 0;
-  virtual int apply_lineage_bucket_creation(lineage_req * const lr) = 0;
-  virtual int apply_lineage_bucket_deletion(lineage_req * const lr) = 0;
-  virtual int apply_lineage_object_creation(lineage_req * const lr) = 0;
-  virtual int apply_lineage_object_gotten(lineage_req * const lr) = 0;
-  virtual int apply_lineage_object_deletion(lineage_req * const lr) = 0;
-  virtual int apply_lineage_object_multi_deletion(lineage_req * const lr) = 0;
-  virtual int apply_lineage_object_copy(lineage_req * const lr) = 0;
+  virtual int apply_lineage_init_definition(const string tenant = "") = 0;
+  virtual int apply_lineage_bucket_creation(lineage_req * const lr, const string tenant = "") = 0;
+  virtual int apply_lineage_bucket_deletion(lineage_req * const lr, const string tenant = "") = 0;
+  virtual int apply_lineage_object_creation(lineage_req * const lr, const string tenant = "") = 0;
+  virtual int apply_lineage_object_gotten(lineage_req * const lr, const string tenant = "") = 0;
+  virtual int apply_lineage_object_deletion(lineage_req * const lr, const string tenant = "") = 0;
+  virtual int apply_lineage_object_multi_deletion(lineage_req * const lr, const string tenant = "") = 0;
+  virtual int apply_lineage_object_copy(lineage_req * const lr, const string tenant = "") = 0;
 
-  virtual bool is_lineage_health_ok() = 0;
+  virtual bool is_lineage_health_ok(const string tenant = "") = 0;
 };
 
 class RGWLineageAtlasImpl
@@ -78,7 +80,7 @@ protected:
     string qname  = "s3://";
 
     qname += bucket;
- 
+
     if (!object.empty()) {
       qname += "/" + object;
     }
@@ -94,16 +96,16 @@ public:
   };
   virtual ~RGWLineageAtlasImpl(){};
 
-  virtual int atlas_init_definition() = 0;
-  virtual int atlas_bucket_creation(lineage_req * const lr) = 0;
-  virtual int atlas_bucket_deletion(lineage_req * const lr) = 0;
-  virtual int atlas_object_creation(lineage_req * const lr) = 0;
-  virtual int atlas_object_gotten(lineage_req * const lr) = 0;
-  virtual int atlas_object_deletion(lineage_req * const lr) = 0;
-  virtual int atlas_object_multi_deletion(lineage_req * const lr) = 0;
-  virtual int atlas_object_copy(lineage_req * const lr) = 0;
+  virtual int atlas_init_definition(const string tenant = "") = 0;
+  virtual int atlas_bucket_creation(lineage_req * const lr, const string tenant = "") = 0;
+  virtual int atlas_bucket_deletion(lineage_req * const lr, const string tenant = "") = 0;
+  virtual int atlas_object_creation(lineage_req * const lr, const string tenant = "") = 0;
+  virtual int atlas_object_gotten(lineage_req * const lr, const string tenant = "") = 0;
+  virtual int atlas_object_deletion(lineage_req * const lr, const string tenant = "") = 0;
+  virtual int atlas_object_multi_deletion(lineage_req * const lr, const string tenant = "") = 0;
+  virtual int atlas_object_copy(lineage_req * const lr, const string tenant = "") = 0;
 
-  virtual bool is_atlas_health_ok() = 0;
+  virtual bool is_atlas_health_ok(const string tenant = "") = 0;
 };
 
 #endif

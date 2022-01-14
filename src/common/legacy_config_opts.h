@@ -178,7 +178,7 @@ OPTION(ms_async_rdma_type, OPT_STR)
 OPTION(ms_max_accept_failures, OPT_INT)
 
 OPTION(ms_dpdk_port_id, OPT_INT)
-SAFE_OPTION(ms_dpdk_coremask, OPT_STR)        // it is modified in unittest so that use SAFE_OPTION to declare 
+SAFE_OPTION(ms_dpdk_coremask, OPT_STR)        // it is modified in unittest so that use SAFE_OPTION to declare
 OPTION(ms_dpdk_memory_channel, OPT_STR)
 OPTION(ms_dpdk_hugepages, OPT_STR)
 OPTION(ms_dpdk_pmd, OPT_STR)
@@ -557,7 +557,7 @@ OPTION(osd_data, OPT_STR)
 OPTION(osd_journal, OPT_STR)
 OPTION(osd_journal_size, OPT_INT)         // in mb
 OPTION(osd_journal_flush_on_shutdown, OPT_BOOL) // Flush journal to data store on shutdown
-// flags for specific control purpose during osd mount() process. 
+// flags for specific control purpose during osd mount() process.
 // e.g., can be 1 to skip over replaying journal
 // or 2 to skip over mounting omap or 3 to skip over both.
 // This might be helpful in case the journal is totally corrupted
@@ -867,7 +867,7 @@ OPTION(osd_snap_trim_cost, OPT_U32) // set default cost equal to 1MB io
 
 OPTION(osd_scrub_priority, OPT_U32)
 // set default cost equal to 50MB io
-OPTION(osd_scrub_cost, OPT_U32) 
+OPTION(osd_scrub_cost, OPT_U32)
 // set requested scrub priority higher than scrub priority to make the
 // requested scrubs jump the queue of scheduled scrubs
 OPTION(osd_requested_scrub_priority, OPT_U32)
@@ -1004,15 +1004,15 @@ OPTION(bluestore_compression_max_blob_size_ssd, OPT_U32)
 /*
  * Specifies minimum expected amount of saved allocation units
  * per single blob to enable compressed blobs garbage collection
- * 
+ *
  */
-OPTION(bluestore_gc_enable_blob_threshold, OPT_INT)  
+OPTION(bluestore_gc_enable_blob_threshold, OPT_INT)
 /*
  * Specifies minimum expected amount of saved allocation units
  * per all blobsb to enable compressed blobs garbage collection
- * 
+ *
  */
-OPTION(bluestore_gc_enable_total_threshold, OPT_INT)  
+OPTION(bluestore_gc_enable_total_threshold, OPT_INT)
 
 OPTION(bluestore_max_blob_size, OPT_U32)
 OPTION(bluestore_max_blob_size_hdd, OPT_U32)
@@ -1583,6 +1583,8 @@ OPTION(rgw_lineage_manager_retries, OPT_INT) // The number of retries for failed
 
 OPTION(rgw_lineage_init_definition, OPT_BOOL) // Enable init_definition step
 
+OPTION(rgw_lineage_user_tenancy, OPT_BOOL) // Enable lineage user tenancy
+
 OPTION(rgw_lineage_record_getobj, OPT_BOOL) // Enable GET_OBJ recoding to the lineage management system
 OPTION(rgw_lineage_record_external_in, OPT_BOOL) // Enable external_in recoding to the lineage management system
 OPTION(rgw_lineage_record_external_out, OPT_BOOL) // Enable external_out recoding to the lineage management system
@@ -1597,3 +1599,4 @@ OPTION(rgw_lineage_atlas_rest_admin_user, OPT_STR) // Atlas admin user
 OPTION(rgw_lineage_atlas_rest_admin_password, OPT_STR) // Atlas admin password
 OPTION(rgw_lineage_atlas_rest_admin_password_path, OPT_STR) // Path to a file containing the Atlas admin password
 
+OPTION(rgw_lineage_atlas_rest_tenant_header, OPT_STR) // Header marking atlas tenant

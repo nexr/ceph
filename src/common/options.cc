@@ -6902,7 +6902,7 @@ std::vector<Option> get_rgw_options() {
     .set_description("Number of seconds the timeout on the reshard locks (bucket reshard lock and reshard log lock) are set to. As a reshard proceeds these locks can be renewed/extended. If too short, reshards cannot complete and will fail, causing a future reshard attempt. If too long a hung or crashed reshard attempt will keep the bucket locked for an extended period, not allowing RGW to detect the failed reshard attempt and recover.")
     .add_tag("performance")
     .add_service("rgw"),
-    
+
     Option("rgw_reshard_batch_size", Option::TYPE_UINT, Option::LEVEL_ADVANCED)
     .set_default(64)
     .set_min(8)
@@ -7195,6 +7195,7 @@ std::vector<Option> get_rgw_options() {
     .add_see_also("rgw_lineage_manager_interval")
     .add_see_also("rgw_lineage_manager_retries")
     .add_see_also("rgw_lineage_init_definition")
+    .add_see_also("rgw_lineage_user_tenancy")
     .add_see_also("rgw_lineage_record_getobj")
     .add_see_also("rgw_lineage_record_external_in")
     .add_see_also("rgw_lineage_backend"),
@@ -7213,6 +7214,12 @@ std::vector<Option> get_rgw_options() {
     .set_default(false)
     .set_description("Enable init_definition step")
     .set_flag(Option::FLAG_STARTUP),
+
+    Option("rgw_lineage_user_tenancy", Option::TYPE_BOOL, Option::LEVEL_ADVANCED)
+    .set_default(false)
+    .set_description("Enable lineage user tenency")
+    .set_flag(Option::FLAG_STARTUP)
+    .add_see_also("rgw_lineage_atlas_rest_tenant_header"),
 
     Option("rgw_lineage_record_getobj", Option::TYPE_BOOL, Option::LEVEL_ADVANCED)
     .set_default(false)
@@ -7267,6 +7274,11 @@ std::vector<Option> get_rgw_options() {
     Option("rgw_lineage_atlas_rest_admin_password_path", Option::TYPE_STR, Option::LEVEL_ADVANCED)
     .set_default("")
     .set_description("Path to a file containing the Atlas admin password.")
+    .set_flag(Option::FLAG_RUNTIME),
+
+    Option("rgw_lineage_atlas_rest_tenant_header", Option::TYPE_STR, Option::LEVEL_ADVANCED)
+    .set_default("X-Nes-Atlas-Tenant")
+    .set_description("Header marking atlas tenant")
     .set_flag(Option::FLAG_RUNTIME),
 
   });

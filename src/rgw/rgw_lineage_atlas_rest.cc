@@ -32,7 +32,7 @@ static inline std::string read_secret(const std::string& file_path)
   return s;
 }
 
-int RGWLineageAtlasRest::send_curl(const string& method, const string& path, bufferlist * const ret_body_bl, const string& data, bool versioned)
+int RGWLineageAtlasRest::send_curl(const string tenant, const string method, const string path, bufferlist * const ret_body_bl, const string data, bool versioned)
 {
   string rest_endpoint = cct->_conf->rgw_lineage_atlas_rest_url;
 
@@ -74,6 +74,11 @@ int RGWLineageAtlasRest::send_curl(const string& method, const string& path, buf
   http_tx.append_header("Content-Type", "application/json");
   http_tx.append_header("Accept", "application/json");
 
+  if (! tenant.empty()) {
+    string atlas_tenant_header = cct->_conf->rgw_lineage_atlas_rest_tenant_header;
+    http_tx.append_header(atlas_tenant_header, tenant);
+  }
+
   dout(20) << __func__ << "(): send data = " << data << dendl;
 
   http_tx.set_post_data(data);
@@ -86,7 +91,7 @@ int RGWLineageAtlasRest::send_curl(const string& method, const string& path, buf
   return http_tx.get_http_status();
 }
 
-int RGWLineageAtlasRest::search_entities(vector<string> & out, const string qname, const string type_name, bool exclude_deleted_entities)
+int RGWLineageAtlasRest::search_entities(vector<string> & out, const string tenant, const string qname, const string type_name, bool exclude_deleted_entities)
 {
   string path;
   path  = "search/dsl";
@@ -97,7 +102,7 @@ int RGWLineageAtlasRest::search_entities(vector<string> & out, const string qnam
   dout(25) << __func__ << "(): query path = " << path << dendl;
 
   bufferlist search_ret_body;
-  int ret = send_curl("GET", path, &search_ret_body);
+  int ret = send_curl(tenant, "GET", path, &search_ret_body);
 
   if (ret != 200) {
     dout(10) << __func__ << "(): Failed to get search result form atlas" << dendl;
@@ -121,10 +126,10 @@ int RGWLineageAtlasRest::search_entities(vector<string> & out, const string qnam
   return out.size();
 }
 
-bool RGWLineageAtlasRest::is_entity_exist_with_qname(const string qualified_name, const string type_name, bool exclude_deleted_entities)
+bool RGWLineageAtlasRest::is_entity_exist_with_qname(const string tenant, const string qualified_name, const string type_name, bool exclude_deleted_entities)
 {
   vector<string> entities;
-  int count = search_entities(entities, qualified_name, type_name, exclude_deleted_entities);
+  int count = search_entities(entities, tenant, qualified_name, type_name, exclude_deleted_entities);
 
   return (count > 0);
 }
@@ -153,10 +158,10 @@ const string RGWLineageAtlasRest::extract_guid_from_entity(const string entity_s
   return guid;
 }
 
-int RGWLineageAtlasRest::query_guid_first_with_qname(string& guid, const string qualified_name, const string type_name, bool exclude_deleted_entities)
+int RGWLineageAtlasRest::query_guid_first_with_qname(string& guid, const string tenant, const string qualified_name, const string type_name, bool exclude_deleted_entities)
 {
   vector<string> entities;
-  int count = search_entities(entities, qualified_name, type_name, exclude_deleted_entities);
+  int count = search_entities(entities, tenant, qualified_name, type_name, exclude_deleted_entities);
 
   if (count == 0) {
     dout(20) << __func__ << "(): The search entity not exists." << dendl;
@@ -177,13 +182,13 @@ int RGWLineageAtlasRest::query_guid_first_with_qname(string& guid, const string 
   return 0;
 }
 
-int RGWLineageAtlasRest::query_attribute_value(string& value, const string guid, const string attr)
+int RGWLineageAtlasRest::query_attribute_value(string& value, const string tenant, const string guid, const string attr)
 {
   if (guid.empty()) return -1;
   if (attr.empty()) return -1;
 
   bufferlist entity_ret_body;
-  int ret = send_curl("GET", "/entity/guid/" + guid, &entity_ret_body);
+  int ret = send_curl(tenant, "GET", "/entity/guid/" + guid, &entity_ret_body);
 
   if (ret != 200) {
     dout(10) << __func__ << "(): Failed to get entity result form atlas. guid = " << guid << dendl;
@@ -259,7 +264,7 @@ long RGWLineageAtlasRest::time_to_long_msec(lineage_req::time & t)
   return ret;
 }
 
-int RGWLineageAtlasRest::record_request(lineage_req * const lr, JSONFormattable* in, JSONFormattable* out)
+int RGWLineageAtlasRest::record_request(const string tenant, lineage_req * const lr, JSONFormattable* in, JSONFormattable* out)
 {
   int ret = 0;
 
@@ -272,7 +277,7 @@ int RGWLineageAtlasRest::record_request(lineage_req * const lr, JSONFormattable*
   string server_qname = server_id + "/" + server_fsid;
 
   string server_guid;
-  ret = query_guid_first_with_qname(server_guid, server_qname, "aws_s3_server");
+  ret = query_guid_first_with_qname(server_guid, tenant, server_qname, "aws_s3_server");
   if (ret != 0) {
     dout(10) << __func__ << "(): Failed to get server guid" << dendl;
     return ret;
@@ -306,7 +311,7 @@ int RGWLineageAtlasRest::record_request(lineage_req * const lr, JSONFormattable*
 
     jf.flush(ss);
 
-    ret = send_curl("POST", "/entity", ss.str());
+    ret = send_curl(tenant, "POST", "/entity", ss.str());
 
     if (ret != 200) {
       dout(10) << __func__ << "(): Failed to create server entity" << dendl;
@@ -381,12 +386,12 @@ int RGWLineageAtlasRest::record_request(lineage_req * const lr, JSONFormattable*
 
   jf.flush(ss);
 
-  ret = send_curl("POST", "/entity", ss.str());
+  ret = send_curl(tenant, "POST", "/entity", ss.str());
 
   return ret;
 }
 
-int RGWLineageAtlasRest::create_bucket(lineage_req * const lr)
+int RGWLineageAtlasRest::create_bucket(lineage_req * const lr, const string tenant)
 {
   int ret = -1;
 
@@ -425,7 +430,7 @@ int RGWLineageAtlasRest::create_bucket(lineage_req * const lr)
   stringstream ss;
   jf.flush(ss);
 
-  ret = send_curl("POST", "/entity", ss.str());
+  ret = send_curl(tenant, "POST", "/entity", ss.str());
 
   if (ret != 200) {
     dout(10) << __func__ << "(): Failed to create '" << bucket_name << "' bucket entity" << dendl;
@@ -434,7 +439,7 @@ int RGWLineageAtlasRest::create_bucket(lineage_req * const lr)
   return ret;
 }
 
-int RGWLineageAtlasRest::create_object(lineage_req * const lr)
+int RGWLineageAtlasRest::create_object(lineage_req * const lr, const string tenant)
 {
   int ret = -1;
 
@@ -448,8 +453,8 @@ int RGWLineageAtlasRest::create_object(lineage_req * const lr)
   long   size        = lr->object_size;
   string etag        = lr->object_etag;
 
-  if (! is_entity_exist_with_qname(make_s3_qname(bucket_name), "aws_s3_v2_bucket")) {
-    ret = create_bucket(lr);
+  if (! is_entity_exist_with_qname(tenant, make_s3_qname(bucket_name), "aws_s3_v2_bucket")) {
+    ret = create_bucket(lr, tenant);
     if (ret != 200) {
       dout(10) << __func__ << "(): Failed to create dummy bucket '" << bucket_name << "'" << dendl;
       return ret;
@@ -512,7 +517,7 @@ int RGWLineageAtlasRest::create_object(lineage_req * const lr)
   stringstream ss;
   jf.flush(ss);
 
-  ret = send_curl("POST", "/entity/bulk", ss.str());
+  ret = send_curl(tenant, "POST", "/entity/bulk", ss.str());
   if (ret != 200) {
     dout(10) << __func__ << "(): Failed to create '" << bucket_name
                          << "/" << object_name << "' object entity" << dendl;
@@ -521,7 +526,7 @@ int RGWLineageAtlasRest::create_object(lineage_req * const lr)
   return ret;
 }
 
-int RGWLineageAtlasRest::atlas_init_definition()
+int RGWLineageAtlasRest::atlas_init_definition(const string tenant)
 {
   int ret = 0;
 
@@ -709,7 +714,7 @@ int RGWLineageAtlasRest::atlas_init_definition()
   stringstream ss;
   jf.flush(ss);
 
-  ret = send_curl("POST", "/types/typedefs", ss.str());
+  ret = send_curl(tenant, "POST", "/types/typedefs", ss.str());
 
   if (ret == 409) { ret = 200; } //* return 409 if already exist*/
 
@@ -720,11 +725,11 @@ int RGWLineageAtlasRest::atlas_init_definition()
   return ret;
 }
 
-int RGWLineageAtlasRest::atlas_bucket_creation(lineage_req * const lr)
+int RGWLineageAtlasRest::atlas_bucket_creation(lineage_req * const lr, const string tenant)
 {
   int ret = 0;
 
-  ret = create_bucket(lr);
+  ret = create_bucket(lr, tenant);
   if (ret != 200) return ret;
 
   string bucket_name = lr->bucket;
@@ -741,17 +746,17 @@ int RGWLineageAtlasRest::atlas_bucket_creation(lineage_req * const lr)
     out_jf.close_section(); // ""
   }
 
-  return record_request(lr, NULL, &out_jf);
+  return record_request(tenant, lr, NULL, &out_jf);
 }
 
-int RGWLineageAtlasRest::atlas_bucket_deletion(lineage_req * const lr)
+int RGWLineageAtlasRest::atlas_bucket_deletion(lineage_req * const lr, const string tenant)
 {
   int ret = 0;
 
   string bucket_name = lr->bucket;
 
   string bucket_guid;
-  ret = query_guid_first_with_qname(bucket_guid, make_s3_qname(bucket_name), "aws_s3_v2_bucket");
+  ret = query_guid_first_with_qname(bucket_guid, tenant, make_s3_qname(bucket_name), "aws_s3_v2_bucket");
   if (ret != 0) {
     dout(10) << __func__ << "(): Failed to get guid" << dendl;
     return ret;
@@ -770,22 +775,22 @@ int RGWLineageAtlasRest::atlas_bucket_deletion(lineage_req * const lr)
     in_jf.close_section(); // }
   }
 
-  ret = record_request(lr, &in_jf, NULL);
+  ret = record_request(tenant, lr, &in_jf, NULL);
   if (ret != 200) {
     dout(10) << __func__ << "(): Failed to record request before delete bucket entity" << dendl;
     return ret;
   }
 
-  ret = send_curl("DELETE", "/entity/guid/"+bucket_guid);
+  ret = send_curl(tenant, "DELETE", "/entity/guid/"+bucket_guid);
 
   return ret;
 }
 
-int RGWLineageAtlasRest::atlas_object_creation(lineage_req * const lr)
+int RGWLineageAtlasRest::atlas_object_creation(lineage_req * const lr, const string tenant)
 {
   int ret = -1;
 
-  ret = create_object(lr);
+  ret = create_object(lr, tenant);
   if (ret != 200) return ret;
 
   string bucket_name = lr->bucket;
@@ -815,18 +820,18 @@ int RGWLineageAtlasRest::atlas_object_creation(lineage_req * const lr)
     out_jf.close_section(); // }
   }
 
-  return record_request(lr, &in_jf, &out_jf);
+  return record_request(tenant, lr, &in_jf, &out_jf);
 }
 
-int RGWLineageAtlasRest::atlas_object_gotten(lineage_req * const lr)
+int RGWLineageAtlasRest::atlas_object_gotten(lineage_req * const lr, const string tenant)
 {
   int ret = -1;
 
   string bucket_name = lr->bucket;
   string object_name = lr->object;
 
-  if (! is_entity_exist_with_qname(make_s3_qname(bucket_name, object_name), "aws_s3_v2_object")) {
-    ret = create_object(lr);
+  if (! is_entity_exist_with_qname(tenant, make_s3_qname(bucket_name, object_name), "aws_s3_v2_object")) {
+    ret = create_object(lr, tenant);
     if (ret != 200) {
       dout(10) << __func__ << "(): Failed to create dummy object '" << object_name << "'" << dendl;
       return ret;
@@ -856,7 +861,7 @@ int RGWLineageAtlasRest::atlas_object_gotten(lineage_req * const lr)
     stringstream ss;
     jf.flush(ss);
 
-    ret = send_curl("POST", "/entity", ss.str());
+    ret = send_curl(tenant, "POST", "/entity", ss.str());
     if (ret != 200) {
       dout(10) << __func__ << "(): Failed to create 'external_out' entity" << dendl;
       return ret;
@@ -887,10 +892,10 @@ int RGWLineageAtlasRest::atlas_object_gotten(lineage_req * const lr)
     out_jf.close_section(); // }
   }
 
-  return record_request(lr, &in_jf, &out_jf);
+  return record_request(tenant, lr, &in_jf, &out_jf);
 }
 
-int RGWLineageAtlasRest::atlas_object_deletion(lineage_req * const lr)
+int RGWLineageAtlasRest::atlas_object_deletion(lineage_req * const lr, const string tenant)
 {
   int ret = -1;
 
@@ -898,7 +903,7 @@ int RGWLineageAtlasRest::atlas_object_deletion(lineage_req * const lr)
   string object_name = lr->object;
 
   string object_guid;
-  ret = query_guid_first_with_qname(object_guid, make_s3_qname(bucket_name, object_name), "aws_s3_v2_object");
+  ret = query_guid_first_with_qname(object_guid, tenant, make_s3_qname(bucket_name, object_name), "aws_s3_v2_object");
   if (ret != 0) {
     dout(10) << __func__ << "(): Failed to get guid of " << bucket_name << "/" << object_name << dendl;
     return ret;
@@ -917,19 +922,19 @@ int RGWLineageAtlasRest::atlas_object_deletion(lineage_req * const lr)
     in_jf.close_section(); // }
   }
 
-  ret = record_request(lr, &in_jf, NULL);
+  ret = record_request(tenant, lr, &in_jf, NULL);
 
   if (ret != 200) {
     dout(10) << __func__ << "(): Failed to record request before delete object entity" << dendl;
     return ret;
   }
 
-  ret = send_curl("DELETE", "/entity/guid/"+object_guid);
+  ret = send_curl(tenant, "DELETE", "/entity/guid/"+object_guid);
 
   return ret;
 }
 
-int RGWLineageAtlasRest::atlas_object_multi_deletion(lineage_req * const lr)
+int RGWLineageAtlasRest::atlas_object_multi_deletion(lineage_req * const lr, const string tenant)
 {
   int ret = 0;
 
@@ -963,7 +968,7 @@ int RGWLineageAtlasRest::atlas_object_multi_deletion(lineage_req * const lr)
     each_lr = *lr;
     each_lr.object = (*iter).name;
 
-    ret = atlas_object_deletion(&each_lr);
+    ret = atlas_object_deletion(&each_lr, tenant);
     if (ret != 200) {
       dout(10) << __func__ << "(): Failed to delete '"
                            << each_lr.object << "' object" << dendl;
@@ -974,7 +979,7 @@ int RGWLineageAtlasRest::atlas_object_multi_deletion(lineage_req * const lr)
   return ret;
 }
 
-int RGWLineageAtlasRest::atlas_object_copy(lineage_req * const lr)
+int RGWLineageAtlasRest::atlas_object_copy(lineage_req * const lr, const string tenant)
 {
   int ret = -1;
 
@@ -984,7 +989,7 @@ int RGWLineageAtlasRest::atlas_object_copy(lineage_req * const lr)
   string src_object_name = lr->src_object;
 
   string src_qname = make_s3_qname(src_bucket_name, src_object_name);
-  if (! is_entity_exist_with_qname(src_qname, "aws_s3_v2_object")) {
+  if (! is_entity_exist_with_qname(tenant, src_qname, "aws_s3_v2_object")) {
     lineage_req dummy_put_obj;
 
     dummy_put_obj.bucket = src_bucket_name;
@@ -997,7 +1002,7 @@ int RGWLineageAtlasRest::atlas_object_copy(lineage_req * const lr)
 
     dummy_put_obj.zonegroup = lr->zonegroup;
 
-    ret = create_object(&dummy_put_obj);
+    ret = create_object(&dummy_put_obj, tenant);
     if (ret != 200) {
       dout(10) << __func__ << "(): Failed to create dummy object '" << src_object_name << "'" << dendl;
       return ret;
@@ -1005,15 +1010,15 @@ int RGWLineageAtlasRest::atlas_object_copy(lineage_req * const lr)
   }
   else if (lr->object_size == 0) {
     string found_guid;
-    query_guid_first_with_qname(found_guid, src_qname, "aws_s3_v2_object");
+    query_guid_first_with_qname(found_guid, tenant, src_qname, "aws_s3_v2_object");
 
     string queried_size;
-    query_attribute_value(queried_size, found_guid, "size");
+    query_attribute_value(queried_size, tenant, found_guid, "size");
 
     lr->object_size = (queried_size.empty()) ? 0 : stol(queried_size);
   }
 
-  ret = create_object(lr);
+  ret = create_object(lr, tenant);
   if (ret != 200) {
     dout(10) << __func__ << "(): Failed to create '" << lr->object << "' object entity" << dendl;
     return ret;
@@ -1043,11 +1048,11 @@ int RGWLineageAtlasRest::atlas_object_copy(lineage_req * const lr)
     out_jf.close_section(); // }
   }
 
-  return record_request(lr, &in_jf, &out_jf);
+  return record_request(tenant, lr, &in_jf, &out_jf);
 }
 
-bool RGWLineageAtlasRest::is_atlas_health_ok() {
-  int ret = send_curl("GET", "/admin/version", false);
+bool RGWLineageAtlasRest::is_atlas_health_ok(const string tenant) {
+  int ret = send_curl(tenant, "GET", "/admin/version", false);
 
   return ( ret == 200 );
 }

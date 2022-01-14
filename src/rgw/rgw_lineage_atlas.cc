@@ -29,47 +29,47 @@ RGWLineageAtlas::~RGWLineageAtlas()
   }
 }
 
-int RGWLineageAtlas::apply_lineage_init_definition()
+int RGWLineageAtlas::apply_lineage_init_definition(const string tenant)
 {
-  return impl->atlas_init_definition();
+  return impl->atlas_init_definition(tenant);
 }
 
-int RGWLineageAtlas::apply_lineage_bucket_creation(lineage_req * const lr)
+int RGWLineageAtlas::apply_lineage_bucket_creation(lineage_req * const lr, const string tenant)
 {
-  return impl->atlas_bucket_creation(lr);
+  return impl->atlas_bucket_creation(lr, tenant);
 }
 
-int RGWLineageAtlas::apply_lineage_bucket_deletion(lineage_req * const lr)
+int RGWLineageAtlas::apply_lineage_bucket_deletion(lineage_req * const lr, const string tenant)
 {
-  return impl->atlas_bucket_deletion(lr);
+  return impl->atlas_bucket_deletion(lr, tenant);
 }
 
-int RGWLineageAtlas::apply_lineage_object_creation(lineage_req * const lr)
+int RGWLineageAtlas::apply_lineage_object_creation(lineage_req * const lr, const string tenant)
 {
-  return impl->atlas_object_creation(lr);
+  return impl->atlas_object_creation(lr, tenant);
 }
 
-int RGWLineageAtlas::apply_lineage_object_gotten(lineage_req * const lr)
+int RGWLineageAtlas::apply_lineage_object_gotten(lineage_req * const lr, const string tenant)
 {
-  return impl->atlas_object_gotten(lr);
+  return impl->atlas_object_gotten(lr, tenant);
 }
 
-int RGWLineageAtlas::apply_lineage_object_deletion(lineage_req * const lr)
+int RGWLineageAtlas::apply_lineage_object_deletion(lineage_req * const lr, const string tenant)
 {
-  return impl->atlas_object_deletion(lr);
+  return impl->atlas_object_deletion(lr, tenant);
 }
 
-int RGWLineageAtlas::apply_lineage_object_multi_deletion(lineage_req * const lr)
+int RGWLineageAtlas::apply_lineage_object_multi_deletion(lineage_req * const lr, const string tenant)
 {
-  return impl->atlas_object_multi_deletion(lr);
+  return impl->atlas_object_multi_deletion(lr, tenant);
 }
 
-int RGWLineageAtlas::apply_lineage_object_copy(lineage_req * const lr)
+int RGWLineageAtlas::apply_lineage_object_copy(lineage_req * const lr, const string tenant)
 {
-  return impl->atlas_object_copy(lr);
+  return impl->atlas_object_copy(lr, tenant);
 }
 
-bool RGWLineageAtlas::is_lineage_health_ok()
+bool RGWLineageAtlas::is_lineage_health_ok(const string tenant)
 {
-  return impl->is_atlas_health_ok();
+  return impl->is_atlas_health_ok(tenant);
 }

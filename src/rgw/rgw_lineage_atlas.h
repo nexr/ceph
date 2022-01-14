@@ -18,15 +18,15 @@ public:
 
   ImplType get_impl_type() { return impl_type; }
 
-  int apply_lineage_init_definition() override;
+  int apply_lineage_init_definition(const string tenant) override;
 
-  int apply_lineage_bucket_creation(lineage_req * const lr) override;
-  int apply_lineage_bucket_deletion(lineage_req * const lr) override;
-  int apply_lineage_object_creation(lineage_req * const lr) override;
-  int apply_lineage_object_gotten(lineage_req * const lr) override;
-  int apply_lineage_object_deletion(lineage_req * const lr) override;
-  int apply_lineage_object_multi_deletion(lineage_req * const lr) override;
-  int apply_lineage_object_copy(lineage_req * const lr) override;
+  int apply_lineage_bucket_creation(lineage_req * const lr, const string tenant) override;
+  int apply_lineage_bucket_deletion(lineage_req * const lr, const string tenant) override;
+  int apply_lineage_object_creation(lineage_req * const lr, const string tenant) override;
+  int apply_lineage_object_gotten(lineage_req * const lr, const string tenant) override;
+  int apply_lineage_object_deletion(lineage_req * const lr, const string tenant) override;
+  int apply_lineage_object_multi_deletion(lineage_req * const lr, const string tenant) override;
+  int apply_lineage_object_copy(lineage_req * const lr, const string tenant) override;
 
-  bool is_lineage_health_ok() override;
+  bool is_lineage_health_ok(const string tenant) override;
 };

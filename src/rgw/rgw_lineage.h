@@ -24,6 +24,9 @@ private:
 
   bool can_init = false;
 
+  bool user_tenancy = false;
+  map<string, bool> tenant_init;
+
   const string optype_to_string(RGWOpType op_type);
   const string get_etag(RGWOp * op);
   const bufferlist get_data(RGWOp* op);
