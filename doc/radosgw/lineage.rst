@@ -139,17 +139,17 @@ Using user tenancy for apache atlas lineage management system (RestAPI)
 
 .. ditaa::
 
-                                                                             If Atlas Tenant Header is "A"   +-----------+
-                                                                            +------------------------------> +  Atlas A  | !Request recv.!
-           +---------------------+                          +------------+  |                                +-----------+
-           | Ceph Object Gateway |                          |            +--+
-           |   +-----------------+  Atlas Tenant Header(A)  |            |   If Atlas Tenant Header is "B"   +-----------+
-           |   | Lineage Manager + -----------------------> + Http Proxy +-===============================-> +  Atlas B  |
-           +---+-----------------+                          |            |                                   +-----------+
-                                                            |            +-=+
-                                                            +------------+  :             Else               +-----------+
-                                                                            +-============================-> +  Atlas C  |
-                                                                                                             +-----------+
+                                                                    If Atlas Tenant Header is "A"   +---------+
+                                                                   +------------------------------> + Atlas A | !Request recv.!
+ +---------------------+                          +------------+   |                                +---------+
+ | Ceph Object Gateway |                          |            +---+
+ |   +-----------------+  Atlas Tenant Header(A)  |            |    If Atlas Tenant Header is "B"   +---------+
+ |   | Lineage Manager + -----------------------> + Http Proxy +-================================-> + Atlas B |
+ +---+-----------------+                          |            |                                    +---------+
+                                                  |            +-==+
+                                                  +------------+   :             Else               +---------+
+                                                                   +-============================-> + Atlas C |
+                                                                                                    +---------+
 
 When user tenancy feature is enabled, atlas restAPI based lineage integration put user tenant info on header of lineage request.
 You can change ``rgw_lineage_atlas_rest_tenant_header`` to specify the header name. (defualt: "X-Nes-Atlas-Tenant")
