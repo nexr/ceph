@@ -147,8 +147,7 @@ class ObjstoreUsersync(MgrModule):
         subproc = subprocess.Popen(
             full_cmd.split(' '),
             stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE
-        )
+            stderr=subprocess.PIPE)
 
         out, err = subproc.communicate()
         rc = subproc.returncode
@@ -163,13 +162,13 @@ class ObjstoreUsersync(MgrModule):
 
         self.log.debug("%s request: %s" % (method, url))
 
-        basic_auth = HTTPBasicAuth(self.ranger_admin_user, self.ranger_admin_password)
-
         response = None
 
-        if   (method == "GET")    : response = requests.get(url, auth=basic_auth)
-        elif (method == "PUT")    : response = requests.put(url, auth=basic_auth, json=data)
-        elif (method == "POST")   : response = requests.post(url, auth=basic_auth, json=data)
+        basic_auth = HTTPBasicAuth(self.ranger_admin_user, self.ranger_admin_password)
+
+        if   (method == "GET"   ) : response = requests.get(url, auth=basic_auth)
+        elif (method == "PUT"   ) : response = requests.put(url, auth=basic_auth, json=data)
+        elif (method == "POST"  ) : response = requests.post(url, auth=basic_auth, json=data)
         elif (method == "DELETE") : response = requests.delete(url, auth=basic_auth)
 
         if (response == None):
@@ -189,7 +188,6 @@ class ObjstoreUsersync(MgrModule):
         self.ranger_group_id = ""
 
         group_query_path = "/xusers/groups/groupName/%s" % self.sync_tenant
-
         resp, scode = self._request_ranger_rest("get", group_query_path)
 
         if scode == 200:
@@ -231,13 +229,13 @@ class ObjstoreUsersync(MgrModule):
         need_continue = True
         offset = 0
         while need_continue:
-            user_list_path  = "/xusers/%s/users?startIndex=%d" % (group_id, offset)
+            user_list_path = "/xusers/%s/users?startIndex=%d" % (group_id, offset)
             resp, scode = self._request_ranger_rest("get", user_list_path)
             is_success  = (scode == 200)
 
             if is_success:
-                result_size  = int(resp['vxUserList']['resultSize'])
-                page_size    = int(resp['vxUserList']['pageSize'])
+                result_size = int(resp['vxUserList']['resultSize'])
+                page_size   = int(resp['vxUserList']['pageSize'])
 
                 # when result_size is 1, vXUsers was not array
                 if result_size == 1:
@@ -331,7 +329,7 @@ class ObjstoreUsersync(MgrModule):
         if is_success:
             result_size = int(resp['vxGroupList']['resultSize'])
 
-            # when result_size is 1, result_users was not array
+            # when result_size is 1, vXGroups was not array
             if result_size == 1:
                 user_groups = [ resp['vxGroupList']['vXGroups']['id'] ]
             elif result_size > 1:
@@ -400,7 +398,7 @@ class ObjstoreUsersync(MgrModule):
         if is_success:
             result_size = int(resp['vxGroupList']['resultSize'])
 
-            # when result_size is 1, result_users was not array
+            # when result_size is 1, vXGroups was not array
             if result_size == 1:
                 user_groups = [ resp['vxGroupList']['vXGroups']['id'] ]
             elif result_size > 1:
