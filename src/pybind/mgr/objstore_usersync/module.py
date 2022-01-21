@@ -24,7 +24,7 @@ class ObjstoreUsersync(MgrModule):
             'type': 'int',
             'default': 30,
             'min': 30,
-            'desc': 'How frequently to synchronize user (must be above 60)',
+            'desc': 'How frequently to synchronize user (must be above 30)',
             'runtime': True,
         },
         {
