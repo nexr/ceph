@@ -77,7 +77,7 @@ class ObjstoreUsersync(MgrModule):
             'type': 'bool',
             'default': True,
             'desc': 'Whether remove user hardly or not. ' + \
-                    'When it set False, the user would become invisible instead of removed',
+                    'When it set False, the user would become invisible instead removed',
             'runtime': True,
         },
     ]
