@@ -76,7 +76,8 @@ class ObjstoreUsersync(MgrModule):
             'name': 'ranger_user_hard_remove',
             'type': 'bool',
             'default': True,
-            'desc': 'endpoint of target statuspage',
+            'desc': 'Whether remove user hardly or not. ' + \
+                    'When it set False, the user would become invisible instead of removed',
             'runtime': True,
         },
     ]
