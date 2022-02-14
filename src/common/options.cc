@@ -6080,6 +6080,34 @@ std::vector<Option> get_rgw_options() {
     .set_default(false)
     .set_description("Should OPA be used to authorize client requests."),
 
+    Option("rgw_ranger_url", Option::TYPE_STR, Option::LEVEL_ADVANCED)
+    .set_default("")
+    .set_description("URL to Ranger server."),
+
+    Option("rgw_ranger_admin_user", Option::TYPE_STR, Option::LEVEL_ADVANCED)
+    .set_default("")
+    .set_description("The Ranger admin user name to authenticate client requests."),
+
+    Option("rgw_ranger_admin_password", Option::TYPE_STR, Option::LEVEL_ADVANCED)
+    .set_default("")
+    .set_description("The Ranger admin user password to authenticate client requests."),
+
+    Option("rgw_ranger_admin_password_path", Option::TYPE_STR, Option::LEVEL_ADVANCED)
+    .set_default("")
+    .set_description("Path to a file containing the Ranger admin password."),
+
+    Option("rgw_ranger_tenant", Option::TYPE_STR, Option::LEVEL_ADVANCED)
+    .set_default("nes")
+    .set_description("The ranger group name for tenant of this cluster"),
+
+    Option("rgw_ranger_verify_ssl", Option::TYPE_BOOL, Option::LEVEL_ADVANCED)
+    .set_default(true)
+    .set_description("Should RGW verify the Ranger server SSL certificate."),
+
+    Option("rgw_use_ranger_authz", Option::TYPE_BOOL, Option::LEVEL_ADVANCED)
+    .set_default(false)
+    .set_description("Should Ranger be used to authorize client requests."),
+
     Option("rgw_admin_entry", Option::TYPE_STR, Option::LEVEL_ADVANCED)
     .set_default("admin")
     .set_description("Path prefix to be used for accessing RGW RESTful admin API."),

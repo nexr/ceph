@@ -175,6 +175,7 @@ set(rgw_a_srcs
   rgw_swift_auth.cc
   rgw_usage.cc
   rgw_opa.cc
+  rgw_ranger.cc
   rgw_sts.cc
   rgw_rest_sts.cc)
 

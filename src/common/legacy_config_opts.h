@@ -1367,6 +1367,14 @@ OPTION(rgw_opa_token, OPT_STR)  // Bearer token OPA uses to authenticate client 
 OPTION(rgw_opa_verify_ssl, OPT_BOOL) // should we try to verify OPA's ssl
 OPTION(rgw_use_opa_authz, OPT_BOOL) // should we use OPA to authorize client requests?
 
+OPTION(rgw_ranger_url, OPT_STR)  // url for Ranger server
+OPTION(rgw_ranger_admin_user, OPT_STR)  // The Ranger admin user name to authenticate client requests
+OPTION(rgw_ranger_admin_password, OPT_STR)  // The Ranger admin user password to authenticate client requests
+OPTION(rgw_ranger_admin_password_path, OPT_STR)  // Path to a file containing the Ranger admin password
+OPTION(rgw_ranger_tenant, OPT_STR)  // The ranger tenant name for nes
+OPTION(rgw_ranger_verify_ssl, OPT_BOOL) // should we try to verify Ranger's ssl
+OPTION(rgw_use_ranger_authz, OPT_BOOL) // should we use Ranger to authorize client requests?
+
 /* OpenLDAP-style LDAP parameter strings */
 /* rgw_ldap_uri  space-separated list of LDAP servers in URI format */
 OPTION(rgw_ldap_uri, OPT_STR)
