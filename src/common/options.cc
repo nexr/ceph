@@ -6082,23 +6082,31 @@ std::vector<Option> get_rgw_options() {
 
     Option("rgw_ranger_url", Option::TYPE_STR, Option::LEVEL_ADVANCED)
     .set_default("")
-    .set_description("URL to Ranger server."),
+    .set_description("URL to Ranger server.")
+    .set_flag(Option::FLAG_RUNTIME),
 
     Option("rgw_ranger_admin_user", Option::TYPE_STR, Option::LEVEL_ADVANCED)
     .set_default("")
-    .set_description("The Ranger admin user name to authenticate client requests."),
+    .set_description("The Ranger admin user name to authenticate client requests.")
+    .add_see_also("rgw_ranger_admin_password")
+    .add_see_also("rgw_ranger_admin_password_path")
+    .set_flag(Option::FLAG_RUNTIME),
 
     Option("rgw_ranger_admin_password", Option::TYPE_STR, Option::LEVEL_ADVANCED)
     .set_default("")
-    .set_description("The Ranger admin user password to authenticate client requests."),
+    .set_description("The Ranger admin user password to authenticate client requests.")
+    .add_see_also("rgw_ranger_admin_password_path")
+    .set_flag(Option::FLAG_RUNTIME),
 
     Option("rgw_ranger_admin_password_path", Option::TYPE_STR, Option::LEVEL_ADVANCED)
     .set_default("")
-    .set_description("Path to a file containing the Ranger admin password."),
+    .set_description("Path to a file containing the Ranger admin password.")
+    .set_flag(Option::FLAG_RUNTIME),
 
     Option("rgw_ranger_tenant", Option::TYPE_STR, Option::LEVEL_ADVANCED)
     .set_default("nes")
-    .set_description("The ranger group name for tenant of this cluster"),
+    .set_description("The ranger group name for tenant of this cluster")
+    .set_flag(Option::FLAG_RUNTIME),
 
     Option("rgw_ranger_verify_ssl", Option::TYPE_BOOL, Option::LEVEL_ADVANCED)
     .set_default(true)
@@ -6106,7 +6114,14 @@ std::vector<Option> get_rgw_options() {
 
     Option("rgw_use_ranger_authz", Option::TYPE_BOOL, Option::LEVEL_ADVANCED)
     .set_default(false)
-    .set_description("Should Ranger be used to authorize client requests."),
+    .set_description("Should Ranger be used to authorize client requests.")
+    .add_see_also("rgw_ranger_url")
+    .add_see_also("rgw_ranger_admin_user")
+    .add_see_also("rgw_ranger_admin_password")
+    .add_see_also("rgw_ranger_admin_password_path")
+    .add_see_also("rgw_ranger_tenant")
+    .add_see_also("rgw_ranger_verify_ssl"),
+
 
     Option("rgw_admin_entry", Option::TYPE_STR, Option::LEVEL_ADVANCED)
     .set_default("admin")
