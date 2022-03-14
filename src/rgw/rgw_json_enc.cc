@@ -36,6 +36,29 @@ void decode_json_obj(obj_version& v, JSONObj *obj)
   JSONDecoder::decode_json("ver", v.ver, obj);
 }
 
+void encode_json(const char *name, const RGWUserEndpoint& val, Formatter *f) {
+  f->open_object_section(name);
+  f->dump_string("type", val.type);
+  f->dump_bool("enabled", val.enabled);
+  f->dump_string("url", val.url);
+  f->dump_string("tenant_group", val.tenant_group);
+  f->dump_string("admin_user", val.admin_user);
+  f->dump_string("admin_password", val.admin_passwd);
+  f->dump_string("admin_password_path", val.admin_passwd_path);
+  f->close_section();
+}
+
+void encode_json(const char *name, const RGWUserEndpoints& val, Formatter *f) {
+  f->open_array_section(name);
+
+  RGWUserEndpoints::const_iterator endp_citer = val.begin();
+  for (;endp_citer != val.end(); endp_citer++) {
+    encode_json(endp_citer->first.c_str(), endp_citer->second, f);
+  }
+
+  f->close_section();
+}
+
 void encode_json(const char *name, const RGWUserCaps& val, Formatter *f)
 {
   val.dump(f, name);
@@ -463,7 +486,6 @@ static void user_info_dump_swift_key(const char *name, const RGWAccessKey& key, 
 
 void RGWUserInfo::dump(Formatter *f) const
 {
-
   encode_json("user_id", user_id.to_str(), f);
   encode_json("display_name", display_name, f);
   encode_json("email", user_email, f);
@@ -513,6 +535,8 @@ void RGWUserInfo::dump(Formatter *f) const
   }
   encode_json("type", user_source_type, f);
   encode_json("mfa_ids", mfa_ids, f);
+
+  encode_json("endpoints", endpoints, f);
 }
 
 
@@ -619,7 +643,7 @@ void rgw_data_placement_target::dump(Formatter *f) const
   encode_json("data_extra_pool", data_extra_pool, f);
   encode_json("index_pool", index_pool, f);
 }
-  
+
 void rgw_data_placement_target::decode_json(JSONObj *obj) {
   JSONDecoder::decode_json("data_pool", data_pool, obj);
   JSONDecoder::decode_json("data_extra_pool", data_extra_pool, obj);
@@ -1387,7 +1411,7 @@ void rgw_meta_sync_info::decode_json(JSONObj *obj)
     state = StateBuildingFullSyncMaps;
   } else if (s == "sync") {
     state = StateSync;
-  }    
+  }
   JSONDecoder::decode_json("num_shards", num_shards, obj);
   JSONDecoder::decode_json("period", period, obj);
   JSONDecoder::decode_json("realm_epoch", realm_epoch, obj);

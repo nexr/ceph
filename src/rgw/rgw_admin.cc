@@ -89,6 +89,9 @@ void usage()
   cout << "  user check                 check user info\n";
   cout << "  user stats                 show user stats as accounted by quota subsystem\n";
   cout << "  user list                  list users\n";
+  cout << "  user endpoint create       create a ranger endpoint\n";
+  cout << "  user endpoint modify       modify ranger endpoint\n";
+  cout << "  user endpoint rm           remove ranger endpoint\n";
   cout << "  caps add                   add user capabilities\n";
   cout << "  caps rm                    remove user capabilities\n";
   cout << "  subuser create             create a new subuser\n" ;
@@ -262,6 +265,16 @@ void usage()
   cout << "   --bucket=<bucket>         Specify the bucket name. Also used by the quota command.\n";
   cout << "   --pool=<pool>             Specify the pool name. Also used to scan for leaked rados objects.\n";
   cout << "   --object=<object>         object name\n";
+  cout << "   --endpoint-url=<url>      url for user endpoint\n";
+  cout << "   --endpoint-admin=<name>   set the admin user name for user endpoint\n";
+  cout << "   --endpoint-admin-passwd=<passwd>\n";
+  cout << "                             set the admin user password for user endpoint\n";
+  cout << "   --endpoint-admin-passwd-path=<path>\n";
+  cout << "                             set path to the admin user password file for user endpoint\n";
+  cout << "   --endpoint-tenant=<tenant>\n";
+  cout << "                             tenant for user endpoint\n";
+  cout << "   --endpoint-type=<type>    set endpoint type for user endpoint\n";
+  cout << "   --endpoint-enabled        set user endpoint enabled flag\n";
   cout << "   --date=<date>             date in the format yyyy-mm-dd\n";
   cout << "   --start-date=<date>       start date in the format yyyy-mm-dd\n";
   cout << "   --end-date=<date>         end date in the format yyyy-mm-dd\n";
@@ -393,6 +406,9 @@ enum {
   OPT_USER_CHECK,
   OPT_USER_STATS,
   OPT_USER_LIST,
+  OPT_USER_ENDP_CREATE,
+  OPT_USER_ENDP_MODIFY,
+  OPT_USER_ENDP_RM,
   OPT_SUBUSER_CREATE,
   OPT_SUBUSER_MODIFY,
   OPT_SUBUSER_RM,
@@ -654,6 +670,19 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
       return OPT_USER_STATS;
     if (strcmp(cmd, "list") == 0)
       return OPT_USER_LIST;
+    if (strcmp(cmd, "endpoint") == 0) {
+      *need_more = true;
+      return 0;
+    }
+  } else if (prev_prev_cmd && strcmp(prev_prev_cmd, "user") == 0) {
+    if (strcmp(prev_cmd, "endpoint") == 0) {
+      if (strcmp(cmd, "create") == 0)
+        return OPT_USER_ENDP_CREATE;
+      if (strcmp(cmd, "modify") == 0)
+        return OPT_USER_ENDP_MODIFY;
+      if (strcmp(cmd, "rm") == 0)
+        return OPT_USER_ENDP_RM;
+    }
   } else if (strcmp(prev_cmd, "subuser") == 0) {
     if (strcmp(cmd, "create") == 0)
       return OPT_SUBUSER_CREATE;
@@ -949,7 +978,7 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
     if (strcmp(cmd, "list") == 0)
       return OPT_SYNC_ERROR_LIST;
     if (strcmp(cmd, "trim") == 0)
-      return OPT_SYNC_ERROR_TRIM; 
+      return OPT_SYNC_ERROR_TRIM;
   } else if (strcmp(prev_cmd, "mdlog") == 0) {
     if (strcmp(cmd, "list") == 0)
       return OPT_MDLOG_LIST;
@@ -2136,7 +2165,7 @@ static void get_md_sync_status(list<string>& status)
     push_ss(ss, status) << "metadata is caught up with master";
   } else {
     push_ss(ss, status) << "metadata is behind on " << total_behind << " shards";
-    
+
     push_ss(ss, status) << "behind shards: " << "[" << shards_behind_set << "]";
 
     map<int, rgw_mdlog_shard_data> master_pos;
@@ -2678,7 +2707,7 @@ static int scan_totp(CephContext *cct, ceph::real_time& now, rados::cls::otp::ot
 
   while (time_ofs_abs < max_skew) {
     int rc = oath_totp_validate2(totp.seed_bin.c_str(), totp.seed_bin.length(),
-                             start_time, 
+                             start_time,
                              step_size,
                              time_ofs,
                              1,
@@ -2686,7 +2715,7 @@ static int scan_totp(CephContext *cct, ceph::real_time& now, rados::cls::otp::ot
                              pins[0].c_str());
     if (rc != OATH_INVALID_OTP) {
       rc = oath_totp_validate2(totp.seed_bin.c_str(), totp.seed_bin.length(),
-                               start_time, 
+                               start_time,
                                step_size,
                                time_ofs - step_size, /* smaller time_ofs moves time forward */
                                1,
@@ -2845,6 +2874,10 @@ int main(int argc, const char **argv)
   list<string> tags_add;
   list<string> tags_rm;
 
+  std::string endp_type, endp_url, endp_admin, endp_admin_pw, endp_admin_pw_path;
+  std::string endp_tenant = "nes";
+  int endp_enabled = true;
+
   int64_t max_objects = -1;
   int64_t max_size = -1;
   bool have_max_objects = false;
@@ -2943,6 +2976,20 @@ int main(int argc, const char **argv)
       object = val;
     } else if (ceph_argparse_witharg(args, i, &val, "--object-version", (char*)NULL)) {
       object_version = val;
+    } else if (ceph_argparse_witharg(args, i, &val, "--endpoint-url", (char*)NULL)) {
+      endp_url = (val.empty()) ? "-" : val;
+    } else if (ceph_argparse_witharg(args, i, &val, "--endpoint-admin", (char*)NULL)) {
+      endp_admin = (val.empty()) ? "-" : val;
+    } else if (ceph_argparse_witharg(args, i, &val, "--endpoint-admin-passwd", (char*)NULL)) {
+      endp_admin_pw = (val.empty()) ? "-" : val;
+    } else if (ceph_argparse_witharg(args, i, &val, "--endpoint-admin-passwd-path", (char*)NULL)) {
+      endp_admin_pw_path = (val.empty()) ? "-" : val;
+    } else if (ceph_argparse_witharg(args, i, &val, "--endpoint-tenant", (char*)NULL)) {
+      endp_tenant = (val.empty()) ? "-" : val;
+    } else if (ceph_argparse_witharg(args, i, &val, "--endpoint-type", (char*)NULL)) {
+      endp_type = (val.empty()) ? "-" : val;
+    } else if (ceph_argparse_binary_flag(args, i, &endp_enabled, NULL, "--endpoint-enabled", (char*)NULL)) {
+      user_op.endp_enabled_specified = true;
     } else if (ceph_argparse_witharg(args, i, &val, "--client-id", (char*)NULL)) {
       client_id = val;
     } else if (ceph_argparse_witharg(args, i, &val, "--op-id", (char*)NULL)) {
@@ -3073,7 +3120,7 @@ int main(int argc, const char **argv)
       list<string>::iterator iter;
       get_str_list(cat_str, cat_list);
       for (iter = cat_list.begin(); iter != cat_list.end(); ++iter) {
-	categories[*iter] = true;
+        categories[*iter] = true;
       }
     } else if (ceph_argparse_binary_flag(args, i, &delete_child_objects, NULL, "--purge-objects", (char*)NULL)) {
       // do nothing
@@ -3275,12 +3322,12 @@ int main(int argc, const char **argv)
     for (i = args.begin(); i != args.end(); ++i) {
       opt_cmd = get_cmd(*i, prev_cmd, prev_prev_cmd, &need_more);
       if (opt_cmd < 0) {
-	cerr << "unrecognized arg " << *i << std::endl;
-	exit(1);
+        cerr << "unrecognized arg " << *i << std::endl;
+        exit(1);
       }
       if (!need_more) {
-	++i;
-	break;
+        ++i;
+        break;
       }
       prev_prev_cmd = prev_cmd;
       prev_cmd = *i;
@@ -3486,76 +3533,75 @@ int main(int argc, const char **argv)
     switch (opt_cmd) {
     case OPT_PERIOD_DELETE:
       {
-	if (period_id.empty()) {
-	  cerr << "missing period id" << std::endl;
-	  return EINVAL;
-	}
-	RGWPeriod period(period_id);
-	int ret = period.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "period.init failed: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	ret = period.delete_obj();
-	if (ret < 0) {
-	  cerr << "ERROR: couldn't delete period: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-
+        if (period_id.empty()) {
+          cerr << "missing period id" << std::endl;
+          return EINVAL;
+        }
+        RGWPeriod period(period_id);
+        int ret = period.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "period.init failed: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        ret = period.delete_obj();
+        if (ret < 0) {
+          cerr << "ERROR: couldn't delete period: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
       }
       break;
     case OPT_PERIOD_GET:
       {
-	epoch_t epoch = 0;
-	if (!period_epoch.empty()) {
-	  epoch = atoi(period_epoch.c_str());
-	}
-        if (staging) {
-          RGWRealm realm(realm_id, realm_name);
-          int ret = realm.init(g_ceph_context, store->svc.sysobj);
-          if (ret < 0 ) {
-            cerr << "Error initializing realm " << cpp_strerror(-ret) << std::endl;
-            return -ret;
-          }
-          realm_id = realm.get_id();
-          realm_name = realm.get_name();
-          period_id = RGWPeriod::get_staging_id(realm_id);
-          epoch = 1;
+        epoch_t epoch = 0;
+        if (!period_epoch.empty()) {
+          epoch = atoi(period_epoch.c_str());
         }
-	RGWPeriod period(period_id, epoch);
-	int ret = period.init(g_ceph_context, store->svc.sysobj, realm_id, realm_name);
-	if (ret < 0) {
-	  cerr << "period init failed: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	encode_json("period", period, formatter);
-	formatter->flush(cout);
+              if (staging) {
+                RGWRealm realm(realm_id, realm_name);
+                int ret = realm.init(g_ceph_context, store->svc.sysobj);
+                if (ret < 0 ) {
+                  cerr << "Error initializing realm " << cpp_strerror(-ret) << std::endl;
+                  return -ret;
+                }
+                realm_id = realm.get_id();
+                realm_name = realm.get_name();
+                period_id = RGWPeriod::get_staging_id(realm_id);
+                epoch = 1;
+              }
+        RGWPeriod period(period_id, epoch);
+        int ret = period.init(g_ceph_context, store->svc.sysobj, realm_id, realm_name);
+        if (ret < 0) {
+          cerr << "period init failed: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        encode_json("period", period, formatter);
+        formatter->flush(cout);
       }
       break;
     case OPT_PERIOD_GET_CURRENT:
       {
         int ret = read_current_period_id(store, realm_id, realm_name, &period_id);
-	if (ret < 0) {
-	  return -ret;
-	}
-	formatter->open_object_section("period_get_current");
-	encode_json("current_period", period_id, formatter);
-	formatter->close_section();
-	formatter->flush(cout);
+        if (ret < 0) {
+          return -ret;
+        }
+        formatter->open_object_section("period_get_current");
+        encode_json("current_period", period_id, formatter);
+        formatter->close_section();
+        formatter->flush(cout);
       }
       break;
     case OPT_PERIOD_LIST:
       {
-	list<string> periods;
-	int ret = store->svc.zone->list_periods(periods);
-	if (ret < 0) {
-	  cerr << "failed to list periods: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	formatter->open_object_section("periods_list");
-	encode_json("periods", periods, formatter);
-	formatter->close_section();
-	formatter->flush(cout);
+        list<string> periods;
+        int ret = store->svc.zone->list_periods(periods);
+        if (ret < 0) {
+          cerr << "failed to list periods: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        formatter->open_object_section("periods_list");
+        encode_json("periods", periods, formatter);
+        formatter->close_section();
+        formatter->flush(cout);
       }
       break;
     case OPT_PERIOD_UPDATE:
@@ -3563,9 +3609,9 @@ int main(int argc, const char **argv)
         int ret = update_period(realm_id, realm_name, period_id, period_epoch,
                                 commit, remote, url, access_key, secret_key,
                                 formatter, yes_i_really_mean_it);
-	if (ret < 0) {
-	  return -ret;
-	}
+        if (ret < 0) {
+          return -ret;
+        }
       }
       break;
     case OPT_PERIOD_PULL:
@@ -3691,17 +3737,17 @@ int main(int argc, const char **argv)
       break;
     case OPT_REALM_CREATE:
       {
-	if (realm_name.empty()) {
-	  cerr << "missing realm name" << std::endl;
-	  return EINVAL;
-	}
+        if (realm_name.empty()) {
+          cerr << "missing realm name" << std::endl;
+          return EINVAL;
+        }
 
-	RGWRealm realm(realm_name, g_ceph_context, store->svc.sysobj);
-	int ret = realm.create();
-	if (ret < 0) {
-	  cerr << "ERROR: couldn't create realm " << realm_name << ": " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWRealm realm(realm_name, g_ceph_context, store->svc.sysobj);
+        int ret = realm.create();
+        if (ret < 0) {
+          cerr << "ERROR: couldn't create realm " << realm_name << ": " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
         if (set_default) {
           ret = realm.set_as_default();
@@ -3710,123 +3756,122 @@ int main(int argc, const char **argv)
           }
         }
 
-	encode_json("realm", realm, formatter);
-	formatter->flush(cout);
+        encode_json("realm", realm, formatter);
+        formatter->flush(cout);
       }
       break;
     case OPT_REALM_DELETE:
       {
-	RGWRealm realm(realm_id, realm_name);
-	if (realm_name.empty() && realm_id.empty()) {
-	  cerr << "missing realm name or id" << std::endl;
-	  return EINVAL;
-	}
-	int ret = realm.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "realm.init failed: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	ret = realm.delete_obj();
-	if (ret < 0) {
-	  cerr << "ERROR: couldn't : " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-
+        RGWRealm realm(realm_id, realm_name);
+        if (realm_name.empty() && realm_id.empty()) {
+          cerr << "missing realm name or id" << std::endl;
+          return EINVAL;
+        }
+        int ret = realm.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "realm.init failed: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        ret = realm.delete_obj();
+        if (ret < 0) {
+          cerr << "ERROR: couldn't : " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
       }
       break;
     case OPT_REALM_GET:
       {
-	RGWRealm realm(realm_id, realm_name);
-	int ret = realm.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  if (ret == -ENOENT && realm_name.empty() && realm_id.empty()) {
-	    cerr << "missing realm name or id, or default realm not found" << std::endl;
-	  } else {
-	    cerr << "realm.init failed: " << cpp_strerror(-ret) << std::endl;
-          }
-	  return -ret;
-	}
-	encode_json("realm", realm, formatter);
-	formatter->flush(cout);
+        RGWRealm realm(realm_id, realm_name);
+        int ret = realm.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          if (ret == -ENOENT && realm_name.empty() && realm_id.empty()) {
+            cerr << "missing realm name or id, or default realm not found" << std::endl;
+          } else {
+            cerr << "realm.init failed: " << cpp_strerror(-ret) << std::endl;
+                }
+          return -ret;
+        }
+        encode_json("realm", realm, formatter);
+        formatter->flush(cout);
       }
       break;
     case OPT_REALM_GET_DEFAULT:
       {
-	RGWRealm realm(g_ceph_context, store->svc.sysobj);
-	string default_id;
-	int ret = realm.read_default_id(default_id);
-	if (ret == -ENOENT) {
-	  cout << "No default realm is set" << std::endl;
-	  return -ret;
-	} else if (ret < 0) {
-	  cerr << "Error reading default realm:" << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	cout << "default realm: " << default_id << std::endl;
+        RGWRealm realm(g_ceph_context, store->svc.sysobj);
+        string default_id;
+        int ret = realm.read_default_id(default_id);
+        if (ret == -ENOENT) {
+          cout << "No default realm is set" << std::endl;
+          return -ret;
+        } else if (ret < 0) {
+          cerr << "Error reading default realm:" << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        cout << "default realm: " << default_id << std::endl;
       }
       break;
     case OPT_REALM_LIST:
       {
-	RGWRealm realm(g_ceph_context, store->svc.sysobj);
-	string default_id;
-	int ret = realm.read_default_id(default_id);
-	if (ret < 0 && ret != -ENOENT) {
-	  cerr << "could not determine default realm: " << cpp_strerror(-ret) << std::endl;
-	}
-	list<string> realms;
-	ret = store->svc.zone->list_realms(realms);
-	if (ret < 0) {
-	  cerr << "failed to list realms: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	formatter->open_object_section("realms_list");
-	encode_json("default_info", default_id, formatter);
-	encode_json("realms", realms, formatter);
-	formatter->close_section();
-	formatter->flush(cout);
+        RGWRealm realm(g_ceph_context, store->svc.sysobj);
+        string default_id;
+        int ret = realm.read_default_id(default_id);
+        if (ret < 0 && ret != -ENOENT) {
+          cerr << "could not determine default realm: " << cpp_strerror(-ret) << std::endl;
+        }
+        list<string> realms;
+        ret = store->svc.zone->list_realms(realms);
+        if (ret < 0) {
+          cerr << "failed to list realms: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        formatter->open_object_section("realms_list");
+        encode_json("default_info", default_id, formatter);
+        encode_json("realms", realms, formatter);
+        formatter->close_section();
+        formatter->flush(cout);
       }
       break;
     case OPT_REALM_LIST_PERIODS:
       {
         int ret = read_current_period_id(store, realm_id, realm_name, &period_id);
-	if (ret < 0) {
-	  return -ret;
-	}
-	list<string> periods;
-	ret = store->svc.zone->list_periods(period_id, periods);
-	if (ret < 0) {
-	  cerr << "list periods failed: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	formatter->open_object_section("realm_periods_list");
-	encode_json("current_period", period_id, formatter);
-	encode_json("periods", periods, formatter);
-	formatter->close_section();
-	formatter->flush(cout);
+        if (ret < 0) {
+          return -ret;
+        }
+        list<string> periods;
+        ret = store->svc.zone->list_periods(period_id, periods);
+        if (ret < 0) {
+          cerr << "list periods failed: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        formatter->open_object_section("realm_periods_list");
+        encode_json("current_period", period_id, formatter);
+        encode_json("periods", periods, formatter);
+        formatter->close_section();
+        formatter->flush(cout);
       }
       break;
 
     case OPT_REALM_RENAME:
       {
-	RGWRealm realm(realm_id, realm_name);
-	if (realm_new_name.empty()) {
-	  cerr << "missing realm new name" << std::endl;
-	  return EINVAL;
-	}
-	if (realm_name.empty() && realm_id.empty()) {
-	  cerr << "missing realm name or id" << std::endl;
-	  return EINVAL;
-	}
-	int ret = realm.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "realm.init failed: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	ret = realm.rename(realm_new_name);
-	if (ret < 0) {
-	  cerr << "realm.rename failed: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWRealm realm(realm_id, realm_name);
+        if (realm_new_name.empty()) {
+          cerr << "missing realm new name" << std::endl;
+          return EINVAL;
+        }
+        if (realm_name.empty() && realm_id.empty()) {
+          cerr << "missing realm name or id" << std::endl;
+          return EINVAL;
+        }
+        int ret = realm.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "realm.init failed: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        ret = realm.rename(realm_new_name);
+        if (ret < 0) {
+          cerr << "realm.rename failed: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
         cout << "Realm name updated. Note that this change only applies to "
             "the current cluster, so this command must be run separately "
             "on each of the realm's other clusters." << std::endl;
@@ -3834,44 +3879,44 @@ int main(int argc, const char **argv)
       break;
     case OPT_REALM_SET:
       {
-	if (realm_id.empty() && realm_name.empty()) {
-	  cerr << "no realm name or id provided" << std::endl;
-	  return EINVAL;
-	}
-	RGWRealm realm(realm_id, realm_name);
-	bool new_realm = false;
-	int ret = realm.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0 && ret != -ENOENT) {
-	  cerr << "failed to init realm: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	} else if (ret == -ENOENT) {
-	  new_realm = true;
-	}
-	ret = read_decode_json(infile, realm);
-	if (ret < 0) {
-	  return 1;
-	}
-	if (!realm_name.empty() && realm.get_name() != realm_name) {
-	  cerr << "mismatch between --rgw-realm " << realm_name << " and json input file name " <<
-	    realm.get_name() << std::endl;
-	  return EINVAL;
-	}
-	/* new realm */
-	if (new_realm) {
-	  cout << "clearing period and epoch for new realm" << std::endl;
-	  realm.clear_current_period_and_epoch();
-	  ret = realm.create();
-	  if (ret < 0) {
-	    cerr << "ERROR: couldn't create new realm: " << cpp_strerror(-ret) << std::endl;
-	    return 1;
-	  }
-	} else {
-	  ret = realm.update();
-	  if (ret < 0) {
-	    cerr << "ERROR: couldn't store realm info: " << cpp_strerror(-ret) << std::endl;
-	    return 1;
-	  }
-	}
+        if (realm_id.empty() && realm_name.empty()) {
+          cerr << "no realm name or id provided" << std::endl;
+          return EINVAL;
+        }
+        RGWRealm realm(realm_id, realm_name);
+        bool new_realm = false;
+        int ret = realm.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0 && ret != -ENOENT) {
+          cerr << "failed to init realm: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        } else if (ret == -ENOENT) {
+          new_realm = true;
+        }
+        ret = read_decode_json(infile, realm);
+        if (ret < 0) {
+          return 1;
+        }
+        if (!realm_name.empty() && realm.get_name() != realm_name) {
+          cerr << "mismatch between --rgw-realm " << realm_name << " and json input file name " <<
+            realm.get_name() << std::endl;
+          return EINVAL;
+        }
+        /* new realm */
+        if (new_realm) {
+          cout << "clearing period and epoch for new realm" << std::endl;
+          realm.clear_current_period_and_epoch();
+          ret = realm.create();
+          if (ret < 0) {
+            cerr << "ERROR: couldn't create new realm: " << cpp_strerror(-ret) << std::endl;
+            return 1;
+          }
+        } else {
+          ret = realm.update();
+          if (ret < 0) {
+            cerr << "ERROR: couldn't store realm info: " << cpp_strerror(-ret) << std::endl;
+            return 1;
+          }
+        }
 
         if (set_default) {
           ret = realm.set_as_default();
@@ -3879,24 +3924,24 @@ int main(int argc, const char **argv)
             cerr << "failed to set realm " << realm_name << " as default: " << cpp_strerror(-ret) << std::endl;
           }
         }
-	encode_json("realm", realm, formatter);
-	formatter->flush(cout);
+        encode_json("realm", realm, formatter);
+        formatter->flush(cout);
       }
       break;
 
     case OPT_REALM_DEFAULT:
       {
-	RGWRealm realm(realm_id, realm_name);
-	int ret = realm.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to init realm: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	ret = realm.set_as_default();
-	if (ret < 0) {
-	  cerr << "failed to set realm as default: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWRealm realm(realm_id, realm_name);
+        int ret = realm.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to init realm: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        ret = realm.set_as_default();
+        if (ret < 0) {
+          cerr << "failed to set realm as default: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
       }
       break;
     case OPT_REALM_PULL:
@@ -3954,12 +3999,12 @@ int main(int argc, const char **argv)
             << cpp_strerror(ret) << std::endl;
           return -ret;
         } else if (ret ==-EEXIST) {
-	  ret = realm.update();
-	  if (ret < 0) {
-	    cerr << "Error storing realm " << realm.get_id() << ": "
-		 << cpp_strerror(ret) << std::endl;
-	  }
-	}
+          ret = realm.update();
+          if (ret < 0) {
+            cerr << "Error storing realm " << realm.get_id() << ": "
+           << cpp_strerror(ret) << std::endl;
+          }
+        }
 
         if (set_default) {
           ret = realm.set_as_default();
@@ -3975,24 +4020,24 @@ int main(int argc, const char **argv)
 
     case OPT_ZONEGROUP_ADD:
       {
-	if (zonegroup_id.empty() && zonegroup_name.empty()) {
-	  cerr << "no zonegroup name or id provided" << std::endl;
-	  return EINVAL;
-	}
+        if (zonegroup_id.empty() && zonegroup_name.empty()) {
+          cerr << "no zonegroup name or id provided" << std::endl;
+          return EINVAL;
+        }
 
-	RGWZoneGroup zonegroup(zonegroup_id,zonegroup_name);
-	int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to initialize zonegroup " << zonegroup_name << " id " << zonegroup_id << " :"
-	       << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	RGWZoneParams zone(zone_id, zone_name);
-	ret = zone.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneGroup zonegroup(zonegroup_id,zonegroup_name);
+        int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to initialize zonegroup " << zonegroup_name << " id " << zonegroup_id << " :"
+               << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        RGWZoneParams zone(zone_id, zone_name);
+        ret = zone.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
         if (zone.realm_id != zonegroup.realm_id) {
           zone.realm_id = zonegroup.realm_id;
           ret = zone.update();
@@ -4022,11 +4067,11 @@ int main(int argc, const char **argv)
                                  psync_from_all, sync_from, sync_from_rm,
                                  predirect_zone,
 				 store->svc.sync_modules->get_manager());
-	if (ret < 0) {
-	  cerr << "failed to add zone " << zone_name << " to zonegroup " << zonegroup.get_name() << ": "
-	       << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        if (ret < 0) {
+          cerr << "failed to add zone " << zone_name << " to zonegroup " << zonegroup.get_name() << ": "
+               << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
         encode_json("zonegroup", zonegroup, formatter);
         formatter->flush(cout);
@@ -4034,24 +4079,24 @@ int main(int argc, const char **argv)
       break;
     case OPT_ZONEGROUP_CREATE:
       {
-	if (zonegroup_name.empty()) {
-	  cerr << "Missing zonegroup name" << std::endl;
-	  return EINVAL;
-	}
-	RGWRealm realm(realm_id, realm_name);
-	int ret = realm.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to init realm: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        if (zonegroup_name.empty()) {
+          cerr << "Missing zonegroup name" << std::endl;
+          return EINVAL;
+        }
+        RGWRealm realm(realm_id, realm_name);
+        int ret = realm.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to init realm: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
-	RGWZoneGroup zonegroup(zonegroup_name, is_master, g_ceph_context, store->svc.sysobj, realm.get_id(), endpoints);
-        zonegroup.api_name = (api_name.empty() ? zonegroup_name : api_name);
-	ret = zonegroup.create();
-	if (ret < 0) {
-	  cerr << "failed to create zonegroup " << zonegroup_name << ": " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneGroup zonegroup(zonegroup_name, is_master, g_ceph_context, store->svc.sysobj, realm.get_id(), endpoints);
+              zonegroup.api_name = (api_name.empty() ? zonegroup_name : api_name);
+        ret = zonegroup.create();
+        if (ret < 0) {
+          cerr << "failed to create zonegroup " << zonegroup_name << ": " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
         if (set_default) {
           ret = zonegroup.set_as_default();
@@ -4060,105 +4105,105 @@ int main(int argc, const char **argv)
           }
         }
 
-	encode_json("zonegroup", zonegroup, formatter);
-	formatter->flush(cout);
+        encode_json("zonegroup", zonegroup, formatter);
+        formatter->flush(cout);
       }
       break;
     case OPT_ZONEGROUP_DEFAULT:
       {
-	if (zonegroup_id.empty() && zonegroup_name.empty()) {
-	  cerr << "no zonegroup name or id provided" << std::endl;
-	  return EINVAL;
-	}
+        if (zonegroup_id.empty() && zonegroup_name.empty()) {
+          cerr << "no zonegroup name or id provided" << std::endl;
+          return EINVAL;
+        }
 
-	RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
-	int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
+        int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
-	ret = zonegroup.set_as_default();
-	if (ret < 0) {
-	  cerr << "failed to set zonegroup as default: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        ret = zonegroup.set_as_default();
+        if (ret < 0) {
+          cerr << "failed to set zonegroup as default: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
       }
       break;
     case OPT_ZONEGROUP_DELETE:
       {
-	if (zonegroup_id.empty() && zonegroup_name.empty()) {
-	  cerr << "no zonegroup name or id provided" << std::endl;
-	  return EINVAL;
-	}
-	RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
-	int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	ret = zonegroup.delete_obj();
-	if (ret < 0) {
-	  cerr << "ERROR: couldn't delete zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        if (zonegroup_id.empty() && zonegroup_name.empty()) {
+          cerr << "no zonegroup name or id provided" << std::endl;
+          return EINVAL;
+        }
+        RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
+        int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        ret = zonegroup.delete_obj();
+        if (ret < 0) {
+          cerr << "ERROR: couldn't delete zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
       }
       break;
     case OPT_ZONEGROUP_GET:
       {
-	RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
-	int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
+        int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
-	encode_json("zonegroup", zonegroup, formatter);
-	formatter->flush(cout);
+        encode_json("zonegroup", zonegroup, formatter);
+        formatter->flush(cout);
       }
       break;
     case OPT_ZONEGROUP_LIST:
       {
-	RGWZoneGroup zonegroup;
-	int ret = zonegroup.init(g_ceph_context, store->svc.sysobj, false);
-	if (ret < 0) {
-	  cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneGroup zonegroup;
+        int ret = zonegroup.init(g_ceph_context, store->svc.sysobj, false);
+        if (ret < 0) {
+          cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
-	list<string> zonegroups;
-	ret = store->svc.zone->list_zonegroups(zonegroups);
-	if (ret < 0) {
-	  cerr << "failed to list zonegroups: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	string default_zonegroup;
-	ret = zonegroup.read_default_id(default_zonegroup);
-	if (ret < 0 && ret != -ENOENT) {
-	  cerr << "could not determine default zonegroup: " << cpp_strerror(-ret) << std::endl;
-	}
-	formatter->open_object_section("zonegroups_list");
-	encode_json("default_info", default_zonegroup, formatter);
-	encode_json("zonegroups", zonegroups, formatter);
-	formatter->close_section();
-	formatter->flush(cout);
+        list<string> zonegroups;
+        ret = store->svc.zone->list_zonegroups(zonegroups);
+        if (ret < 0) {
+          cerr << "failed to list zonegroups: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        string default_zonegroup;
+        ret = zonegroup.read_default_id(default_zonegroup);
+        if (ret < 0 && ret != -ENOENT) {
+          cerr << "could not determine default zonegroup: " << cpp_strerror(-ret) << std::endl;
+        }
+        formatter->open_object_section("zonegroups_list");
+        encode_json("default_info", default_zonegroup, formatter);
+        encode_json("zonegroups", zonegroups, formatter);
+        formatter->close_section();
+        formatter->flush(cout);
       }
       break;
     case OPT_ZONEGROUP_MODIFY:
       {
-	RGWRealm realm(realm_id, realm_name);
-	int ret = realm.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to init realm: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWRealm realm(realm_id, realm_name);
+        int ret = realm.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to init realm: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
-	RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
-	ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
+        ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
         bool need_update = false;
 
@@ -4167,8 +4212,8 @@ int main(int argc, const char **argv)
           need_update = true;
         }
 
-	if (is_master_set) {
-	  zonegroup.update_master(is_master);
+        if (is_master_set) {
+          zonegroup.update_master(is_master);
           need_update = true;
         }
 
@@ -4197,12 +4242,12 @@ int main(int argc, const char **argv)
         }
 
         if (need_update) {
-	  ret = zonegroup.update();
-	  if (ret < 0) {
-	    cerr << "failed to update zonegroup: " << cpp_strerror(-ret) << std::endl;
-	    return -ret;
-	  }
-	}
+          ret = zonegroup.update();
+          if (ret < 0) {
+            cerr << "failed to update zonegroup: " << cpp_strerror(-ret) << std::endl;
+            return -ret;
+          }
+        }
 
         if (set_default) {
           ret = zonegroup.set_as_default();
@@ -4217,39 +4262,39 @@ int main(int argc, const char **argv)
       break;
     case OPT_ZONEGROUP_SET:
       {
-	RGWRealm realm(realm_id, realm_name);
-	int ret = realm.init(g_ceph_context, store->svc.sysobj);
-       bool default_realm_not_exist = (ret == -ENOENT && realm_id.empty() && realm_name.empty());
+        RGWRealm realm(realm_id, realm_name);
+        int ret = realm.init(g_ceph_context, store->svc.sysobj);
+        bool default_realm_not_exist = (ret == -ENOENT && realm_id.empty() && realm_name.empty());
 
-	if (ret < 0 && !default_realm_not_exist ) {
-	  cerr << "failed to init realm: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        if (ret < 0 && !default_realm_not_exist ) {
+          cerr << "failed to init realm: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
-	RGWZoneGroup zonegroup;
-	ret = zonegroup.init(g_ceph_context, store->svc.sysobj, false);
-	if (ret < 0) {
-	  cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	ret = read_decode_json(infile, zonegroup);
-	if (ret < 0) {
-	  return 1;
-	}
-	if (zonegroup.realm_id.empty() && !default_realm_not_exist) {
-	  zonegroup.realm_id = realm.get_id();
-	}
-	ret = zonegroup.create();
-	if (ret < 0 && ret != -EEXIST) {
-	  cerr << "ERROR: couldn't create zonegroup info: " << cpp_strerror(-ret) << std::endl;
-	  return 1;
-	} else if (ret == -EEXIST) {
-	  ret = zonegroup.update();
-	  if (ret < 0) {
-	    cerr << "ERROR: couldn't store zonegroup info: " << cpp_strerror(-ret) << std::endl;
-	    return 1;
-	  }
-	}
+        RGWZoneGroup zonegroup;
+        ret = zonegroup.init(g_ceph_context, store->svc.sysobj, false);
+        if (ret < 0) {
+          cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        ret = read_decode_json(infile, zonegroup);
+        if (ret < 0) {
+          return 1;
+        }
+        if (zonegroup.realm_id.empty() && !default_realm_not_exist) {
+          zonegroup.realm_id = realm.get_id();
+        }
+        ret = zonegroup.create();
+        if (ret < 0 && ret != -EEXIST) {
+          cerr << "ERROR: couldn't create zonegroup info: " << cpp_strerror(-ret) << std::endl;
+          return 1;
+        } else if (ret == -EEXIST) {
+          ret = zonegroup.update();
+          if (ret < 0) {
+            cerr << "ERROR: couldn't store zonegroup info: " << cpp_strerror(-ret) << std::endl;
+            return 1;
+          }
+        }
 
         if (set_default) {
           ret = zonegroup.set_as_default();
@@ -4258,8 +4303,8 @@ int main(int argc, const char **argv)
           }
         }
 
-	encode_json("zonegroup", zonegroup, formatter);
-	formatter->flush(cout);
+        encode_json("zonegroup", zonegroup, formatter);
+        formatter->flush(cout);
       }
       break;
     case OPT_ZONEGROUP_REMOVE:
@@ -4302,61 +4347,61 @@ int main(int argc, const char **argv)
       break;
     case OPT_ZONEGROUP_RENAME:
       {
-	if (zonegroup_new_name.empty()) {
-	  cerr << " missing zonegroup new name" << std::endl;
-	  return EINVAL;
-	}
-	if (zonegroup_id.empty() && zonegroup_name.empty()) {
-	  cerr << "no zonegroup name or id provided" << std::endl;
-	  return EINVAL;
-	}
-	RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
-	int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	ret = zonegroup.rename(zonegroup_new_name);
-	if (ret < 0) {
-	  cerr << "failed to rename zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        if (zonegroup_new_name.empty()) {
+          cerr << " missing zonegroup new name" << std::endl;
+          return EINVAL;
+        }
+        if (zonegroup_id.empty() && zonegroup_name.empty()) {
+          cerr << "no zonegroup name or id provided" << std::endl;
+          return EINVAL;
+        }
+        RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
+        int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        ret = zonegroup.rename(zonegroup_new_name);
+        if (ret < 0) {
+          cerr << "failed to rename zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
       }
       break;
     case OPT_ZONEGROUP_PLACEMENT_LIST:
       {
-	RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
-	int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
+        int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
-	encode_json("placement_targets", zonegroup.placement_targets, formatter);
-	formatter->flush(cout);
+        encode_json("placement_targets", zonegroup.placement_targets, formatter);
+        formatter->flush(cout);
       }
       break;
     case OPT_ZONEGROUP_PLACEMENT_GET:
       {
-	if (placement_id.empty()) {
-	  cerr << "ERROR: --placement-id not specified" << std::endl;
-	  return EINVAL;
-	}
+        if (placement_id.empty()) {
+          cerr << "ERROR: --placement-id not specified" << std::endl;
+          return EINVAL;
+        }
 
-	RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
-	int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
+        int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
-	auto p = zonegroup.placement_targets.find(placement_id);
-	if (p == zonegroup.placement_targets.end()) {
-	  cerr << "failed to find a zonegroup placement target named '" << placement_id << "'" << std::endl;
-	  return -ENOENT;
-	}
-	encode_json("placement_targets", p->second, formatter);
-	formatter->flush(cout);
+        auto p = zonegroup.placement_targets.find(placement_id);
+        if (p == zonegroup.placement_targets.end()) {
+          cerr << "failed to find a zonegroup placement target named '" << placement_id << "'" << std::endl;
+          return -ENOENT;
+        }
+        encode_json("placement_targets", p->second, formatter);
+        formatter->flush(cout);
       }
       break;
     case OPT_ZONEGROUP_PLACEMENT_ADD:
@@ -4380,12 +4425,12 @@ int main(int argc, const char **argv)
           rule.storage_class = storage_class;
         }
 
-	RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
-	int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
+        int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
         if (opt_cmd == OPT_ZONEGROUP_PLACEMENT_ADD ||
             opt_cmd == OPT_ZONEGROUP_PLACEMENT_MODIFY) {
@@ -4429,33 +4474,33 @@ int main(int argc, const char **argv)
     case OPT_ZONE_CREATE:
       {
         if (zone_name.empty()) {
-	  cerr << "zone name not provided" << std::endl;
-	  return EINVAL;
+          cerr << "zone name not provided" << std::endl;
+          return EINVAL;
         }
-	int ret;
-	RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
-	/* if the user didn't provide zonegroup info , create stand alone zone */
-	if (!zonegroup_id.empty() || !zonegroup_name.empty()) {
-	  ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	  if (ret < 0) {
-	    cerr << "unable to initialize zonegroup " << zonegroup_name << ": " << cpp_strerror(-ret) << std::endl;
-	    return -ret;
-	  }
-	  if (realm_id.empty() && realm_name.empty()) {
-	    realm_id = zonegroup.realm_id;
-	  }
-	}
+        int ret;
+        RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
+        /* if the user didn't provide zonegroup info , create stand alone zone */
+        if (!zonegroup_id.empty() || !zonegroup_name.empty()) {
+          ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+          if (ret < 0) {
+            cerr << "unable to initialize zonegroup " << zonegroup_name << ": " << cpp_strerror(-ret) << std::endl;
+            return -ret;
+          }
+          if (realm_id.empty() && realm_name.empty()) {
+            realm_id = zonegroup.realm_id;
+          }
+        }
 
-	RGWZoneParams zone(zone_id, zone_name);
-	ret = zone.init(g_ceph_context, store->svc.sysobj, false);
-	if (ret < 0) {
-	  cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneParams zone(zone_id, zone_name);
+        ret = zone.init(g_ceph_context, store->svc.sysobj, false);
+        if (ret < 0) {
+          cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
         zone.system_key.id = access_key;
         zone.system_key.key = secret_key;
-	zone.realm_id = realm_id;
+        zone.realm_id = realm_id;
         for (auto a : tier_config_add) {
           int r = zone.tier_config.set(a.first, a.second);
           if (r < 0) {
@@ -4464,17 +4509,17 @@ int main(int argc, const char **argv)
           }
         }
 
-	ret = zone.create();
-	if (ret < 0) {
-	  cerr << "failed to create zone " << zone_name << ": " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        ret = zone.create();
+        if (ret < 0) {
+          cerr << "failed to create zone " << zone_name << ": " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
-	if (!zonegroup_id.empty() || !zonegroup_name.empty()) {
+        if (!zonegroup_id.empty() || !zonegroup_name.empty()) {
           string *ptier_type = (tier_type_specified ? &tier_type : nullptr);
           bool *psync_from_all = (sync_from_all_specified ? &sync_from_all : nullptr);
           string *predirect_zone = (redirect_zone_set ? &redirect_zone : nullptr);
-	  ret = zonegroup.add_zone(zone,
+          ret = zonegroup.add_zone(zone,
                                    (is_master_set ? &is_master : NULL),
                                    (is_read_only_set ? &read_only : NULL),
                                    endpoints,
@@ -4482,13 +4527,13 @@ int main(int argc, const char **argv)
                                    psync_from_all,
                                    sync_from, sync_from_rm,
                                    predirect_zone,
-				   store->svc.sync_modules->get_manager());
-	  if (ret < 0) {
-	    cerr << "failed to add zone " << zone_name << " to zonegroup " << zonegroup.get_name()
-		 << ": " << cpp_strerror(-ret) << std::endl;
-	    return -ret;
-	  }
-	}
+           store->svc.sync_modules->get_manager());
+          if (ret < 0) {
+            cerr << "failed to add zone " << zone_name << " to zonegroup " << zonegroup.get_name()
+           << ": " << cpp_strerror(-ret) << std::endl;
+            return -ret;
+          }
+        }
 
         if (set_default) {
           ret = zone.set_as_default();
@@ -4497,53 +4542,53 @@ int main(int argc, const char **argv)
           }
         }
 
-	encode_json("zone", zone, formatter);
-	formatter->flush(cout);
+        encode_json("zone", zone, formatter);
+        formatter->flush(cout);
       }
       break;
     case OPT_ZONE_DEFAULT:
       {
-	RGWZoneGroup zonegroup(zonegroup_id,zonegroup_name);
-	int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "WARNING: failed to initialize zonegroup " << zonegroup_name << std::endl;
-	}
-	if (zone_id.empty() && zone_name.empty()) {
-	  cerr << "no zone name or id provided" << std::endl;
-	  return EINVAL;
-	}
-	RGWZoneParams zone(zone_id, zone_name);
-	ret = zone.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	ret = zone.set_as_default();
-	if (ret < 0) {
-	  cerr << "failed to set zone as default: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneGroup zonegroup(zonegroup_id,zonegroup_name);
+        int ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "WARNING: failed to initialize zonegroup " << zonegroup_name << std::endl;
+        }
+        if (zone_id.empty() && zone_name.empty()) {
+          cerr << "no zone name or id provided" << std::endl;
+          return EINVAL;
+        }
+        RGWZoneParams zone(zone_id, zone_name);
+        ret = zone.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        ret = zone.set_as_default();
+        if (ret < 0) {
+          cerr << "failed to set zone as default: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
       }
       break;
     case OPT_ZONE_DELETE:
       {
-	if (zone_id.empty() && zone_name.empty()) {
-	  cerr << "no zone name or id provided" << std::endl;
-	  return EINVAL;
-	}
-	RGWZoneParams zone(zone_id, zone_name);
-	int ret = zone.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        if (zone_id.empty() && zone_name.empty()) {
+          cerr << "no zone name or id provided" << std::endl;
+          return EINVAL;
+        }
+        RGWZoneParams zone(zone_id, zone_name);
+        int ret = zone.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
         list<string> zonegroups;
-	ret = store->svc.zone->list_zonegroups(zonegroups);
-	if (ret < 0) {
-	  cerr << "failed to list zonegroups: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        ret = store->svc.zone->list_zonegroups(zonegroups);
+        if (ret < 0) {
+          cerr << "failed to list zonegroups: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
         for (list<string>::iterator iter = zonegroups.begin(); iter != zonegroups.end(); ++iter) {
           RGWZoneGroup zonegroup(string(), *iter);
@@ -4559,60 +4604,60 @@ int main(int argc, const char **argv)
           }
         }
 
-	ret = zone.delete_obj();
-	if (ret < 0) {
-	  cerr << "failed to delete zone " << zone_name << ": " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        ret = zone.delete_obj();
+        if (ret < 0) {
+          cerr << "failed to delete zone " << zone_name << ": " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
       }
       break;
     case OPT_ZONE_GET:
       {
-	RGWZoneParams zone(zone_id, zone_name);
-	int ret = zone.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	encode_json("zone", zone, formatter);
-	formatter->flush(cout);
+        RGWZoneParams zone(zone_id, zone_name);
+        int ret = zone.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        encode_json("zone", zone, formatter);
+        formatter->flush(cout);
       }
       break;
     case OPT_ZONE_SET:
       {
-	RGWZoneParams zone(zone_name);
-	int ret = zone.init(g_ceph_context, store->svc.sysobj, false);
-	if (ret < 0) {
-	  return -ret;
-	}
+        RGWZoneParams zone(zone_name);
+        int ret = zone.init(g_ceph_context, store->svc.sysobj, false);
+        if (ret < 0) {
+          return -ret;
+        }
 
         ret = zone.read();
         if (ret < 0 && ret != -ENOENT) {
-	  cerr << "zone.read() returned ret=" << ret << std::endl;
+          cerr << "zone.read() returned ret=" << ret << std::endl;
           return -ret;
         }
 
         string orig_id = zone.get_id();
 
-	ret = read_decode_json(infile, zone);
-	if (ret < 0) {
-	  return 1;
-	}
+        ret = read_decode_json(infile, zone);
+        if (ret < 0) {
+          return 1;
+        }
 
-	if(zone.realm_id.empty()) {
-	  RGWRealm realm(realm_id, realm_name);
-	  int ret = realm.init(g_ceph_context, store->svc.sysobj);
-	  if (ret < 0 && ret != -ENOENT) {
-	    cerr << "failed to init realm: " << cpp_strerror(-ret) << std::endl;
-	    return -ret;
-	  }
-	  zone.realm_id = realm.get_id();
-	}
+        if(zone.realm_id.empty()) {
+          RGWRealm realm(realm_id, realm_name);
+          int ret = realm.init(g_ceph_context, store->svc.sysobj);
+          if (ret < 0 && ret != -ENOENT) {
+            cerr << "failed to init realm: " << cpp_strerror(-ret) << std::endl;
+            return -ret;
+          }
+          zone.realm_id = realm.get_id();
+        }
 
-	if( !zone_name.empty() && !zone.get_name().empty() && zone.get_name() != zone_name) {
-	  cerr << "Error: zone name" << zone_name << " is different than the zone name " << zone.get_name() << " in the provided json " << std::endl;
-	  return EINVAL;
-	}
+        if( !zone_name.empty() && !zone.get_name().empty() && zone.get_name() != zone_name) {
+          cerr << "Error: zone name" << zone_name << " is different than the zone name " << zone.get_name() << " in the provided json " << std::endl;
+          return EINVAL;
+        }
 
         if (zone.get_name().empty()) {
           zone.set_name(zone_name);
@@ -4628,27 +4673,27 @@ int main(int argc, const char **argv)
           zone.set_id(orig_id);
         }
 
-	if (zone.get_id().empty()) {
-	  cerr << "no zone name id the json provided, assuming old format" << std::endl;
-	  if (zone_name.empty()) {
-	    cerr << "missing zone name"  << std::endl;
-	    return EINVAL;
-	  }
-	  zone.set_name(zone_name);
-	  zone.set_id(zone_name);
-	}
+        if (zone.get_id().empty()) {
+          cerr << "no zone name id the json provided, assuming old format" << std::endl;
+          if (zone_name.empty()) {
+            cerr << "missing zone name"  << std::endl;
+            return EINVAL;
+          }
+          zone.set_name(zone_name);
+          zone.set_id(zone_name);
+        }
 
-	cerr << "zone id " << zone.get_id();
-	ret = zone.fix_pool_names();
-	if (ret < 0) {
-	  cerr << "ERROR: couldn't fix zone: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	ret = zone.write(false);
-	if (ret < 0) {
-	  cerr << "ERROR: couldn't create zone: " << cpp_strerror(-ret) << std::endl;
-	  return 1;
-	}
+        cerr << "zone id " << zone.get_id();
+        ret = zone.fix_pool_names();
+        if (ret < 0) {
+          cerr << "ERROR: couldn't fix zone: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        ret = zone.write(false);
+        if (ret < 0) {
+          cerr << "ERROR: couldn't create zone: " << cpp_strerror(-ret) << std::endl;
+          return 1;
+        }
 
         if (set_default) {
           ret = zone.set_as_default();
@@ -4657,45 +4702,45 @@ int main(int argc, const char **argv)
           }
         }
 
-	encode_json("zone", zone, formatter);
-	formatter->flush(cout);
+        encode_json("zone", zone, formatter);
+        formatter->flush(cout);
       }
       break;
     case OPT_ZONE_LIST:
       {
-	list<string> zones;
-	int ret = store->svc.zone->list_zones(zones);
-	if (ret < 0) {
-	  cerr << "failed to list zones: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        list<string> zones;
+        int ret = store->svc.zone->list_zones(zones);
+        if (ret < 0) {
+          cerr << "failed to list zones: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
-	RGWZoneParams zone;
-	ret = zone.init(g_ceph_context, store->svc.sysobj, false);
-	if (ret < 0) {
-	  cerr << "failed to init zone: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	string default_zone;
-	ret = zone.read_default_id(default_zone);
-	if (ret < 0 && ret != -ENOENT) {
-	  cerr << "could not determine default zone: " << cpp_strerror(-ret) << std::endl;
-	}
-	formatter->open_object_section("zones_list");
-	encode_json("default_info", default_zone, formatter);
-	encode_json("zones", zones, formatter);
-	formatter->close_section();
-	formatter->flush(cout);
+        RGWZoneParams zone;
+        ret = zone.init(g_ceph_context, store->svc.sysobj, false);
+        if (ret < 0) {
+          cerr << "failed to init zone: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        string default_zone;
+        ret = zone.read_default_id(default_zone);
+        if (ret < 0 && ret != -ENOENT) {
+          cerr << "could not determine default zone: " << cpp_strerror(-ret) << std::endl;
+        }
+        formatter->open_object_section("zones_list");
+        encode_json("default_info", default_zone, formatter);
+        encode_json("zones", zones, formatter);
+        formatter->close_section();
+        formatter->flush(cout);
       }
       break;
     case OPT_ZONE_MODIFY:
       {
-	RGWZoneParams zone(zone_id, zone_name);
-	int ret = zone.init(g_ceph_context, store->svc.sysobj);
+        RGWZoneParams zone(zone_id, zone_name);
+        int ret = zone.init(g_ceph_context, store->svc.sysobj);
         if (ret < 0) {
-	  cerr << "failed to init zone: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+          cerr << "failed to init zone: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
         bool need_zone_update = false;
         if (!access_key.empty()) {
@@ -4748,12 +4793,12 @@ int main(int argc, const char **argv)
           }
         }
 
-	RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
-	ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
+        ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
         string *ptier_type = (tier_type_specified ? &tier_type : nullptr);
 
         bool *psync_from_all = (sync_from_all_specified ? &sync_from_all : nullptr);
@@ -4766,16 +4811,16 @@ int main(int argc, const char **argv)
                                  psync_from_all, sync_from, sync_from_rm,
                                  predirect_zone,
 				 store->svc.sync_modules->get_manager());
-	if (ret < 0) {
-	  cerr << "failed to update zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        if (ret < 0) {
+          cerr << "failed to update zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
-	ret = zonegroup.update();
-	if (ret < 0) {
-	  cerr << "failed to update zonegroup: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        ret = zonegroup.update();
+        if (ret < 0) {
+          cerr << "failed to update zonegroup: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
         if (set_default) {
           ret = zone.set_as_default();
@@ -4790,37 +4835,37 @@ int main(int argc, const char **argv)
       break;
     case OPT_ZONE_RENAME:
       {
-	if (zone_new_name.empty()) {
-	  cerr << " missing zone new name" << std::endl;
-	  return EINVAL;
-	}
-	if (zone_id.empty() && zone_name.empty()) {
-	  cerr << "no zonegroup name or id provided" << std::endl;
-	  return EINVAL;
-	}
-	RGWZoneParams zone(zone_id,zone_name);
-	int ret = zone.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	ret = zone.rename(zone_new_name);
-	if (ret < 0) {
-	  cerr << "failed to rename zone " << zone_name << " to " << zone_new_name << ": " << cpp_strerror(-ret)
-	       << std::endl;
-	  return -ret;
-	}
-	RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
-	ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "WARNING: failed to initialize zonegroup " << zonegroup_name << std::endl;
-	} else {
-	  ret = zonegroup.rename_zone(zone);
-	  if (ret < 0) {
-	    cerr << "Error in zonegroup rename for " << zone_name << ": " << cpp_strerror(-ret) << std::endl;
-	    return -ret;
-	  }
-	}
+        if (zone_new_name.empty()) {
+          cerr << " missing zone new name" << std::endl;
+          return EINVAL;
+        }
+        if (zone_id.empty() && zone_name.empty()) {
+          cerr << "no zonegroup name or id provided" << std::endl;
+          return EINVAL;
+        }
+        RGWZoneParams zone(zone_id,zone_name);
+        int ret = zone.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        ret = zone.rename(zone_new_name);
+        if (ret < 0) {
+          cerr << "failed to rename zone " << zone_name << " to " << zone_new_name << ": " << cpp_strerror(-ret)
+               << std::endl;
+          return -ret;
+        }
+        RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
+        ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "WARNING: failed to initialize zonegroup " << zonegroup_name << std::endl;
+        } else {
+          ret = zonegroup.rename_zone(zone);
+          if (ret < 0) {
+            cerr << "Error in zonegroup rename for " << zone_name << ": " << cpp_strerror(-ret) << std::endl;
+            return -ret;
+          }
+        }
       }
       break;
     case OPT_ZONE_PLACEMENT_ADD:
@@ -4838,60 +4883,60 @@ int main(int argc, const char **argv)
           return EINVAL;
         }
 
-	RGWZoneParams zone(zone_id, zone_name);
-	int ret = zone.init(g_ceph_context, store->svc.sysobj);
-        if (ret < 0) {
-	  cerr << "failed to init zone: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
+        RGWZoneParams zone(zone_id, zone_name);
+        int ret = zone.init(g_ceph_context, store->svc.sysobj);
+              if (ret < 0) {
+          cerr << "failed to init zone: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
 
         if (opt_cmd == OPT_ZONE_PLACEMENT_ADD ||
-	    opt_cmd == OPT_ZONE_PLACEMENT_MODIFY) {
-	  RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
-	  ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
-	  if (ret < 0) {
-	    cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
-	    return -ret;
-	  }
+            opt_cmd == OPT_ZONE_PLACEMENT_MODIFY) {
+          RGWZoneGroup zonegroup(zonegroup_id, zonegroup_name);
+          ret = zonegroup.init(g_ceph_context, store->svc.sysobj);
+          if (ret < 0) {
+            cerr << "failed to init zonegroup: " << cpp_strerror(-ret) << std::endl;
+            return -ret;
+          }
 
-	  auto ptiter = zonegroup.placement_targets.find(placement_id);
-	  if (ptiter == zonegroup.placement_targets.end()) {
-	    cerr << "ERROR: placement id '" << placement_id << "' is not configured in zonegroup placement targets" << std::endl;
-	    return EINVAL;
-	  }
+          auto ptiter = zonegroup.placement_targets.find(placement_id);
+          if (ptiter == zonegroup.placement_targets.end()) {
+            cerr << "ERROR: placement id '" << placement_id << "' is not configured in zonegroup placement targets" << std::endl;
+            return EINVAL;
+          }
 
-	  storage_class = rgw_placement_rule::get_canonical_storage_class(storage_class);
-	  if (ptiter->second.storage_classes.find(storage_class) == ptiter->second.storage_classes.end()) {
-	    cerr << "ERROR: storage class '" << storage_class << "' is not defined in zonegroup '" << placement_id << "' placement target" << std::endl;
-	    return EINVAL;
-	  }
+          storage_class = rgw_placement_rule::get_canonical_storage_class(storage_class);
+          if (ptiter->second.storage_classes.find(storage_class) == ptiter->second.storage_classes.end()) {
+            cerr << "ERROR: storage class '" << storage_class << "' is not defined in zonegroup '" << placement_id << "' placement target" << std::endl;
+            return EINVAL;
+          }
 
           RGWZonePlacementInfo& info = zone.placement_pools[placement_id];
 
-	  string opt_index_pool = index_pool.value_or(string());
-	  string opt_data_pool = data_pool.value_or(string());
+          string opt_index_pool = index_pool.value_or(string());
+          string opt_data_pool = data_pool.value_or(string());
 
-	  if (!opt_index_pool.empty()) {
-	    info.index_pool = opt_index_pool;
-	  }
+          if (!opt_index_pool.empty()) {
+            info.index_pool = opt_index_pool;
+          }
 
-	  if (info.index_pool.empty()) {
-            cerr << "ERROR: index pool not configured, need to specify --index-pool" << std::endl;
-            return EINVAL;
-	  }
+          if (info.index_pool.empty()) {
+                  cerr << "ERROR: index pool not configured, need to specify --index-pool" << std::endl;
+                  return EINVAL;
+          }
 
-	  if (opt_data_pool.empty()) {
-	    const RGWZoneStorageClass *porig_sc{nullptr};
-	    if (info.storage_classes.find(storage_class, &porig_sc)) {
-	      if (porig_sc->data_pool) {
-		opt_data_pool = porig_sc->data_pool->to_str();
-	      }
-	    }
-	    if (opt_data_pool.empty()) {
-	      cerr << "ERROR: data pool not configured, need to specify --data-pool" << std::endl;
-	      return EINVAL;
-	    }
-	  }
+          if (opt_data_pool.empty()) {
+            const RGWZoneStorageClass *porig_sc{nullptr};
+            if (info.storage_classes.find(storage_class, &porig_sc)) {
+              if (porig_sc->data_pool) {
+          opt_data_pool = porig_sc->data_pool->to_str();
+              }
+            }
+            if (opt_data_pool.empty()) {
+              cerr << "ERROR: data pool not configured, need to specify --data-pool" << std::endl;
+              return EINVAL;
+            }
+          }
 
           rgw_pool dp = opt_data_pool;
           info.storage_classes.set_storage_class(storage_class, &dp, compression_type.get_ptr());
@@ -4900,12 +4945,12 @@ int main(int argc, const char **argv)
             info.data_extra_pool = *data_extra_pool;
           }
           if (index_type_specified) {
-	    info.index_type = placement_index_type;
+            info.index_type = placement_index_type;
           }
 
           ret = check_pool_support_omap(info.get_data_extra_pool());
           if (ret < 0) {
-             cerr << "ERROR: the data extra (non-ec) pool '" << info.get_data_extra_pool() 
+             cerr << "ERROR: the data extra (non-ec) pool '" << info.get_data_extra_pool()
                  << "' does not support omap" << std::endl;
              return ret;
           }
@@ -4925,36 +4970,36 @@ int main(int argc, const char **argv)
       break;
     case OPT_ZONE_PLACEMENT_LIST:
       {
-	RGWZoneParams zone(zone_id, zone_name);
-	int ret = zone.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	encode_json("placement_pools", zone.placement_pools, formatter);
-	formatter->flush(cout);
+        RGWZoneParams zone(zone_id, zone_name);
+        int ret = zone.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        encode_json("placement_pools", zone.placement_pools, formatter);
+        formatter->flush(cout);
       }
       break;
     case OPT_ZONE_PLACEMENT_GET:
       {
-	if (placement_id.empty()) {
-	  cerr << "ERROR: --placement-id not specified" << std::endl;
-	  return EINVAL;
-	}
+        if (placement_id.empty()) {
+          cerr << "ERROR: --placement-id not specified" << std::endl;
+          return EINVAL;
+        }
 
-	RGWZoneParams zone(zone_id, zone_name);
-	int ret = zone.init(g_ceph_context, store->svc.sysobj);
-	if (ret < 0) {
-	  cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
-	  return -ret;
-	}
-	auto p = zone.placement_pools.find(placement_id);
-	if (p == zone.placement_pools.end()) {
-	  cerr << "ERROR: zone placement target '" << placement_id << "' not found" << std::endl;
-	  return -ENOENT;
-	}
-	encode_json("placement_pools", p->second, formatter);
-	formatter->flush(cout);
+        RGWZoneParams zone(zone_id, zone_name);
+        int ret = zone.init(g_ceph_context, store->svc.sysobj);
+        if (ret < 0) {
+          cerr << "unable to initialize zone: " << cpp_strerror(-ret) << std::endl;
+          return -ret;
+        }
+        auto p = zone.placement_pools.find(placement_id);
+        if (p == zone.placement_pools.end()) {
+          cerr << "ERROR: zone placement target '" << placement_id << "' not found" << std::endl;
+          return -ENOENT;
+        }
+        encode_json("placement_pools", p->second, formatter);
+        formatter->flush(cout);
       }
       break;
     }
@@ -4962,7 +5007,7 @@ int main(int argc, const char **argv)
   }
 
   bool non_master_cmd = (!store->svc.zone->is_meta_master() && !yes_i_really_mean_it);
-  std::set<int> non_master_ops_list = {OPT_USER_CREATE, OPT_USER_RM, 
+  std::set<int> non_master_ops_list = {OPT_USER_CREATE, OPT_USER_RM,
                                         OPT_USER_MODIFY, OPT_USER_ENABLE,
                                         OPT_USER_SUSPEND, OPT_SUBUSER_CREATE,
                                         OPT_SUBUSER_MODIFY, OPT_SUBUSER_RM,
@@ -4993,6 +5038,18 @@ int main(int argc, const char **argv)
 
   if (!user_email.empty())
     user_op.set_user_email(user_email);
+
+  if (!endp_type.empty()) {
+    RGWUserEndpoint user_endpoint(endp_type,
+                                  endp_url,
+                                  endp_tenant,
+                                  endp_admin,
+                                  endp_admin_pw,
+                                  endp_admin_pw_path,
+                                  endp_enabled);
+
+    user_op.set_user_endpoint(user_endpoint);
+  }
 
   if (!access_key.empty())
     user_op.set_access_key(access_key);
@@ -5095,7 +5152,7 @@ int main(int argc, const char **argv)
     if (ret < 0) {
       cerr << "could not create user: " << err_msg << std::endl;
       if (ret == -ERR_INVALID_TENANT_NAME)
-	ret = -EINVAL;
+        ret = -EINVAL;
 
       return -ret;
     }
@@ -5125,6 +5182,33 @@ int main(int argc, const char **argv)
       return -ret;
     }
 
+    break;
+  case OPT_USER_ENDP_CREATE:
+    ret = user.endpoints.add(user_op, &err_msg);
+    if (ret < 0) {
+      cerr << "could not create user endpoint: " << err_msg << std::endl;
+      return -ret;
+    }
+
+    break;
+  case OPT_USER_ENDP_MODIFY:
+    ret = user.endpoints.modify(user_op, &err_msg);
+    if (ret < 0) {
+      cerr << "could not modify user endpoint: " << err_msg << std::endl;
+      return -ret;
+    }
+
+    break;
+  case OPT_USER_ENDP_RM:
+    {
+      ret = user.endpoints.remove(user_op, &err_msg);
+      if (ret < 0) {
+        cerr << "could not remove user endpoint: " << err_msg << std::endl;
+        return -ret;
+      }
+    }
+
+    output_user_info = false;
     break;
   case OPT_SUBUSER_CREATE:
     ret = user.subusers.add(user_op, &err_msg);
@@ -6969,11 +7053,11 @@ next:
         cerr << "ERROR: lists_keys_next(): " << cpp_strerror(-ret) << std::endl;
         return -ret;
       } if (ret != -ENOENT) {
-	for (list<string>::iterator iter = keys.begin(); iter != keys.end(); ++iter) {
-	  formatter->dump_string("key", *iter);
+        for (list<string>::iterator iter = keys.begin(); iter != keys.end(); ++iter) {
+          formatter->dump_string("key", *iter);
           ++count;
-	}
-	formatter->flush(cout);
+        }
+        formatter->flush(cout);
       }
     } while (truncated && left > 0);
 
@@ -7226,7 +7310,7 @@ next:
       set<string> pending_buckets;
       set<string> recovering_buckets;
       rgw_data_sync_marker sync_marker;
-      ret = sync.read_shard_status(shard_id, pending_buckets, recovering_buckets, &sync_marker, 
+      ret = sync.read_shard_status(shard_id, pending_buckets, recovering_buckets, &sync_marker,
                                    max_entries_specified ? max_entries : 20);
       if (ret < 0 && ret != -ENOENT) {
         cerr << "ERROR: sync.read_shard_status() returned ret=" << ret << std::endl;
@@ -7299,7 +7383,7 @@ next:
     }
 
     RGWSyncModuleInstanceRef sync_module;
-    int ret = store->svc.sync_modules->get_manager()->create_instance(g_ceph_context, store->svc.zone->get_zone().tier_type, 
+    int ret = store->svc.sync_modules->get_manager()->create_instance(g_ceph_context, store->svc.zone->get_zone().tier_type,
         store->svc.zone->get_zone_params().tier_config, &sync_module);
     if (ret < 0) {
       lderr(cct) << "ERROR: failed to init sync module instance, ret=" << ret << dendl;
@@ -7863,7 +7947,7 @@ next:
       cerr << "MFA creation failed, error: " << cpp_strerror(-ret) << std::endl;
       return -ret;
     }
-    
+
     RGWUserInfo& user_info = user_op.get_user_info();
     user_info.mfa_ids.insert(totp_serial);
     user_op.set_mfa_ids(user_info.mfa_ids);

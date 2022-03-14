@@ -113,6 +113,10 @@ void RGWOp_User_Create::execute()
   std::string tenant_name;
   std::string op_mask_str;
 
+  std::string endp_type, endp_url, endp_tenant;
+  std::string endp_admin, endp_admin_pw, endp_admin_pw_path;
+
+  bool endp_enabled;
   bool gen_key;
   bool suspended;
   bool system;
@@ -139,6 +143,16 @@ void RGWOp_User_Create::execute()
   RESTArgs::get_bool(s, "system", false, &system);
   RESTArgs::get_bool(s, "exclusive", false, &exclusive);
   RESTArgs::get_string(s, "op-mask", op_mask_str, &op_mask_str);
+
+  RESTArgs::get_string(s, "endpoint-type", endp_type, &endp_type);
+  RESTArgs::get_string(s, "endpoint-url",  endp_url,  &endp_url);
+  RESTArgs::get_string(s, "endpoint-tenant",  "nes",  &endp_tenant);
+
+  RESTArgs::get_string(s, "endpoint-admin",  endp_admin, &endp_admin);
+  RESTArgs::get_string(s, "endpoint-admin-passwd",  endp_admin_pw, &endp_admin_pw);
+  RESTArgs::get_string(s, "endpoint-admin-passwd-path",  endp_admin_pw_path, &endp_admin_pw_path);
+
+  RESTArgs::get_bool(s, "endpoint-enabled", true, &endp_enabled);
 
   if (!s->user->system && system) {
     ldout(s->cct, 0) << "cannot set system flag by non-system user" << dendl;
@@ -182,6 +196,18 @@ void RGWOp_User_Create::execute()
   if (max_buckets != default_max_buckets)
     op_state.set_max_buckets(max_buckets);
 
+  if (s->info.args.exists("endpoint-type")) {
+    RGWUserEndpoint user_endpoint(endp_type,
+                                  endp_url,
+                                  endp_tenant,
+                                  endp_admin,
+                                  endp_admin_pw,
+                                  endp_admin_pw_path,
+                                  endp_enabled);
+
+    op_state.set_user_endpoint(user_endpoint);
+  }
+
   if (s->info.args.exists("suspended"))
     op_state.set_suspension(suspended);
 
@@ -222,6 +248,10 @@ void RGWOp_User_Modify::execute()
   std::string caps;
   std::string op_mask_str;
 
+  std::string endp_type, endp_url, endp_tenant;
+  std::string endp_admin, endp_admin_pw, endp_admin_pw_path;
+
+  bool endp_enabled;
   bool gen_key;
   bool suspended;
   bool system;
@@ -246,6 +276,19 @@ void RGWOp_User_Modify::execute()
 
   RESTArgs::get_bool(s, "system", false, &system);
   RESTArgs::get_string(s, "op-mask", op_mask_str, &op_mask_str);
+
+  bool is_endp_type_exists, is_endp_url_exists, is_endp_tenant_exists;
+  RESTArgs::get_string(s, "endpoint-type",   endp_type,   &endp_type,   &is_endp_type_exists);
+  RESTArgs::get_string(s, "endpoint-url",    endp_url,    &endp_url,    &is_endp_url_exists);
+  RESTArgs::get_string(s, "endpoint-tenant", endp_tenant, &endp_tenant, &is_endp_tenant_exists);
+
+  bool is_endp_admin_user_exists, is_endp_admin_pw_exists, is_endp_admin_pw_path_exists;
+  RESTArgs::get_string(s, "endpoint-admin", endp_admin, &endp_admin, &is_endp_admin_user_exists);
+  RESTArgs::get_string(s, "endpoint-admin-passwd", endp_admin_pw, &endp_admin_pw, &is_endp_admin_pw_exists);
+  RESTArgs::get_string(s, "endpoint-admin-passwd-path", endp_admin_pw_path, &endp_admin_pw_path, &is_endp_admin_pw_path_exists);
+
+  bool is_endp_enabled_exists;
+  RESTArgs::get_bool(s, "endpoint-enabled", true, &endp_enabled, &is_endp_enabled_exists);
 
   if (!s->user->system && system) {
     ldout(s->cct, 0) << "cannot set system flag by non-system user" << dendl;
@@ -277,6 +320,26 @@ void RGWOp_User_Modify::execute()
       key_type = KEY_TYPE_S3;
 
     op_state.set_key_type(key_type);
+  }
+
+  if (is_endp_type_exists) {
+    if (is_endp_url_exists && endp_url.empty()) { endp_url = "-"; }
+    if (is_endp_tenant_exists && endp_tenant.empty()) { endp_tenant = "-"; }
+    if (is_endp_admin_user_exists && endp_admin.empty()) { endp_admin = "-"; }
+    if (is_endp_admin_pw_exists && endp_admin_pw.empty()) { endp_admin_pw = "-"; }
+    if (is_endp_admin_pw_path_exists && endp_admin_pw_path.empty()) { endp_admin_pw_path = "-"; }
+
+    RGWUserEndpoint user_endpoint(endp_type,
+                                  endp_url,
+                                  endp_tenant,
+                                  endp_admin,
+                                  endp_admin_pw,
+                                  endp_admin_pw_path,
+                                  endp_enabled);
+
+    op_state.set_user_endpoint(user_endpoint);
+
+    op_state.endp_enabled_specified = is_endp_enabled_exists;
   }
 
   if (s->info.args.exists("suspended"))
@@ -377,7 +440,7 @@ void RGWOp_Subuser_Create::execute()
   //RESTArgs::get_bool(s, "generate-subuser", false, &gen_subuser);
   RESTArgs::get_bool(s, "generate-secret", false, &gen_secret);
   RESTArgs::get_bool(s, "gen-access-key", false, &gen_access);
-  
+
   perm_mask = rgw_str_to_perm(perm_str.c_str());
   op_state.set_perm(perm_mask);
 
@@ -675,7 +738,7 @@ struct UserQuotas {
 
   UserQuotas() {}
 
-  explicit UserQuotas(RGWUserInfo& info) : bucket_quota(info.bucket_quota), 
+  explicit UserQuotas(RGWUserInfo& info) : bucket_quota(info.bucket_quota),
 				  user_quota(info.user_quota) {}
 
   void dump(Formatter *f) const {
@@ -946,6 +1009,154 @@ void RGWOp_Quota_Set::execute()
   }
 }
 
+class RGWOp_Endpoint_Create : public RGWRESTOp {
+
+public:
+  RGWOp_Endpoint_Create() {}
+
+  int check_caps(RGWUserCaps& caps) override {
+    return caps.check_cap("users", RGW_CAP_WRITE);
+  }
+
+  void execute() override;
+
+  const char* name() const override { return "create_endpoint"; }
+};
+
+void RGWOp_Endpoint_Create::execute()
+{
+  std::string uid_str;
+  std::string endp_type, endp_url, endp_tenant;
+  std::string endp_admin, endp_admin_pw, endp_admin_pw_path;
+
+  bool endp_enabled;
+
+  RGWUserAdminOpState op_state;
+
+  RESTArgs::get_string(s, "uid", uid_str, &uid_str);
+  rgw_user uid(uid_str);
+
+  RESTArgs::get_string(s, "endpoint-type", endp_type, &endp_type);
+  RESTArgs::get_string(s, "endpoint-url",  endp_url,  &endp_url);
+  RESTArgs::get_string(s, "endpoint-tenant",  "nes",  &endp_tenant);
+
+  RESTArgs::get_string(s, "endpoint-admin",  endp_admin, &endp_admin);
+  RESTArgs::get_string(s, "endpoint-admin-passwd",  endp_admin_pw, &endp_admin_pw);
+  RESTArgs::get_string(s, "endpoint-admin-passwd-path",  endp_admin_pw_path, &endp_admin_pw_path);
+
+  RESTArgs::get_bool(s, "endpoint-enabled", true, &endp_enabled);
+
+  op_state.set_user_id(uid);
+  RGWUserEndpoint user_endpoint(endp_type,
+                                endp_url,
+                                endp_tenant,
+                                endp_admin,
+                                endp_admin_pw,
+                                endp_admin_pw_path,
+                                endp_enabled);
+
+  op_state.set_user_endpoint(user_endpoint);
+
+  http_ret = RGWUserAdminOp_Endpoint::create(store, op_state, flusher);
+}
+
+class RGWOp_Endpoint_Modify : public RGWRESTOp {
+
+public:
+  RGWOp_Endpoint_Modify() {}
+
+  int check_caps(RGWUserCaps& caps) override {
+    return caps.check_cap("users", RGW_CAP_WRITE);
+  }
+
+  void execute() override;
+
+  const char* name() const override { return "modify_endpoint"; }
+};
+
+void RGWOp_Endpoint_Modify::execute()
+{
+  std::string uid_str;
+  std::string endp_type, endp_url, endp_tenant;
+  std::string endp_admin, endp_admin_pw, endp_admin_pw_path;
+
+  bool endp_enabled;
+
+  RGWUserAdminOpState op_state;
+
+  RESTArgs::get_string(s, "uid", uid_str, &uid_str);
+  rgw_user uid(uid_str);
+
+  bool is_endp_type_exists, is_endp_url_exists, is_endp_tenant_exists;
+  RESTArgs::get_string(s, "endpoint-type",   endp_type,   &endp_type,   &is_endp_type_exists);
+  RESTArgs::get_string(s, "endpoint-url",    endp_url,    &endp_url,    &is_endp_url_exists);
+  RESTArgs::get_string(s, "endpoint-tenant", endp_tenant, &endp_tenant, &is_endp_tenant_exists);
+
+  bool is_endp_admin_user_exists, is_endp_admin_pw_exists, is_endp_admin_pw_path_exists;
+  RESTArgs::get_string(s, "endpoint-admin", endp_admin, &endp_admin, &is_endp_admin_user_exists);
+  RESTArgs::get_string(s, "endpoint-admin-passwd", endp_admin_pw, &endp_admin_pw, &is_endp_admin_pw_exists);
+  RESTArgs::get_string(s, "endpoint-admin-passwd-path", endp_admin_pw_path, &endp_admin_pw_path, &is_endp_admin_pw_path_exists);
+
+  bool is_endp_enabled_exists;
+  RESTArgs::get_bool(s, "endpoint-enabled", true, &endp_enabled, &is_endp_enabled_exists);
+
+  op_state.set_user_id(uid);
+
+  if (is_endp_type_exists) {
+    if (is_endp_url_exists           && endp_url.empty()) { endp_url = "-"; }
+    if (is_endp_tenant_exists        && endp_tenant.empty()) { endp_tenant = "-"; }
+    if (is_endp_admin_user_exists    && endp_admin.empty()) { endp_admin = "-"; }
+    if (is_endp_admin_pw_exists      && endp_admin_pw.empty()) { endp_admin_pw = "-"; }
+    if (is_endp_admin_pw_path_exists && endp_admin_pw_path.empty()) { endp_admin_pw_path = "-"; }
+
+    RGWUserEndpoint user_endpoint(endp_type,
+                                  endp_url,
+                                  endp_tenant,
+                                  endp_admin,
+                                  endp_admin_pw,
+                                  endp_admin_pw_path,
+                                  endp_enabled);
+
+    op_state.set_user_endpoint(user_endpoint);
+
+    op_state.endp_enabled_specified = is_endp_enabled_exists;
+  }
+
+  http_ret = RGWUserAdminOp_Endpoint::modify(store, op_state, flusher);
+}
+
+class RGWOp_Endpoint_Remove : public RGWRESTOp {
+
+public:
+  RGWOp_Endpoint_Remove() {}
+
+  int check_caps(RGWUserCaps& caps) override {
+    return caps.check_cap("users", RGW_CAP_WRITE);
+  }
+
+  void execute() override;
+
+  const char* name() const override { return "remove_endpoint"; }
+};
+
+void RGWOp_Endpoint_Remove::execute()
+{
+  std::string uid_str;
+  std::string endp_type;
+
+  RGWUserAdminOpState op_state;
+
+  RESTArgs::get_string(s, "uid", uid_str, &uid_str);
+  rgw_user uid(uid_str);
+
+  RESTArgs::get_string(s, "endpoint-type", endp_type, &endp_type);
+
+  op_state.set_user_id(uid);
+  op_state.user_endpoint.type = endp_type;
+
+  http_ret = RGWUserAdminOp_Endpoint::remove(store, op_state, flusher);
+}
+
 RGWOp *RGWHandler_User::op_get()
 {
   if (s->info.args.sub_resource_exists("quota"))
@@ -971,6 +1182,9 @@ RGWOp *RGWHandler_User::op_put()
   if (s->info.args.sub_resource_exists("quota"))
     return new RGWOp_Quota_Set;
 
+  if (s->info.args.sub_resource_exists("endpoint"))
+    return new RGWOp_Endpoint_Create;
+
   return new RGWOp_User_Create;
 }
 
@@ -978,6 +1192,9 @@ RGWOp *RGWHandler_User::op_post()
 {
   if (s->info.args.sub_resource_exists("subuser"))
     return new RGWOp_Subuser_Modify;
+
+  if (s->info.args.sub_resource_exists("endpoint"))
+    return new RGWOp_Endpoint_Modify;
 
   return new RGWOp_User_Modify;
 }
@@ -992,6 +1209,9 @@ RGWOp *RGWHandler_User::op_delete()
 
   if (s->info.args.sub_resource_exists("caps"))
     return new RGWOp_Caps_Remove;
+
+  if (s->info.args.sub_resource_exists("endpoint"))
+    return new RGWOp_Endpoint_Remove;
 
   return new RGWOp_User_Remove;
 }
