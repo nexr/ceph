@@ -576,7 +576,7 @@ struct RGWUserEndpoint {
     admin_user = _user;
 
     admin_passwd = _passwd;
-    admin_passwd_path = _passwd;
+    admin_passwd_path = _passwd_path;
 
     enabled = _enabled;
   }
