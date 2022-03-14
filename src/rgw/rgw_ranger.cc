@@ -1,6 +1,7 @@
 #include "rgw_ranger.h"
 #include "include/ipaddr.h"
 #include <regex>
+#include <fstream>
 
 #define dout_context g_ceph_context
 #define dout_subsys ceph_subsys_rgw
@@ -64,6 +65,64 @@ inline bool parse_ip(entity_addr_t *network, string addr) {
   }
 
 	return false;
+}
+
+static inline std::string read_secret(const std::string& file_path)
+{
+  constexpr int16_t size{1024};
+  char buf[size];
+  string s;
+
+  s.reserve(size);
+  FILE* pFile = fopen(file_path.c_str(), "r"); //read mode
+  if(pFile == NULL)
+  {
+    dout(10) << __func__ << "(): The passwd file is not exists. passwd file = " << file_path << dendl;
+    return "";
+  }
+
+  fgets(buf, size, pFile);
+  fclose(pFile);
+
+  s.append(buf);
+
+  boost::algorithm::trim(s);
+
+  if (s.back() == '\n') {
+    s.pop_back();
+  }
+
+  return s;
+}
+
+bool get_ranger_endpoint(RGWUserEndpoint& out, RGWOp *& op, req_state * const s) {
+
+  RGWUserEndpoints* user_endps = &(s->user->endpoints);
+  RGWUserEndpoint* found_endp  = user_endps->get("ranger");
+
+  if (found_endp != nullptr && found_endp->enabled) {
+    out = *found_endp;
+  }
+  else {
+    out.url = s->cct->_conf->rgw_ranger_url;
+    if (out.url == "") {
+      ldpp_dout(op, 2) << __func__ << "(): RNAGER_URL not provided" << dendl;
+      return false;
+    }
+
+    out.use_ssl = s->cct->_conf->rgw_ranger_verify_ssl;
+
+    out.admin_user = s->cct->_conf->rgw_ranger_admin_user;
+
+    out.admin_passwd = s->cct->_conf->rgw_ranger_admin_password;
+    out.admin_passwd_path = s->cct->_conf->rgw_ranger_admin_password;
+
+    out.tenant_group = s->cct->_conf->rgw_ranger_tenant;
+
+    out.enabled = true;
+  }
+
+  return true;
 }
 
 // return true if success
@@ -398,9 +457,8 @@ bool is_item_related(RGWOp *& op, req_state * const s, ranger_policy::item& poli
       remote_ips_str.push_back(ips);
     }
   }
-  else {
-    remote_ips_str.push_back(s->env["aws:SourceIp"]);
-  }
+
+  remote_ips_str.push_back(s->env["aws:SourceIp"]);
 
   vector<entity_addr_t> remote_ips;
   vector<string>::iterator ip_iter = remote_ips_str.begin();
@@ -432,6 +490,9 @@ bool is_item_related(RGWOp *& op, req_state * const s, ranger_policy::item& poli
     vector<string>::iterator cidr_iter = each_cond.cidrs.begin();
     for (;cidr_iter != each_cond.cidrs.end(); cidr_iter++) {
       string each_cidr = *cidr_iter;
+      if (each_cidr.rfind("/") == string::npos) {
+        each_cidr += "/32";
+      }
 
       entity_addr_t network;
       unsigned int prefix;
@@ -593,7 +654,7 @@ bool is_authz_denied(RGWOp *& op, req_state * const s, ranger_policy& policy)
 int rgw_ranger_authorize(RGWOp *& op, req_state * const s)
 {
   // check wheter ranger authorize is needed or not
-  const string& bucket_owner = s->bucket_owner.get_id().to_str();
+  const string bucket_owner = s->bucket_owner.get_id().to_str();
   if (bucket_owner == "") {
     ldpp_dout(op, 5) << __func__ << "(): The ranger authorizing is not needed. Skip the steps." << dendl;
     return 0;
@@ -601,15 +662,14 @@ int rgw_ranger_authorize(RGWOp *& op, req_state * const s)
 
   ldpp_dout(op, 5) << __func__ << "(): authorizing request using Ranger" << dendl;
 
-  // get Ranger url
-  const string& ranger_url = s->cct->_conf->rgw_ranger_url;
-  if (ranger_url == "") {
-    ldpp_dout(op, 2) << __func__ << "(): RNAGER_URL not provided" << dendl;
+  RGWUserEndpoint endpoint;
+  if (!get_ranger_endpoint(endpoint, op, s)) {
+    ldpp_dout(op, 2) << __func__ << "(): Failed to parse ranger endpoint of " << bucket_owner << dendl;
     return -ERR_INVALID_REQUEST;
   }
 
   string url;
-  url  = ranger_url;
+  url  = endpoint.url;
   url += "/plugins/policies/service/name/";
   url += bucket_owner;
   url  = regex_replace(url, regex("/+"), "/");
@@ -618,8 +678,18 @@ int rgw_ranger_authorize(RGWOp *& op, req_state * const s)
   ldpp_dout(op, 10) << __func__ << "(): RANGER URL= " << url.c_str() << dendl;
 
   // get authentication info for Ranger
-  const string& ranger_user = s->cct->_conf->rgw_ranger_admin_user;
-  const string& ranger_pass = s->cct->_conf->rgw_ranger_admin_password;
+  string ranger_user = endpoint.admin_user;
+  string ranger_pass = "";
+
+  string endp_admin_pw_path = endpoint.admin_passwd_path;
+  if (endp_admin_pw_path.empty()) {
+    ranger_pass = endpoint.admin_passwd;
+  }
+  else {
+    ranger_pass = read_secret(endp_admin_pw_path);
+    ldpp_dout(op, 20) << __func__ << "(): read ranger admin_password from " << endp_admin_pw_path
+                      << " = " << ranger_pass << dendl;
+  }
 
   bufferlist auth_bl;
   auth_bl.append(ranger_user);
@@ -629,63 +699,93 @@ int rgw_ranger_authorize(RGWOp *& op, req_state * const s)
   bufferlist encoded_bl;
   auth_bl.encode_base64(encoded_bl);
 
-  int ret;
-  bufferlist bl;
-  RGWHTTPTransceiver req(s->cct, "GET", url.c_str(), &bl);
-
-  // set required headers for Ranger request
-  req.append_header("Authorization", "Basic " + encoded_bl.to_str());
-  req.append_header("Content-Type", "application/json");
-
-  // check if we want to verify Ranger server SSL certificate
-  req.set_verify_ssl(s->cct->_conf->rgw_ranger_verify_ssl);
-
-  // send request
-  ret = req.process();
-  if (ret < 0) {
-    ldpp_dout(op, 2) << __func__ << "(): Ranger process error:" << bl.c_str() << dendl;
-    return ret;
-  }
-
-  ldpp_dout(op, 10) << __func__ << "(): received response status=" << req.get_http_status()
-                    << ", body=" << bl.c_str() << dendl;
-
-  // check Ranger response
-  JSONParser parser;
-  if (!parser.parse(bl.c_str(), bl.length())) {
-    ldpp_dout(op, 2) << __func__ << "(): Ranger parse error. malformed json"
-                     << " (response_str = " << bl.c_str() << ")" << dendl;
-    return -EINVAL;
-  }
-
-  JSONObj* policies_obj = parser.find_obj("policies");
-  if (policies_obj == NULL) {
-    ldpp_dout(op, 2) << __func__ << "(): Invalid policies of ranger result" << dendl;
-    return -EINVAL;
-  }
-
-  vector<string> policies_str = policies_obj->get_array_elements();
-
-  // There are no policies at all
-  if (policies_str.size() == 0) {
-    ldpp_dout(op, 2) << __func__ << "(): Ranger rejecting request because of zero policy" << dendl;
-    return -EPERM;
-  }
+  bool need_continue = true;
+  int offset = 0;
 
   vector<ranger_policy> related_policies;
-  vector<string>::iterator policy_iter = policies_str.begin();
-  for (; policy_iter != policies_str.end(); ++policy_iter) {
-    ranger_policy policy;
-    if (!parse_policy(policy, *policy_iter, op)) {
-      ldpp_dout(op, 2) << __func__ << "(): Failed to parse ranger result" << dendl;
+  while (need_continue) {
+    int ret;
+    bufferlist bl;
+
+    string url_with_offset = url +  "?startIndex=" + to_string(offset);
+    RGWHTTPTransceiver req(s->cct, "GET", url_with_offset.c_str(), &bl);
+
+    // set required headers for Ranger request
+    req.append_header("Authorization", "Basic " + encoded_bl.to_str());
+    req.append_header("Content-Type", "application/json");
+
+    // check if we want to verify Ranger server SSL certificate
+    req.set_verify_ssl(endpoint.use_ssl);
+
+    // send request
+    ret = req.process();
+    if (ret < 0) {
+      ldpp_dout(op, 2) << __func__ << "(): Ranger process error:" << bl.c_str() << dendl;
+      return ret;
+    }
+
+    ldpp_dout(op, 10) << __func__ << "(): received response status=" << req.get_http_status()
+                      << ", body=" << bl.c_str() << dendl;
+
+    // check Ranger response
+    JSONParser parser;
+    if (!parser.parse(bl.c_str(), bl.length())) {
+      ldpp_dout(op, 2) << __func__ << "(): Ranger parse error. malformed json"
+                       << " (response_str = " << bl.c_str() << ")" << dendl;
       return -EINVAL;
     }
 
-    if (is_policy_related(op, s, policy)) {
-      related_policies.push_back(policy);
+    JSONObj* resultsize_obj = parser.find_obj("resultSize");
+    if (resultsize_obj == NULL) {
+      ldpp_dout(op, 2) << __func__ << "(): Invalid resultSize of ranger result" << dendl;
+      return -EINVAL;
     }
-    else {
-      ldpp_dout(op, 5) << __func__ << "(): The '" << policy.id << "' policy is not related. Skip checking." << dendl;
+
+    int result_size;
+    decode_json_obj(result_size, resultsize_obj);
+
+    // There are no policies at all
+    if (result_size == 0) {
+      ldpp_dout(op, 2) << __func__ << "(): Ranger rejecting request because of zero policy" << dendl;
+      return -EPERM;
+    }
+
+    JSONObj* pagesize_obj = parser.find_obj("pageSize");
+    if (pagesize_obj == NULL) {
+      ldpp_dout(op, 2) << __func__ << "(): Invalid pageSize of ranger page" << dendl;
+      return -EINVAL;
+    }
+
+    int page_size;
+    decode_json_obj(page_size, pagesize_obj);
+
+    need_continue = (result_size == page_size);
+    if (need_continue) {
+      offset = offset + page_size;
+    }
+
+    JSONObj* policies_obj = parser.find_obj("policies");
+    if (policies_obj == NULL) {
+      ldpp_dout(op, 2) << __func__ << "(): Invalid policies of ranger result" << dendl;
+      return -EINVAL;
+    }
+
+    vector<string> policies_str = policies_obj->get_array_elements();
+
+    vector<string>::iterator policy_iter = policies_str.begin();
+    for (; policy_iter != policies_str.end(); ++policy_iter) {
+      ranger_policy policy;
+      if (!parse_policy(policy, *policy_iter, op)) {
+        ldpp_dout(op, 2) << __func__ << "(): Failed to parse ranger result" << dendl;
+        return -EINVAL;
+      }
+
+      if (is_policy_related(op, s, policy)) {
+        related_policies.push_back(policy);
+      }
+      else {
+        ldpp_dout(op, 5) << __func__ << "(): The '" << policy.id << "' policy is not related. Skip checking." << dendl;
+      }
     }
   }
 
