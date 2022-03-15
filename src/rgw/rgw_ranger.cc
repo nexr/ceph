@@ -719,7 +719,7 @@ int rgw_ranger_authorize(RGWOp *& op, req_state * const s)
   }
   else {
     ranger_pass = read_secret(endp_admin_pw_path);
-    ldpp_dout(op, 20) << __func__ << "(): read ranger admin_password from " << endp_admin_pw_path
+    ldpp_dout(op, 30) << __func__ << "(): read ranger admin_password from " << endp_admin_pw_path
                       << " = " << ranger_pass << dendl;
   }
 
