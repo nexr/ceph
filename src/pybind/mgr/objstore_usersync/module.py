@@ -136,6 +136,7 @@ class ObjstoreUsersync(MgrModule):
 
         self.log.info("Init")
 
+
     def config_notify(self):
         """
         This method is called whenever one of our config options is changed.
@@ -177,6 +178,7 @@ class ObjstoreUsersync(MgrModule):
             stdout=out,   # stdout
             stderr=err)
 
+
     def _exec_radosgw_admin(self, cmd):
         timeout_sec = int(self.interval / 2)
         if timeout_sec < 15: timeout_sec = 15
@@ -196,87 +198,6 @@ class ObjstoreUsersync(MgrModule):
 
         return out, err, rc
 
-    def _read_secret(self, file_path):
-        ret_str = ""
-
-        try: fd = open(file_path, "r")
-        except Exception as e:
-            self.log.warning("_read_secret(): %s" % e)
-            return ret_str
-
-        ret_str = fd.readline().rstrip()
-
-        fd.close()
-
-        return ret_str
-
-    def _request_ranger_rest(self, method, path, endpoint = {}, data = {}):
-        if len(endpoint) == 0:
-            endpoint = self.endpoint_map['ranger']['default']
-
-        method = method.upper()
-
-        url = "%s/%s" % (endpoint['url'], path)
-        url = re.sub("(http|https):/", r"\1://", re.sub("/+", "/", url))
-
-        self.log.debug("%s request: %s" % (method, url))
-
-        response = None
-
-        admin_pw_path = endpoint['admin_pw_path']
-        admin_pw = endpoint['admin_pw'] if len(admin_pw_path) == 0 else \
-                   self._read_secret(admin_pw_path)
-
-        basic_auth = HTTPBasicAuth(endpoint['admin_user'], admin_pw)
-
-        if   method == "GET"    : response = requests.get(url, auth=basic_auth)
-        elif method == "PUT"    : response = requests.put(url, auth=basic_auth, json=data)
-        elif method == "POST"   : response = requests.post(url, auth=basic_auth, json=data)
-        elif method == "DELETE" : response = requests.delete(url, auth=basic_auth)
-
-        if response == None:
-            self.log.warning("Not defined rest method")
-            return {}, -1
-
-        response_text  = response.text.encode('utf8')
-        response_scode = response.status_code
-        self.log.debug("%s (status code %d)" % (response_text, response_scode))
-
-        try: response_dict = xmltodict.parse(response_text)
-        except Exception as e:
-            try: response_dict = json.loads(response_text)
-            except Exception as e: response_dict = {}
-
-        return response_dict, response_scode
-
-    def _fetch_ranger_group_id(self, endpoint = {}):
-        if len(endpoint) == 0:
-            endpoint = self.endpoint_map['ranger']['default']
-
-        sync_tenant = endpoint['tenant']
-
-        group_query_path = "/xusers/groups/groupName/%s" % sync_tenant
-        resp, scode = self._request_ranger_rest("get", group_query_path, endpoint)
-
-        if scode == 200:
-            endpoint['group_id'] = resp['vxGroup']['id']
-        # the tenant group not founded
-        elif scode == 400 and resp['vxResponse']['messageList']['name'] == 'DATA_NOT_FOUND':
-            group_create_try_msg  = "'%s' ranger group is not exist. " % sync_tenant
-            group_create_try_msg += "Try to create the tenant group"
-            self.log.info(group_create_try_msg)
-
-            data = { 'name': sync_tenant, 'description': 'group for nes tenant' }
-            resp, scode = self._request_ranger_rest("post", "/xusers/groups", endpoint, data)
-
-            if scode == 200:
-                endpoint['group_id'] = resp['vxGroup']['id']
-            else: # group create request failed
-                self.log.warning("The ranger group creating trial is failed")
-        else: # group query request failed
-            self.log.warning("Failed to get ranger group info")
-
-        return endpoint['group_id']
 
     def _get_objuser_info(self, user_name):
         ret_json = {}
@@ -317,6 +238,92 @@ class ObjstoreUsersync(MgrModule):
 
         return ret_list, is_success
 
+
+    def _read_secret(self, file_path):
+        ret_str = ""
+
+        try: fd = open(file_path, "r")
+        except Exception as e:
+            self.log.warning("_read_secret(): %s" % e)
+            return ret_str
+
+        ret_str = fd.readline().rstrip()
+
+        fd.close()
+
+        return ret_str
+
+
+    def _request_ranger_rest(self, method, path, endpoint = {}, data = {}):
+        if len(endpoint) == 0:
+            endpoint = self.endpoint_map['ranger']['default']
+
+        method = method.upper()
+
+        url = "%s/%s" % (endpoint['url'], path)
+        url = re.sub("(http|https):/", r"\1://", re.sub("/+", "/", url))
+
+        self.log.debug("%s request: %s" % (method, url))
+
+        response = None
+
+        admin_pw_path = endpoint['admin_pw_path']
+        admin_pw = endpoint['admin_pw'] if len(admin_pw_path) == 0 else \
+                   self._read_secret(admin_pw_path)
+
+        basic_auth = HTTPBasicAuth(endpoint['admin_user'], admin_pw)
+
+        if   method == "GET"    : response = requests.get(url, auth=basic_auth)
+        elif method == "PUT"    : response = requests.put(url, auth=basic_auth, json=data)
+        elif method == "POST"   : response = requests.post(url, auth=basic_auth, json=data)
+        elif method == "DELETE" : response = requests.delete(url, auth=basic_auth)
+
+        if response == None:
+            self.log.warning("Not defined rest method")
+            return {}, -1
+
+        response_text  = response.text.encode('utf8')
+        response_scode = response.status_code
+        self.log.debug("%s (status code %d)" % (response_text, response_scode))
+
+        try: response_dict = xmltodict.parse(response_text)
+        except Exception as e:
+            try: response_dict = json.loads(response_text)
+            except Exception as e: response_dict = {}
+
+        return response_dict, response_scode
+
+
+    def _fetch_ranger_group_id(self, endpoint = {}):
+        if len(endpoint) == 0:
+            endpoint = self.endpoint_map['ranger']['default']
+
+        sync_tenant = endpoint['tenant']
+
+        group_query_path = "/xusers/groups/groupName/%s" % sync_tenant
+        resp, scode = self._request_ranger_rest("get", group_query_path, endpoint)
+
+        if scode == 200:
+            endpoint['group_id'] = resp['vxGroup']['id']
+        # the tenant group not founded
+        elif scode == 400 and resp['vxResponse']['messageList']['name'] == 'DATA_NOT_FOUND':
+            group_create_try_msg  = "'%s' ranger group is not exist. " % sync_tenant
+            group_create_try_msg += "Try to create the tenant group"
+            self.log.info(group_create_try_msg)
+
+            data = { 'name': sync_tenant, 'description': 'group for nes tenant' }
+            resp, scode = self._request_ranger_rest("post", "/xusers/groups", endpoint, data)
+
+            if scode == 200:
+                endpoint['group_id'] = resp['vxGroup']['id']
+            else: # group create request failed
+                self.log.warning("The ranger group creating trial is failed")
+        else: # group query request failed
+            self.log.warning("Failed to get ranger group info")
+
+        return endpoint['group_id']
+
+
     def _print_endpoint_map(self):
         emap = self.endpoint_map
 
@@ -331,6 +338,7 @@ class ObjstoreUsersync(MgrModule):
                 self.log.debug("    },")
             self.log.debug("  ],")
         self.log.debug("}")
+
 
     def _update_endpoint_map(self):
         user_list, is_success = self._get_objuser_list()
@@ -375,6 +383,7 @@ class ObjstoreUsersync(MgrModule):
 
         return is_success
 
+
     def _get_ranger_user_list(self, endpoint = {}):
         ret_list = []
 
@@ -411,6 +420,7 @@ class ObjstoreUsersync(MgrModule):
 
         return ret_list, is_success
 
+
     def _get_tgtuser_list(self, target, endpoint = {}):
         ret_list = []
         is_success = False
@@ -421,6 +431,7 @@ class ObjstoreUsersync(MgrModule):
             self.log.warning("The '%s' is not supported list target" % target)
 
         return ret_list, is_success
+
 
     def _create_ranger_user(self, user_name, endpoint = {}):
         is_success = False
@@ -610,6 +621,7 @@ class ObjstoreUsersync(MgrModule):
 
         return is_success
 
+
     def _create_tgtuser(self, user_name, target = 'ranger', endpoint = {}):
         is_success = False
 
@@ -619,6 +631,7 @@ class ObjstoreUsersync(MgrModule):
             self.log.warning("The '%s' is not supported user create target" % target)
 
         return is_success
+
 
     def _remove_ranger_user(self, user_name, endpoint = {}):
         is_success = False
@@ -714,6 +727,7 @@ class ObjstoreUsersync(MgrModule):
 
         return is_success
 
+
     def _remove_tgtuser(self, user_name, target = 'ranger', endpoint = {}):
         is_success = False
 
@@ -723,6 +737,7 @@ class ObjstoreUsersync(MgrModule):
             self.log.warning("The '%s' is not supported user remove target" % target)
 
         return is_success
+
 
     def serve(self):
         """
@@ -814,6 +829,7 @@ class ObjstoreUsersync(MgrModule):
                             self.log.warning(user_remove_fail_msg)
 
                     tgtusers_pool[pool_key] = []
+
 
     def shutdown(self):
         """
