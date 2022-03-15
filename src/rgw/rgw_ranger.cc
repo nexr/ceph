@@ -11,6 +11,7 @@ typedef struct {
   bool isEnabled;
   vector<string> paths;
   bool isRecursive;
+  bool isExcludes;
   struct item {
     bool read_checked;
     bool write_checked;
@@ -308,6 +309,16 @@ bool parse_policy(ranger_policy& out, string& policy_str, RGWOp *& op) {
 
   decode_json_obj(out.isRecursive, resources_path_isrecursive_obj);
 
+  // policy.isExcludes
+  JSONObj* resources_path_isexcludes_obj = resources_path_obj->find_obj("isExcludes");
+  if (resources_path_isexcludes_obj == NULL) {
+    ldpp_dout(op, 2) << __func__ << "(): Failed to find resources/path/isExcludes of the entity"
+                     << " (policy_str = " << policy_str.c_str() << ")" << dendl;
+    return false;
+  }
+
+  decode_json_obj(out.isExcludes, resources_path_isexcludes_obj);
+
   // policy.allow_policies
   JSONObj* policyitems_obj = parser.find_obj("policyItems");
   if (policyitems_obj == NULL) {
@@ -386,14 +397,21 @@ bool is_policy_related(RGWOp *& op, req_state * const s, ranger_policy& policy) 
   trim_path(req_target);
   ldpp_dout(op, 20) << __func__ << "(): req_target = " << req_target << dendl;
 
+  string req_user = s->user->user_id.to_str();
+  string bucket_owner = s->bucket_owner.get_id().to_str();
+
   vector<string>::iterator path_iter = policy.paths.begin();
   for (;path_iter != policy.paths.end(); path_iter++) {
     string each_path = *path_iter;
     trim_path(each_path);
 
+    each_path = regex_replace(each_path, regex("\\{USER\\}"), req_user);
+    each_path = regex_replace(each_path, regex("\\{OWNER\\}"), bucket_owner);
+
     string path_regex;
     path_regex += "^";
     path_regex += regex_replace(each_path, regex("\\*+"), "[A-Za-z0-9_=@,.:-\\\\/]*");
+    path_regex  = regex_replace(each_path, regex("\\{|\\}"), "");
     path_regex += (path_regex  ==  "^") ? "[A-Za-z0-9_=@,.:-\\\\/]*" : "";
     path_regex += (!policy.isRecursive) ? "$" : "";
     ldpp_dout(op, 20) << __func__ << "(): each path_regex = " << path_regex << dendl;
@@ -406,6 +424,8 @@ bool is_policy_related(RGWOp *& op, req_state * const s, ranger_policy& policy) 
     }
   }
 
+  if (policy.isExcludes) { ret = !ret; }
+
   if (ret == false) { return false; }
 
   return true;
@@ -415,9 +435,21 @@ bool is_item_related(RGWOp *& op, req_state * const s, ranger_policy::item& poli
   bool ret = false;
 
   string req_user = s->user->user_id.to_str();
+  string bucket_owner = s->bucket_owner.get_id().to_str();
   ldpp_dout(op, 20) << __func__ << "(): req_user = " << req_user << dendl;
 
-  ret = is_in_vector(req_user, policy_item.users);
+  vector<string>::iterator policy_user_iter = policy_item.users.begin();
+  for (; policy_user_iter != policy_item.users.end(); policy_user_iter++) {
+    string each_policy_user = *policy_user_iter;
+
+    if ( (each_policy_user == "{USER}") \
+      || (each_policy_user == "{OWNER}" && bucket_owner == req_user) \
+      || (each_policy_user == req_user) )
+    {
+      ret = true;
+      break;
+    }
+  }
 
   if (ret == true) {
     ldpp_dout(op, 5) << __func__ << "(): The user '" << req_user << "' is related to the policy_item!" << dendl;
