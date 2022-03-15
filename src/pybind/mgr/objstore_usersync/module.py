@@ -74,6 +74,12 @@ class ObjstoreUsersync(MgrModule):
             'runtime': True,
         },
         {
+            'name': 'ranger_admin_password_path',
+            'default': '',
+            'desc': 'Path to file containing ranger admin password',
+            'runtime': True,
+        },
+        {
             'name': 'ranger_user_initial_password',
             'default': 'abc12345',
             'desc': 'Password used when create new user. ' + \
@@ -111,11 +117,12 @@ class ObjstoreUsersync(MgrModule):
         self.mgr_keyring = self.get_ceph_option('mgr_data') + '/keyring'
 
         self.def_ranger_endp = {
-            'url'        : '',
-            'admin_user' : '',
-            'admin_pw'   : '',
-            'tenant'     : '',
-            'group_id'   : '',
+            'url'           : '',
+            'admin_user'    : '',
+            'admin_pw'      : '',
+            'admin_pw_path' : '',
+            'tenant'        : '',
+            'group_id'      : '',
         }
 
         self.endpoint_map = {
@@ -149,11 +156,12 @@ class ObjstoreUsersync(MgrModule):
                     self.get_ceph_option(opt))
             self.log.debug(' native option %s = %s', opt, getattr(self, opt))
 
-        self.def_ranger_endp[ 'url'        ] = self.ranger_rest_url
-        self.def_ranger_endp[ 'admin_user' ] = self.ranger_admin_user
-        self.def_ranger_endp[ 'admin_pw'   ] = self.ranger_admin_password
-        self.def_ranger_endp[ 'tenant'     ] = self.sync_tenant
-        self.def_ranger_endp[ 'group_id'   ] = ''
+        self.def_ranger_endp[ 'url'           ] = self.ranger_rest_url
+        self.def_ranger_endp[ 'admin_user'    ] = self.ranger_admin_user
+        self.def_ranger_endp[ 'admin_pw'      ] = self.ranger_admin_password
+        self.def_ranger_endp[ 'admin_pw_path' ] = self.ranger_admin_password_path
+        self.def_ranger_endp[ 'tenant'        ] = self.sync_tenant
+        self.def_ranger_endp[ 'group_id'      ] = ''
 
         if self.interval < 30: self.interval = 30
         if self.endpoint_map_update_cycle < 3: self.endpoint_map_update_cycle = 3
@@ -188,6 +196,20 @@ class ObjstoreUsersync(MgrModule):
 
         return out, err, rc
 
+    def _read_secret(self, file_path):
+        ret_str = ""
+
+        try: fd = open(file_path, "r")
+        except Exception as e:
+            self.log.warning("_read_secret(): %s" % e)
+            return ret_str
+
+        ret_str = fd.readline().rstrip()
+
+        fd.close()
+
+        return ret_str
+
     def _request_ranger_rest(self, method, path, endpoint = {}, data = {}):
         if len(endpoint) == 0:
             endpoint = self.endpoint_map['ranger']['default']
@@ -201,7 +223,11 @@ class ObjstoreUsersync(MgrModule):
 
         response = None
 
-        basic_auth = HTTPBasicAuth(endpoint['admin_user'], endpoint['admin_pw'])
+        admin_pw_path = endpoint['admin_pw_path']
+        admin_pw = endpoint['admin_pw'] if len(admin_pw_path) == 0 else \
+                   self._read_secret(admin_pw_path)
+
+        basic_auth = HTTPBasicAuth(endpoint['admin_user'], admin_pw)
 
         if   method == "GET"    : response = requests.get(url, auth=basic_auth)
         elif method == "PUT"    : response = requests.put(url, auth=basic_auth, json=data)
@@ -336,11 +362,12 @@ class ObjstoreUsersync(MgrModule):
                 if endp_type not in self.endpoint_map: self.endpoint_map[endp_type] = {}
 
                 self.endpoint_map[endp_type][each_user] = {
-                    'url'        : each_endp['url'],
-                    'admin_user' : each_endp['admin_user'],
-                    'admin_pw'   : each_endp['admin_password'],
-                    'tenant'     : each_endp['tenant_group'],
-                    'group_id'   : '',
+                    'url'           : each_endp['url'],
+                    'admin_user'    : each_endp['admin_user'],
+                    'admin_pw'      : each_endp['admin_password'],
+                    'admin_pw_path' : each_endp['admin_password_path'],
+                    'tenant'        : each_endp['tenant_group'],
+                    'group_id'      : '',
                 }
                 self.log.debug("The '%s' endpoint of '%s' enter map" % (endp_type, each_user))
 
@@ -744,6 +771,7 @@ class ObjstoreUsersync(MgrModule):
                     tgtusers, get_tgtusers_success = self._get_tgtuser_list(each_target, each_endp)
                     if not get_tgtusers_success:
                         self.log.warning("Failed to get %s user list" % each_target)
+                        tgtusers_pool[pool_key] = []
                         continue
 
                     tgtusers_pool[pool_key] = tgtusers
