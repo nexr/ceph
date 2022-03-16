@@ -306,7 +306,7 @@ If successful, the response contains the user information.
 :Type: Container
 :Parent: ``user``
 
-.. versionadded:: Apex
+.. versionadded:: Apex (nes 1.1.1)
 
 ``endpoints``
 
@@ -335,7 +335,7 @@ then it will be modified.
 A ``tenant`` may either be specified as a part of uid or as an additional
 request param.
 
-.. versionadded:: Apex
+.. versionadded:: Apex (nes 1.1.1)
 
 A ``endpoint-xxx`` may either be specified as a part of user info.
 
@@ -438,7 +438,7 @@ A tenant name may also specified as a part of ``uid``, by following the syntax
 :Example: tenant1
 :Required: No
 
-.. versionadded:: Apex
+.. versionadded:: Apex (nes 1.1.1)
 
 ``endpoint-type``
 
@@ -554,7 +554,7 @@ If successful, the response contains the user information.
 :Type: Container
 :Parent: ``user``
 
-.. versionadded:: Apex
+.. versionadded:: Apex (nes 1.1.1)
 
 ``endpoints``
 
@@ -696,7 +696,7 @@ Request Parameters
 :Example: False [False]
 :Required: No
 
-.. versionadded:: Apex
+.. versionadded:: Apex (nes 1.1.1)
 
 ``endpoint-type``
 
@@ -812,7 +812,7 @@ If successful, the response contains the user information.
 :Type: Container
 :Parent: ``user``
 
-.. versionadded:: Apex
+.. versionadded:: Apex (nes 1.1.1)
 
 ``endpoints``
 
@@ -1354,7 +1354,7 @@ None.
 Create Endpoint
 ==============
 
-.. versionadded:: Apex
+.. versionadded:: Apex (nes 1.1.1)
 Create a new endpoint for user to communicate with specific external system.
 
 :caps: users=write
@@ -1508,7 +1508,7 @@ Special Error Responses
 Modify Endpoint
 ==============
 
-.. versionadded:: Apex
+.. versionadded:: Apex (nes 1.1.1)
 Modify an existing endpoint
 
 :caps: users=write
@@ -1663,7 +1663,7 @@ Special Error Responses
 Remove Endpoint
 ===============
 
-.. versionadded:: Apex
+.. versionadded:: Apex (nes 1.1.1)
 Remove an existing endpoint
 
 :caps: users=write

@@ -340,7 +340,8 @@ To remove the swift secret key. ::
   radosgw-admin key rm -subuser=foo:bar --key-type=swift
 
 Add / Modify / Remove endpoints
-------------------------
+-------------------------------
+.. versionadded:: Apex (nes 1.1.1)
 
 Radosgw may work in conjunction with other systems depending on the purpose.
 In most cases, there is only one external system,
