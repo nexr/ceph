@@ -1850,7 +1850,7 @@ int RGWUserEndpointPool::modify(RGWUserAdminOpState& op_state, std::string *err_
     user_endp->set_url((op_url == "-") ? "" : op_url);
   }
 
-  string op_tenant = op_endp.tenant_group;
+  string op_tenant = op_endp.tenant;
   if (!op_tenant.empty()) {
     user_endp->set_tenant((op_tenant == "-") ? "" : op_tenant);
   }

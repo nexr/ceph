@@ -118,7 +118,7 @@ bool get_ranger_endpoint(RGWUserEndpoint& out, RGWOp *& op, req_state * const s)
     out.admin_passwd = s->cct->_conf->rgw_ranger_admin_password;
     out.admin_passwd_path = s->cct->_conf->rgw_ranger_admin_password;
 
-    out.tenant_group = s->cct->_conf->rgw_ranger_tenant;
+    out.tenant = s->cct->_conf->rgw_ranger_tenant;
 
     out.enabled = true;
   }

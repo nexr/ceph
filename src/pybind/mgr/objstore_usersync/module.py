@@ -379,7 +379,7 @@ class ObjstoreUsersync(MgrModule):
                     'admin_user'    : each_endp['admin_user'],
                     'admin_pw'      : each_endp['admin_password'],
                     'admin_pw_path' : each_endp['admin_password_path'],
-                    'tenant'        : each_endp['tenant_group'],
+                    'tenant'        : each_endp['tenant'],
                     'group_id'      : '',
                 }
                 self.log.debug("The '%s' endpoint of '%s' enter map" % (endp_type, each_user))

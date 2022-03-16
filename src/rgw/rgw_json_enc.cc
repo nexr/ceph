@@ -41,7 +41,7 @@ void encode_json(const char *name, const RGWUserEndpoint& val, Formatter *f) {
   f->dump_string("type", val.type);
   f->dump_bool("enabled", val.enabled);
   f->dump_string("url", val.url);
-  f->dump_string("tenant_group", val.tenant_group);
+  f->dump_string("tenant", val.tenant);
   f->dump_string("admin_user", val.admin_user);
   f->dump_string("admin_password", val.admin_passwd);
   f->dump_string("admin_password_path", val.admin_passwd_path);

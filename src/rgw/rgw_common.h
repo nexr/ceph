@@ -545,7 +545,7 @@ struct RGWUserEndpoint {
   string type;
   string url;
   bool use_ssl;
-  string tenant_group;
+  string tenant;
   string admin_user;
   string admin_passwd;
   string admin_passwd_path;
@@ -555,7 +555,7 @@ struct RGWUserEndpoint {
     type = "";
     url = "";
     use_ssl = false;
-    tenant_group = "";
+    tenant = "";
     admin_user = "";
     admin_passwd = "";
     admin_passwd_path = "";
@@ -572,7 +572,7 @@ struct RGWUserEndpoint {
   {
     type = _type;
     set_url(_url);
-    tenant_group = _tenant;
+    tenant = _tenant;
     admin_user = _user;
 
     admin_passwd = _passwd;
@@ -586,7 +586,7 @@ struct RGWUserEndpoint {
     encode(type, bl);
     encode(url, bl);
     encode(use_ssl, bl);
-    encode(tenant_group, bl);
+    encode(tenant, bl);
     encode(admin_user, bl);
     encode(admin_passwd, bl);
     encode(admin_passwd_path, bl);
@@ -599,7 +599,7 @@ struct RGWUserEndpoint {
     decode(type, bl);
     decode(url, bl);
     decode(use_ssl, bl);
-    decode(tenant_group, bl);
+    decode(tenant, bl);
     decode(admin_user, bl);
     decode(admin_passwd, bl);
     decode(admin_passwd_path, bl);
@@ -614,7 +614,7 @@ struct RGWUserEndpoint {
     url = _url;
     use_ssl = boost::algorithm::starts_with(_url, "https://");
   }
-  void set_tenant(string _tenant) { tenant_group = _tenant; }
+  void set_tenant(string _tenant) { tenant = _tenant; }
   void set_admin_user(string _user) { admin_user = _user; }
   void set_admin_passwd(string _passwd) { admin_passwd = _passwd; }
   void set_admin_passwd_path(string _path) { admin_passwd_path = _path; }

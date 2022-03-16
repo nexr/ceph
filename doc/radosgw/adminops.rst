@@ -1457,9 +1457,9 @@ If successful, the response contains the subuser information.
 :Type: String
 :Parent: ``endpoints``
 
-``tenant_group``
+``tenant``
 
-:Description: Endpoint tenant group name.
+:Description: Endpoint tenant name.
 :Type: String
 :Parent: ``endpoints``
 
@@ -1611,9 +1611,9 @@ If successful, the response contains the subuser information.
 :Type: String
 :Parent: ``endpoints``
 
-``tenant_group``
+``tenant``
 
-:Description: Endpoint tenant group name.
+:Description: Endpoint tenant name.
 :Type: String
 :Parent: ``endpoints``
 

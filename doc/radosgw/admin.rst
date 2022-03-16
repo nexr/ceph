@@ -378,7 +378,7 @@ An example how to add a defined ranger endpoint for a user. ::
         "type": "ranger",
         "enabled": true,
         "url": "http://192.168.80.60:6080/service",
-        "tenant_group": "nes",
+        "tenant": "nes",
         "admin_user": "admin",
         "admin_password": "admin",
         "admin_password_path": ""
@@ -406,7 +406,7 @@ To attach a defined other endpoint for a subuser. ::
         "type": "ranger",
         "enabled": true,
         "url": "http://192.168.80.60:6080/service",
-        "tenant_group": "nes",
+        "tenant": "nes",
         "admin_user": "admin",
         "admin_password": "admin",
         "admin_password_path": ""
@@ -415,7 +415,7 @@ To attach a defined other endpoint for a subuser. ::
         "type": "other",
         "enabled": true,
         "url": "https://1.2.3.4:1000/v1",
-        "tenant_group": "nes",
+        "tenant": "nes",
         "admin_user": "admin",
         "admin_password": "",
         "admin_password_path": "/var/lib/ceph/pw"
@@ -443,7 +443,7 @@ To modify a endpoint info. ::
         "type": "ranger",
         "enabled": true,
         "url": "http://192.168.80.60:6080/service",
-        "tenant_group": "nexr",
+        "tenant": "nexr",
         "admin_user": "clarke",
         "admin_password": "admin",
         "admin_password_path": ""
@@ -452,7 +452,7 @@ To modify a endpoint info. ::
         "type": "other",
         "enabled": true,
         "url": "https://1.2.3.4:1000/v1",
-        "tenant_group": "nes",
+        "tenant": "nes",
         "admin_user": "admin",
         "admin_password": "",
         "admin_password_path": "/var/lib/ceph/pw"
