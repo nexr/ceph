@@ -89,9 +89,9 @@ void usage()
   cout << "  user check                 check user info\n";
   cout << "  user stats                 show user stats as accounted by quota subsystem\n";
   cout << "  user list                  list users\n";
-  cout << "  user endpoint create       create a ranger endpoint\n";
-  cout << "  user endpoint modify       modify ranger endpoint\n";
-  cout << "  user endpoint rm           remove ranger endpoint\n";
+  cout << "  endpoint create            create new user endpoint\n";
+  cout << "  endpoint modify            modify user endpoint\n";
+  cout << "  endpoint rm                remove user endpoint\n";
   cout << "  caps add                   add user capabilities\n";
   cout << "  caps rm                    remove user capabilities\n";
   cout << "  subuser create             create a new subuser\n" ;
@@ -406,9 +406,9 @@ enum {
   OPT_USER_CHECK,
   OPT_USER_STATS,
   OPT_USER_LIST,
-  OPT_USER_ENDP_CREATE,
-  OPT_USER_ENDP_MODIFY,
-  OPT_USER_ENDP_RM,
+  OPT_ENDPOINT_CREATE,
+  OPT_ENDPOINT_MODIFY,
+  OPT_ENDPOINT_RM,
   OPT_SUBUSER_CREATE,
   OPT_SUBUSER_MODIFY,
   OPT_SUBUSER_RM,
@@ -591,6 +591,7 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
       strcmp(cmd, "caps") == 0 ||
       strcmp(cmd, "data") == 0 ||
       strcmp(cmd, "datalog") == 0 ||
+      strcmp(cmd, "endpoint") == 0 ||
       strcmp(cmd, "error") == 0 ||
       strcmp(cmd, "event") == 0 ||
       strcmp(cmd, "expire-stale") == 0 ||
@@ -670,19 +671,13 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
       return OPT_USER_STATS;
     if (strcmp(cmd, "list") == 0)
       return OPT_USER_LIST;
-    if (strcmp(cmd, "endpoint") == 0) {
-      *need_more = true;
-      return 0;
-    }
-  } else if (prev_prev_cmd && strcmp(prev_prev_cmd, "user") == 0) {
-    if (strcmp(prev_cmd, "endpoint") == 0) {
-      if (strcmp(cmd, "create") == 0)
-        return OPT_USER_ENDP_CREATE;
-      if (strcmp(cmd, "modify") == 0)
-        return OPT_USER_ENDP_MODIFY;
-      if (strcmp(cmd, "rm") == 0)
-        return OPT_USER_ENDP_RM;
-    }
+  } else if (strcmp(prev_cmd, "endpoint") == 0) {
+		if (strcmp(cmd, "create") == 0)
+			return OPT_ENDPOINT_CREATE;
+		if (strcmp(cmd, "modify") == 0)
+			return OPT_ENDPOINT_MODIFY;
+		if (strcmp(cmd, "rm") == 0)
+			return OPT_ENDPOINT_RM;
   } else if (strcmp(prev_cmd, "subuser") == 0) {
     if (strcmp(cmd, "create") == 0)
       return OPT_SUBUSER_CREATE;
@@ -5183,7 +5178,7 @@ int main(int argc, const char **argv)
     }
 
     break;
-  case OPT_USER_ENDP_CREATE:
+  case OPT_ENDPOINT_CREATE:
     ret = user.endpoints.add(user_op, &err_msg);
     if (ret < 0) {
       cerr << "could not create user endpoint: " << err_msg << std::endl;
@@ -5191,7 +5186,7 @@ int main(int argc, const char **argv)
     }
 
     break;
-  case OPT_USER_ENDP_MODIFY:
+  case OPT_ENDPOINT_MODIFY:
     ret = user.endpoints.modify(user_op, &err_msg);
     if (ret < 0) {
       cerr << "could not modify user endpoint: " << err_msg << std::endl;
@@ -5199,7 +5194,7 @@ int main(int argc, const char **argv)
     }
 
     break;
-  case OPT_USER_ENDP_RM:
+  case OPT_ENDPOINT_RM:
     {
       ret = user.endpoints.remove(user_op, &err_msg);
       if (ret < 0) {
