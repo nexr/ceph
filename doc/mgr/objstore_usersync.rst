@@ -26,16 +26,20 @@ $ ceph config set mgr mgr/objstore_usersync/interval <synchronize_interval secon
 $ ceph config set mgr mgr/objstore_usersync/sync_target <target to synchronize use>
 $ ceph config set mgr mgr/objstore_usersync/sync_tenant <tenant name for nes>
 $ ceph config set mgr mgr/objstore_usersync/allow_user_remove [true|false]
+$ ceph config set mgr mgr/objstore_usersync/endpoint_map_update_cycle <cycles to update>
 
 ## if 'ranger' in sync_target, ranger usersync config
 
 # ranger connection config
 $ ceph config set mgr mgr/objstore_usersync/ranger_rest_url <ranger url> # ex) http[s]://x.x.x.x:yy/service
 $ ceph config set mgr mgr/objstore_usersync/ranger_rest_admin_user <ranger admin user name>
+## choose one of bellow two password config.
 $ ceph config set mgr mgr/objstore_usersync/ranger_rest_admin_password <ranger admin password>
+$ ceph config set mgr mgr/objstore_usersync/ranger_rest_admin_password_path <path to file containing password>
 
 # ranger action config
 $ ceph config set mgr mgr/objstore_usersync/ranger_user_initial_password <default password for newly created user>
+$ ceph config set mgr mgr/objstore_usersync/ranger_service_initial_endpoint <rgw endpoint for newly created S3 service>
 $ ceph config set mgr mgr/objstore_usersync/ranger_user_hard_remove [true|false]
 
 ## enable 'objstore_usersync' module
