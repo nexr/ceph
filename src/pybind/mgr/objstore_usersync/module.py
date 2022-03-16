@@ -328,15 +328,20 @@ class ObjstoreUsersync(MgrModule):
         emap = self.endpoint_map
 
         self.log.debug("{")
+
         for type_key in emap.keys():
             self.log.debug("  " + type_key + ": [")
 
             for user_key in emap[type_key].keys():
                 self.log.debug("    " + user_key + ": {")
+
                 for item_key in emap[type_key][user_key]:
                     self.log.debug("      " + item_key + ": " + emap[type_key][user_key][item_key] + ",")
+
                 self.log.debug("    },")
+
             self.log.debug("  ],")
+
         self.log.debug("}")
 
 

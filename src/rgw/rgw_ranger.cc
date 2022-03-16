@@ -65,7 +65,7 @@ inline bool parse_ip(entity_addr_t *network, string addr) {
     return true;
   }
 
-	return false;
+  return false;
 }
 
 static inline std::string read_secret(const std::string& file_path)
@@ -426,9 +426,7 @@ bool is_policy_related(RGWOp *& op, req_state * const s, ranger_policy& policy) 
 
   if (policy.isExcludes) { ret = !ret; }
 
-  if (ret == false) { return false; }
-
-  return true;
+  return ret;
 }
 
 bool is_item_related(RGWOp *& op, req_state * const s, ranger_policy::item& policy_item) {
@@ -532,7 +530,7 @@ bool is_item_related(RGWOp *& op, req_state * const s, ranger_policy::item& poli
 
       ldpp_dout(op, 20) << __func__ << "(): each condition network = " << network.ip_only_to_str() << "/" << prefix << dendl;
 
-			bool is_each_ip_contained = false;
+      bool is_each_ip_contained = false;
       vector<entity_addr_t>::iterator ip_iter = remote_ips.begin();
       for (; ip_iter != remote_ips.end(); ip_iter++) {
         is_each_ip_contained = network_contains(network, prefix, *ip_iter);
@@ -540,15 +538,15 @@ bool is_item_related(RGWOp *& op, req_state * const s, ranger_policy::item& poli
         if (is_each_ip_contained) { break; }
       }
 
-			if (is_each_ip_contained) {
+      if (is_each_ip_contained) {
         ldpp_dout(op, 10) << __func__ << "(): The ip " << *ip_iter << " is contained"
                           << " in network: " << network.ip_only_to_str() << "/" << prefix << "!" << dendl;
-			}
+      }
 
       if (is_all_type) {
-		 		is_ip_contained = is_ip_contained && is_each_ip_contained;
-		 		if (!is_ip_contained) { break; }
-			}
+        is_ip_contained = is_ip_contained && is_each_ip_contained;
+        if (!is_ip_contained) { break; }
+      }
       else if (is_any_type) {
         is_ip_contained = is_ip_contained || is_each_ip_contained;
         if (is_ip_contained) { break; }
