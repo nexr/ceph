@@ -350,6 +350,7 @@ You may create a endpoint and either modify or enable the endpoint.
 You may also remove a endpoint.
 
 Options include:
+
 - ``--endpoint-type=<type>`` specifies the type of external systems to bind with user. ex) ranger, atlas
 - ``--endpoint-url=<url>`` specifies URL to communicating with external systems.
 - ``--endpoint-admin=<name>`` specifies admin user name to authenticate as.
