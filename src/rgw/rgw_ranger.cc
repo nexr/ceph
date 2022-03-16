@@ -457,7 +457,13 @@ bool is_item_related(RGWOp *& op, req_state * const s, ranger_policy::item& poli
     ldpp_dout(op, 10) << __func__ << "(): The user '" << req_user << "' is not related to the policy_item."
                       << " Check group relation" << dendl;
 
-    const string& ranger_tenant_group = s->cct->_conf->rgw_ranger_tenant;
+    RGWUserEndpoint endpoint;
+    if (!get_ranger_endpoint(endpoint, op, s)) {
+      ldpp_dout(op, 2) << __func__ << "(): Failed to parse ranger endpoint of " << bucket_owner << dendl;
+      return -ERR_INVALID_REQUEST;
+    }
+
+    const string& ranger_tenant_group = endpoint.tenant;
     ldpp_dout(op, 20) << __func__ << "(): ranger_tenant_group = " << ranger_tenant_group << dendl;
 
     ret = is_in_vector(ranger_tenant_group, policy_item.groups);
