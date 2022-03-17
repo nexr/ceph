@@ -190,6 +190,11 @@ install(DIRECTORY
   DESTINATION ${CEPH_INSTALL_DATADIR}/rgw
   REGEX "\\..+\\.sw*" EXCLUDE)
 
+install(DIRECTORY
+  ranger_plugins
+  DESTINATION ${CEPH_INSTALL_DATADIR}/rgw
+  REGEX "\\..+\\.sw*" EXCLUDE)
+
 gperf_generate(${CMAKE_SOURCE_DIR}/src/rgw/rgw_iam_policy_keywords.gperf
   rgw_iam_policy_keywords.frag.cc)
 set_source_files_properties(rgw_iam_policy.cc PROPERTIES
