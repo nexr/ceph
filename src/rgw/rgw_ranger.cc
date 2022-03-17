@@ -405,13 +405,13 @@ bool is_policy_related(RGWOp *& op, req_state * const s, ranger_policy& policy) 
     string each_path = *path_iter;
     trim_path(each_path);
 
-    each_path = regex_replace(each_path, regex("\\{USER\\}"), req_user);
-    each_path = regex_replace(each_path, regex("\\{OWNER\\}"), bucket_owner);
-
     string path_regex;
     path_regex += "^";
-    path_regex += regex_replace(each_path, regex("\\*+"), "[A-Za-z0-9_=@,.:-\\\\/]*");
-    path_regex  = regex_replace(each_path, regex("\\{|\\}"), "");
+    path_regex += each_path;
+    path_regex  = regex_replace(path_regex, regex("\\{USER\\}"), req_user);
+    path_regex  = regex_replace(path_regex, regex("\\{OWNER\\}"), bucket_owner);
+    path_regex  = regex_replace(path_regex, regex("\\{|\\}"), "");
+    path_regex  = regex_replace(path_regex, regex("\\*+"), "[A-Za-z0-9_=@,.:-\\\\/]*");
     path_regex += (path_regex  ==  "^") ? "[A-Za-z0-9_=@,.:-\\\\/]*" : "";
     path_regex += (!policy.isRecursive) ? "$" : "";
     ldpp_dout(op, 20) << __func__ << "(): each path_regex = " << path_regex << dendl;
