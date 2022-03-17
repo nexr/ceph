@@ -136,6 +136,7 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
       return ret;
     }
   }
+  /* Check if Ranger is used to authorize requests */
   else if (s->cct->_conf->rgw_use_ranger_authz) {
     ret = rgw_ranger_authorize(op, s);
     if (ret < 0) {
