@@ -6087,14 +6087,14 @@ std::vector<Option> get_rgw_options() {
 
     Option("rgw_ranger_admin_user", Option::TYPE_STR, Option::LEVEL_ADVANCED)
     .set_default("")
-    .set_description("The Ranger admin user name to authenticate client requests.")
+    .set_description("The Ranger admin user name to authenticate ranger requests.")
     .add_see_also("rgw_ranger_admin_password")
     .add_see_also("rgw_ranger_admin_password_path")
     .set_flag(Option::FLAG_RUNTIME),
 
     Option("rgw_ranger_admin_password", Option::TYPE_STR, Option::LEVEL_ADVANCED)
     .set_default("")
-    .set_description("The Ranger admin user password to authenticate client requests.")
+    .set_description("The Ranger admin user password to authenticate ranger requests.")
     .add_see_also("rgw_ranger_admin_password_path")
     .set_flag(Option::FLAG_RUNTIME),
 
