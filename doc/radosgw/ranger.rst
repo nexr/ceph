@@ -84,7 +84,7 @@ Apache atlas config example
   rgw_ranger_admin_password = admin
   # rgw_ranger_admin_password_path = /var/lib/ceph/radosgw/ceph-rgw.ranger/ranger_pass
 
-When use this config, "rnager" Ceph Object Gateway refers access policies of apache ranger(192.168.80.61:6080) to authorize client requests.
+When use this config, "ranger" Ceph Object Gateway refers access policies of apache ranger(192.168.80.61:6080) to authorize client requests.
 If ``endpoints`` of user is not defined, ranger integration use policies of config-indicated ranger service.
 
 (Optional) Specify user-dedicated ranger endpoint
