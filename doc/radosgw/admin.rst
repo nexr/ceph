@@ -341,6 +341,7 @@ To remove the swift secret key. ::
 
 Add / Modify / Remove endpoints
 -------------------------------
+.. _radosgw_admin_user_endpoints:
 .. versionadded:: Apex (nes 1.1.1)
 
 Radosgw may work in conjunction with other systems depending on the purpose.

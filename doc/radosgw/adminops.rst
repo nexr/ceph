@@ -1351,6 +1351,7 @@ Response Entities
 
 None.
 
+.. _radosgw_adminops_user_endpoints:
 Create Endpoint
 ==============
 
