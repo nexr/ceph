@@ -1286,6 +1286,7 @@ install -m 0644 -D src/logrotate.conf %{buildroot}%{_sysconfdir}/logrotate.d/cep
 chmod 0644 %{buildroot}%{_docdir}/ceph/sample.ceph.conf
 install -m 0644 -D COPYING %{buildroot}%{_docdir}/ceph/COPYING
 install -m 0644 -D etc/sysctl/90-ceph-osd.conf %{buildroot}%{_sysctldir}/90-ceph-osd.conf
+install -m 0644 -D etc/profile.d/ceph-radosgw.sh %{buildroot}%{_sysconfdir}/profile.d/ceph-radosgw.sh
 
 # firewall templates and /sbin/mount.ceph symlink
 %if 0%{?suse_version}
@@ -1863,6 +1864,7 @@ fi
 %{_datadir}/ceph/rgw
 %{_mandir}/man8/radosgw.8*
 %dir %{_localstatedir}/lib/ceph/radosgw
+%{_sysconfdir}/profile.d/ceph-radosgw.sh
 %{_unitdir}/ceph-radosgw@.service
 %{_unitdir}/ceph-radosgw.target
 
@@ -1876,7 +1878,12 @@ fi
 %systemd_post ceph-radosgw@\*.service ceph-radosgw.target
 %endif
 if [ $1 -eq 1 ] ; then
-/usr/bin/systemctl start ceph-radosgw.target >/dev/null 2>&1 || :
+  if [ "x$JRE_HOME" == "x" ]; then
+    export JRE_HOME=/usr/lib/jvm/jre
+  fi
+  export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$JRE_HOME/lib/amd64/server:$JRE_HOME/lib/amd64:$JRE_HOME/lib:$JAVA_HOME/lib/server
+
+  /usr/bin/systemctl start ceph-radosgw.target >/dev/null 2>&1 || :
 fi
 
 %preun radosgw
