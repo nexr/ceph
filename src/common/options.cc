@@ -6082,7 +6082,12 @@ std::vector<Option> get_rgw_options() {
 
     Option("rgw_ranger_url", Option::TYPE_STR, Option::LEVEL_ADVANCED)
     .set_default("")
-    .set_description("URL to Ranger server.")
+    .set_description("URL to Ranger server. ex) http[s]://1.2.3.4:6080")
+    .set_flag(Option::FLAG_RUNTIME),
+
+    Option("rgw_ranger_audit_url", Option::TYPE_STR, Option::LEVEL_ADVANCED)
+    .set_default("")
+    .set_description("URL to Ranger audit server. ex) http[s]://1.2.3.4:6083/solr/ranger_audits")
     .set_flag(Option::FLAG_RUNTIME),
 
     Option("rgw_ranger_admin_user", Option::TYPE_STR, Option::LEVEL_ADVANCED)
@@ -6111,6 +6116,40 @@ std::vector<Option> get_rgw_options() {
     Option("rgw_ranger_verify_ssl", Option::TYPE_BOOL, Option::LEVEL_ADVANCED)
     .set_default(true)
     .set_description("Should RGW verify the Ranger server SSL certificate."),
+
+    Option("rgw_ranger_cache_dir", Option::TYPE_STR, Option::LEVEL_ADVANCED)
+    .set_default("${rgw_data}/../ranger_cache")
+    .set_description("The directory path to save cached ranger policies."),
+
+    Option("rgw_ranger_cache_update_interval", Option::TYPE_INT, Option::LEVEL_ADVANCED)
+    .set_default(60)
+    .set_description("The interval (in seconds) to update cached ranger policy."),
+
+    Option("rgw_ranger_use_cached_one_if_not_cache_updating", Option::TYPE_BOOL, Option::LEVEL_ADVANCED)
+    .set_default(false)
+    .set_description("If it's true, rgw use cached policy when cache update is not needed. This option can reduce request latency dramatically, but some audit log could be lost while rgw_ranger_cache_update_interval."),
+
+    Option("rgw_ranger_cache_age", Option::TYPE_INT, Option::LEVEL_ADVANCED)
+    .set_default(2592000) // 30 days
+    .set_description("The age (in seconds) of cached ranger policy. If 0, cache eviction becomes diabled"),
+
+    Option("rgw_ranger_engine", Option::TYPE_STR, Option::LEVEL_ADVANCED)
+    .set_default("jni")
+    .set_enum_allowed( { "native", "jni" } )
+    .set_description("Ranger integration engine type. One of 'native', 'jni'.")
+    .add_see_also("rgw_use_ranger_authz"),
+
+    Option("rgw_ranger_jni_config_dir", Option::TYPE_STR, Option::LEVEL_ADVANCED)
+    .set_default("${rgw_data}/../ranger_conf")
+    .set_description("The directory path to jni class files."),
+
+    Option("rgw_ranger_jni_engine_jar", Option::TYPE_STR, Option::LEVEL_ADVANCED)
+    .set_default("/usr/share/ceph/rgw/ranger/jni/nesRangerEngine.jar")
+    .set_description("The file path to jni engine jar."),
+
+    Option("rgw_ranger_audit_config_age", Option::TYPE_INT, Option::LEVEL_ADVANCED)
+    .set_default(30)
+    .set_description("The age (in seconds) of ranger audit config."),
 
     Option("rgw_use_ranger_authz", Option::TYPE_BOOL, Option::LEVEL_ADVANCED)
     .set_default(false)

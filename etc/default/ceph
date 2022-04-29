@@ -5,3 +5,6 @@
 
 # Increase tcmalloc cache size
 TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES=134217728
+
+JRE_HOME=/usr/lib/jvm/jre
+LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$JRE_HOME/jre/lib/amd64/server:$JRE_HOME/jre/lib/amd64:$JRE_HOME/lib:$JAVA_HOME/lib/server

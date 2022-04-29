@@ -648,6 +648,8 @@ Requires:	ceph-selinux = %{_epoch_prefix}%{version}-%{release}
 %endif
 Requires:	librados2 = %{_epoch_prefix}%{version}-%{release}
 Requires:	librgw2 = %{_epoch_prefix}%{version}-%{release}
+Requires:	librgw2 = %{_epoch_prefix}%{version}-%{release}
+Requires:	java
 %if 0%{?rhel} || 0%{?fedora}
 Requires:	mailcap
 %endif

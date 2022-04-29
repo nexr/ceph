@@ -969,9 +969,9 @@ int RGWPutObj_ObjStore_SWIFT::get_params()
 
 #define MAX_SLO_ENTRY_SIZE (1024 + 128) // 1024 - max obj name, 128 - enough extra for other info
     uint64_t max_len = s->cct->_conf->rgw_max_slo_entries * MAX_SLO_ENTRY_SIZE;
-    
+
     slo_info = new RGWSLOInfo;
-    
+
     int r = 0;
     std::tie(r, slo_info->raw_data) = rgw_rest_get_json_input_keep_data(s->cct, s, slo_info->entries, max_len);
     if (r < 0) {
@@ -2372,7 +2372,7 @@ int RGWSwiftWebsiteHandler::serve_errordoc(const int http_ret,
 
   RGWOp* newop = &get_errpage_op;
   RGWRequest req(0);
-  return rgw_process_authenticated(handler, newop, &req, s, true);
+  return rgw_process_authenticated(handler, store, newop, &req, s, true);
 }
 
 int RGWSwiftWebsiteHandler::error_handler(const int err_no,

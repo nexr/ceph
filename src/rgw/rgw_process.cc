@@ -84,6 +84,7 @@ void RGWProcess::RGWWQ::_process(RGWRequest *req, ThreadPool::TPHandle &) {
 }
 
 int rgw_process_authenticated(RGWHandler_REST * const handler,
+                              RGWRados * store,
                               RGWOp *& op,
                               RGWRequest * const req,
                               req_state * const s,
@@ -138,7 +139,7 @@ int rgw_process_authenticated(RGWHandler_REST * const handler,
   }
   /* Check if Ranger is used to authorize requests */
   else if (s->cct->_conf->rgw_use_ranger_authz) {
-    ret = rgw_ranger_authorize(op, s);
+    ret = rgw_ranger_authorize(store, op, s);
     if (ret < 0) {
       return ret;
     }
@@ -284,7 +285,7 @@ int process_request(RGWRados* const store,
       goto done;
     }
 
-    ret = rgw_process_authenticated(handler, op, req, s);
+    ret = rgw_process_authenticated(handler, store, op, req, s);
     if (ret < 0) {
       abort_early(s, op, ret, handler);
       goto done;
