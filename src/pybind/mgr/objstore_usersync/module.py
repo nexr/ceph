@@ -437,7 +437,6 @@ class ObjstoreUsersync(MgrModule):
 
         return ret_list, is_success
 
-
     def _create_ranger_user(self, user_name, endpoint = {}):
         is_success = False
 
@@ -535,59 +534,81 @@ class ObjstoreUsersync(MgrModule):
             self.log.warning("Failed to add '%s' to nes tanant group" % user_name)
             return is_success
 
-        user_info, is_success = self._get_objuser_info(user_name)
-        if not is_success: return is_success
+        user_endpoint = { 'url': "", 'tenant': "" }
+        if user_name in self.endpoint_map['ranger']:
+            user_endpoint = self.endpoint_map['ranger'][user_name]
 
-        s3_key_info = {
-            'user': user_name,
-            'access_key': 'accesskey',
-            'secret_key': 'secretkey'
-        }
+        if user_endpoint[ 'url'    ] == endpoint[ 'url'    ] and \
+           user_endpoint[ 'tenant' ] == endpoint[ 'tenant' ]:
+            is_success = self._enable_ranger_service(user_name, endpoint)
 
-        for each_key_info in user_info['keys']:
-            if each_key_info['user'] != user_name: continue
+        if not is_success:
+            self.log.warning("Failed to create S3 service of '%s'" % user_name)
+            return is_success
 
-            s3_key_info = each_key_info
-            break
+        return is_success
 
-        service_endpoint = self.ranger_service_initial_endpoint
-        if len(service_endpoint) == 0: service_endpoint = 'http://1.2.3.4:8080'
 
-        service_define_data = {
-            'name': s3_key_info['user'],
-            'type': 's3',
-            'description': "created by nes. " \
-                         + "If want to change initail endpoint, " \
-                         + "check the 'mgr/objstore_usersync/ranger_service_initial_endpoint' option.",
-            'configs': {
-                'endpoint'  : service_endpoint,
-                'accesskey' : s3_key_info['access_key'],
-                'password'  : s3_key_info['secret_key'],
-            },
-            'isEnabled': True,
-        }
+    def _create_tgtuser(self, user_name, target = 'ranger', endpoint = {}):
+        is_success = False
+
+        if target == "ranger":
+            is_success = self._create_ranger_user(user_name, endpoint)
+        else:
+            self.log.warning("The '%s' is not supported user create target" % target)
+
+        return is_success
+
+
+    def _enable_ranger_service(self, user_name):
+        is_success = False
+
+        endp_key = user_name if user_name in self.endpoint_map['ranger'] else 'default'
+
+        endpoint = self.endpoint_map['ranger'][endp_key]
 
         resp, scode = self._request_ranger_rest("get", "plugins/services/name/" + user_name, endpoint)
         is_success = (scode == 200 or scode == 404)
         is_service_exist = (scode == 200)
+        is_service_enabled = (is_service_exist and resp['isEnabled'] == True)
 
         if not is_success:
-            self.log.warning("Failed to get policies of '%s'" % user_name)
+            self.log.warning("Failed to get service of '%s'" % user_name)
             return is_success
 
-        if is_service_exist:
-            del service_define_data['description']
+        if not is_service_exist:
+            user_info, is_success = self._get_objuser_info(user_name)
+            if not is_success: return is_success
 
-            service_define_data['id'] = resp['id']
+            s3_key_info = {
+                'user': user_name,
+                'access_key': 'accesskey',
+                'secret_key': 'secretkey'
+            }
 
-            resp, scode = self._request_ranger_rest("put", "/plugins/services/%d" % resp['id'], endpoint, service_define_data)
-            is_success  = (scode == 200)
+            for each_key_info in user_info['keys']:
+                if each_key_info['user'] != user_name: continue
 
-            if not is_success:
-                self.log.warning("Failed to enable s3 service of '%s'" % user_name)
-                return is_success
+                s3_key_info = each_key_info
+                break
 
-        else:
+            service_endpoint = self.ranger_service_initial_endpoint
+            if len(service_endpoint) == 0: service_endpoint = 'http://1.2.3.4:8080'
+
+            service_define_data = {
+                'name': s3_key_info['user'],
+                'type': 's3',
+                'description': "created by nes. " \
+                             + "If want to change initail endpoint, " \
+                             + "check the 'mgr/objstore_usersync/ranger_service_initial_endpoint' option.",
+                'configs': {
+                    'endpoint'  : service_endpoint,
+                    'accesskey' : s3_key_info['access_key'],
+                    'password'  : s3_key_info['secret_key'],
+                },
+                'isEnabled': True,
+            }
+
             resp, scode = self._request_ranger_rest("post", "/plugins/services", endpoint, service_define_data)
             is_success  = (scode == 200)
 
@@ -624,16 +645,66 @@ class ObjstoreUsersync(MgrModule):
                 self.log.warning("Failed to create default owner_policy of '%s'" % user_name)
                 return is_success
 
+        elif not is_service_enabled:
+            resp['isEnabled'] = True
+
+            resp, scode = self._request_ranger_rest("put", "/plugins/services/%d" % resp['id'], endpoint, resp)
+            is_success  = (scode == 200)
+
+            if not is_success:
+                self.log.warning("Failed to enable s3 service of '%s'" % user_name)
+                return is_success
+
+
         return is_success
 
 
-    def _create_tgtuser(self, user_name, target = 'ranger', endpoint = {}):
+    def _enable_tgtservice(self, user_name, target = 'ranger'):
         is_success = False
 
         if target == "ranger":
-            is_success = self._create_ranger_user(user_name, endpoint)
+            is_success = self._enable_ranger_service(user_name)
         else:
-            self.log.warning("The '%s' is not supported user create target" % target)
+            self.log.warning("The '%s' is not supported user enable target" % target)
+
+        return is_success
+
+
+    def _disable_ranger_service(self, user_name):
+        is_success = False
+
+        endp_key = user_name if user_name in self.endpoint_map['ranger'] else 'default'
+
+        endpoint = self.endpoint_map['ranger'][endp_key]
+
+        resp, scode = self._request_ranger_rest("get", "plugins/services/name/" + user_name, endpoint)
+        is_success = (scode == 200 or scode == 404)
+        is_service_exist = (scode == 200)
+        is_service_enabled = (is_service_exist and resp['isEnabled'] == True)
+
+        if not is_success:
+            self.log.warning("Failed to get s3 service of '%s'" % user_name)
+            return is_success
+
+        if is_service_enabled:
+            resp['isEnabled'] = False
+
+            resp, scode = self._request_ranger_rest("put", "/plugins/services/%d" % resp['id'], endpoint, resp)
+            is_success  = (scode == 200)
+
+            if not is_success:
+                self.log.warning("Failed to disable s3 service of '%s'" % user_name)
+                return is_success
+
+        return is_success
+
+    def _disable_tgtservice(self, user_name, target = 'ranger'):
+        is_success = False
+
+        if target == "ranger":
+            is_success = self._disable_ranger_service(user_name)
+        else:
+            self.log.warning("The '%s' is not supported user disable target" % target)
 
         return is_success
 
@@ -712,24 +783,6 @@ class ObjstoreUsersync(MgrModule):
             self.log.warning("Failed to remove '%s' user" % user_name)
             return is_success
 
-        resp, scode = self._request_ranger_rest("get", "plugins/services/name/" + user_name, endpoint)
-        is_success = (scode == 200 or scode == 404)
-        is_service_exist = (scode == 200)
-
-        if not is_success:
-            self.log.warning("Failed to get s3 service of '%s'" % user_name)
-            return is_success
-
-        if is_service_exist:
-            resp['isEnabled'] = False
-
-            resp, scode = self._request_ranger_rest("put", "/plugins/services/%d" % resp['id'], endpoint, resp)
-            is_success  = (scode == 200)
-
-            if not is_success:
-                self.log.warning("Failed to disable s3 service of '%s'" % user_name)
-                return is_success
-
         return is_success
 
 
@@ -797,24 +850,25 @@ class ObjstoreUsersync(MgrModule):
                     tgtusers_pool[pool_key] = tgtusers
 
                 for each_objuser in objusers:
+                    for each_endp in target_emap.values():
+                        pool_key = make_tgtusers_pool_key(each_endp)
+                        tgtusers = tgtusers_pool[pool_key]
 
-                    emap_key = each_objuser if each_objuser in target_emap else 'default'
-                    each_endp = target_emap[emap_key]
+                        if each_objuser in tgtusers:
+                            tgtusers.remove(each_objuser)
+                            continue
 
-                    pool_key = make_tgtusers_pool_key(each_endp)
-                    if each_objuser in tgtusers_pool[pool_key]:
-                        tgtusers_pool[pool_key].remove(each_objuser)
-                        continue
+                        is_create_success = self._create_tgtuser(each_objuser, each_target, each_endp)
+                        if is_create_success:
+                            user_create_msg  = "The user '%s' was created " % each_objuser
+                            user_create_msg += "in %s" % each_target
+                            self.log.info(user_create_msg)
+                        else:
+                            user_create_fail_msg  = "Faled to create user '%s' " % each_objuser
+                            user_create_fail_msg += "in %s" % each_target
+                            self.log.warning(user_create_fail_msg)
 
-                    is_create_success = self._create_tgtuser(each_objuser, each_target, each_endp)
-                    if is_create_success:
-                        user_create_msg  = "The user '%s' was created " % each_objuser
-                        user_create_msg += "in %s" % each_target
-                        self.log.info(user_create_msg)
-                    else:
-                        user_create_fail_msg  = "Faled to create user '%s' " % each_objuser
-                        user_create_fail_msg += "in %s" % each_target
-                        self.log.warning(user_create_fail_msg)
+                    self._enable_tgtservice(each_objuser, each_target)
 
                 if not self.allow_user_remove: continue
 
@@ -823,6 +877,8 @@ class ObjstoreUsersync(MgrModule):
 
                     each_tgtusers = tgtusers_pool[pool_key]
                     for each_tgtuser in each_tgtusers:
+                        self._disable_tgtservice(each_tgtuser, each_target)
+
                         is_remove_success = self._remove_tgtuser(each_tgtuser, each_target, each_endp)
                         if is_remove_success:
                             user_remove_msg  = "The user '%s' was removed " % each_tgtuser
@@ -832,6 +888,7 @@ class ObjstoreUsersync(MgrModule):
                             user_remove_fail_msg  = "Faled to remove user '%s' " % each_tgtuser
                             user_remove_fail_msg += "from %s" % each_target
                             self.log.warning(user_remove_fail_msg)
+
 
                     tgtusers_pool[pool_key] = []
 
