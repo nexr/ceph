@@ -99,6 +99,12 @@ build_dashboard_frontend() {
   tar cf dashboard_frontend.tar $outfile/src/pybind/mgr/dashboard/frontend/dist
 }
 
+build_ranger_java_engine() {
+  bin/build_rgw_ranger_java_engine.sh
+  tar cf nes_ranger_java_engine.tar $outfile/src/rgw/ranger/engine/nesRangerEngine.jar
+}
+
+
 # clean out old cruft...
 echo "cleanup..."
 rm -f $outfile*
@@ -146,10 +152,12 @@ download_boost $boost_version 59c9b274bc451cf91a9ba1dd2c7fdcaf5d60b1b3aa83f2c9fa
                https://download.ceph.com/qa
 
 build_dashboard_frontend
+build_ranger_java_engine
 tar --concatenate -f $outfile.all.tar $outfile.version.tar
 tar --concatenate -f $outfile.all.tar $outfile.boost.tar
 tar --concatenate -f $outfile.all.tar $outfile.tar
 tar --concatenate -f $outfile.all.tar dashboard_frontend.tar
+tar --concatenate -f $outfile.all.tar nes_ranger_java_engine.tar
 mv $outfile.all.tar $outfile.tar
 rm $outfile
 rm -f $outfile.version.tar
