@@ -5,6 +5,8 @@
 #include <regex>
 #include <fstream>
 
+RGWRangerNativeManager* rgw_rnm = nullptr;
+
 inline bool is_in_vector(const string subject, vector<string> vec) {
   vector<string>::iterator iter = vec.begin();
   for (; iter != vec.end(); iter++) {
@@ -583,7 +585,9 @@ bool RGWRangerNativeManager::is_authz_denied(uint32_t op_mask, req_state * const
 }
 
 int RGWRangerNativeManager::get_related_policies(vector<ranger_policy>& ret_vec, RGWUserEndpoint endpoint, req_state * const s, string service) {
-  if (cached_mode) {
+  if ( (cached_mode)
+    || (use_cached_one && can_i_use_cached_policy(service)) )
+  {
     return get_related_policies_from_cache(ret_vec, s, service);
   }
   else if (is_connection_ok(endpoint)) {
@@ -744,6 +748,10 @@ int RGWRangerNativeManager::get_related_policies_from_remote(vector<ranger_polic
     if (write_stream.is_open()) {
       write_stream << policies_to_caching;
       write_stream.close();
+
+      if (use_cached_one) {
+        set_svc_read_ts(service);
+      }
     }
     else {
       ldout(cct, 2) << __func__ << "(): Failed to cached file (error = " << strerror(errno) << ")" << dendl;

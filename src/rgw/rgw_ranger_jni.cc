@@ -9,20 +9,6 @@
 
 RGWRangerJniManager* rgw_rjm = nullptr;
 
-void init_global_ranger_jni_manager(CephContext* const cct, RGWRados* store, bool start_vm) {
-  if (rgw_rjm != nullptr) { return; }
-
-  ldout(cct, 10) << __func__ << "(): Init global RGWRangerJniManager instance" << dendl;
-  rgw_rjm = new RGWRangerJniManager(cct, store, start_vm);
-};
-
-void destroy_global_ranger_jni_manager() {
-
-  if (rgw_rjm == nullptr) { return; }
-
-  delete rgw_rjm;
-};
-
 RGWRangerJniManager::RGWRangerJniManager(CephContext* const _cct, RGWRados* const _store, bool start_vm): RGWRangerManager(_cct), store(_store) {
   jni_config_dir = cct->_conf->rgw_ranger_jni_config_dir;
   trim_path(jni_config_dir);
@@ -78,47 +64,6 @@ RGWRangerJniManager::~RGWRangerJniManager() {
   stop_thread();
 
   delete threads;
-}
-
-void RGWRangerJniManager::clip_svc_read_ts_map() {
-  ts_map_clipping = true;
-
-  time_t current = time(NULL);
-  map<string, time_t>::iterator iter = svc_read_ts_map.begin();
-  for (; iter != svc_read_ts_map.end();) {
-    time_t each_ts = iter->second;
-    if (current - each_ts < cache_update_interval) {
-      iter++;
-    }
-    else {
-      iter = svc_read_ts_map.erase(iter);
-    }
-  }
-
-  ts_map_clipping = false;
-}
-
-void RGWRangerJniManager::set_svc_read_ts(string service) {
-  if ((int) svc_read_ts_map.size() > ts_map_size * 3/4) {
-    clip_svc_read_ts_map();
-  }
-
-  svc_read_ts_map[service] = time(NULL);
-}
-
-time_t RGWRangerJniManager::get_svc_read_ts(string service) {
-  if (ts_map_clipping) { return 0; }
-
-  return svc_read_ts_map[service];
-}
-
-bool RGWRangerJniManager::can_i_use_cached_policy(string service) {
-  time_t ts = get_svc_read_ts(service);
-
-  if (ts == 0) { return false; }
-
-  time_t current = time(NULL);
-  return (current - ts < cache_update_interval);
 }
 
 void RGWRangerJniManager::start_thread()
@@ -217,8 +162,6 @@ void RGWRangerJniManager::stop_jvm() {
 
 int RGWRangerJniManager::is_access_allowed(RGWUserEndpoint endp, RGWOp *& op, req_state * const s) {
   static unsigned int thread_counter = 0;
-
-  bool use_cached_one = cct->_conf->rgw_ranger_use_cached_one_if_not_cache_updating;
 
   rgw_user bucket_owner = s->bucket_owner.get_id();
 

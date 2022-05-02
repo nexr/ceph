@@ -6,6 +6,31 @@
 #define dout_context g_ceph_context
 #define dout_subsys ceph_subsys_rgw
 
+RGWRangerManager* rgw_rm = nullptr;
+
+void init_global_ranger_manager(CephContext* const cct, RGWRados* store, bool start_vm) {
+  if (rgw_rm != nullptr) { return; }
+
+  string ranger_engine = cct->_conf->rgw_ranger_engine;
+
+  if (ranger_engine == "jni") {
+    ldout(cct, 10) << __func__ << "(): Init global RGWRangerJniManager instance" << dendl;
+    rgw_rjm = new RGWRangerJniManager(cct, store, start_vm);
+    rgw_rm  = (RGWRangerManager*) rgw_rjm;
+  }
+  else if (ranger_engine == "native") {
+    ldout(cct, 10) << __func__ << "(): Init global RGWRangerNativeManager instance" << dendl;
+    rgw_rnm = new RGWRangerNativeManager(cct);
+    rgw_rm  = (RGWRangerManager*) rgw_rnm;
+  }
+};
+
+void destroy_global_ranger_manager() {
+  if (rgw_rm == nullptr) { return; }
+
+  delete rgw_rm;
+};
+
 bool get_ranger_endpoint(RGWUserEndpoint& out, RGWRados* store, req_state * const s) {
   RGWUserInfo owner_info;
   rgw_user bucket_owner = s->bucket_owner.get_id();
@@ -58,19 +83,11 @@ int rgw_ranger_authorize(RGWRados* store, RGWOp *& op, req_state * const s)
     return -ERR_INVALID_REQUEST;
   }
 
-  int ret;
+  if (rgw_rm == NULL) {
+    return -ERR_INTERNAL_ERROR;
+  }
 
-  string ranger_engine = s->cct->_conf->rgw_ranger_engine;
-  if (ranger_engine == "jni") {
-    ret = rgw_rjm->is_access_allowed(endpoint, op, s);
-  }
-  else if (ranger_engine == "native") {
-    RGWRangerNativeManager rgw_rnm(s->cct);
-    ret = rgw_rnm.is_access_allowed(endpoint, op, s);
-  }
-  else {
-    ret = -EPERM;
-  }
+  int ret = rgw_rm->is_access_allowed(endpoint, op, s);
 
   if (ret == 0) {
     ldpp_dout(op, 2) << __func__ << "(): Ranger accepting request" << dendl;

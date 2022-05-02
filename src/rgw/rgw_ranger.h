@@ -66,11 +66,61 @@ protected:
     }
   }
 
+  bool ts_map_clipping = false;
+  int  ts_map_size = 1024;
+  map<string, time_t> svc_read_ts_map;
+  bool use_cached_one;
+
+  void clip_svc_read_ts_map() {
+    ldout(cct, 15) << __func__ << "(): start to clip svc_read_ts_map" << dendl;
+
+    ts_map_clipping = true;
+
+    time_t current = time(NULL);
+    map<string, time_t>::iterator iter = svc_read_ts_map.begin();
+    for (; iter != svc_read_ts_map.end();) {
+      time_t each_ts = iter->second;
+      if (current - each_ts < cache_update_interval) {
+        iter++;
+      }
+      else {
+        iter = svc_read_ts_map.erase(iter);
+      }
+    }
+
+    ts_map_clipping = false;
+  }
+
+  void set_svc_read_ts(string service) {
+    if ((int) svc_read_ts_map.size() > ts_map_size * 3/4) {
+      clip_svc_read_ts_map();
+    }
+
+    svc_read_ts_map[service] = time(NULL);
+  }
+
+  time_t get_svc_read_ts(string service) {
+    if (ts_map_clipping) { return 0; }
+
+    return svc_read_ts_map[service];
+  }
+
+  bool can_i_use_cached_policy(string service) {
+    time_t ts = get_svc_read_ts(service);
+
+    if (ts == 0) { return false; }
+
+    time_t current = time(NULL);
+    return (current - ts < cache_update_interval);
+  }
+
   string policy_cache_dir;
   time_t cache_update_interval;
 
 public:
   RGWRangerManager(CephContext* const _cct) : cct(_cct) {
+    use_cached_one = cct->_conf->rgw_ranger_use_cached_one_if_not_cache_updating;
+
     policy_cache_dir = cct->_conf->rgw_ranger_cache_dir;
     trim_path(policy_cache_dir);
 
@@ -80,6 +130,7 @@ public:
 
   virtual int is_access_allowed(RGWUserEndpoint endp, RGWOp *& op, req_state * const s) = 0;
 };
+extern RGWRangerManager* rgw_rm;
 
 inline void RGWRangerManager::trim_path(string& path) {
   int path_len = path.length();
@@ -132,6 +183,8 @@ public:
 
   int is_access_allowed(RGWUserEndpoint endpoint, RGWOp *& op, req_state * const s) override;
 };
+
+extern RGWRangerNativeManager* rgw_rnm;
 
 class RGWRangerJniManager;
 
@@ -201,17 +254,6 @@ private:
   int thread_pool_size;
   RGWRangerJniThread** threads;
 
-  bool ts_map_clipping = false;
-  int  ts_map_size = 1024;
-  map<string, time_t> svc_read_ts_map;
-
-  void clip_svc_read_ts_map();
-
-  void   set_svc_read_ts(string service);
-  time_t get_svc_read_ts(string service);
-
-  bool can_i_use_cached_policy(string service);
-
   RGWRados* store;
 
 protected:
@@ -243,8 +285,9 @@ public:
 
 
 extern RGWRangerJniManager* rgw_rjm;
-void init_global_ranger_jni_manager(CephContext* const cct, RGWRados* store, bool start_vm = false);
-void destroy_global_ranger_jni_manager();
+
+void init_global_ranger_manager(CephContext* const cct, RGWRados* store, bool start_vm = false);
+void destroy_global_ranger_manager();
 
 /* authorize request using Ranger */
 int rgw_ranger_authorize(RGWRados* store, RGWOp*& op, req_state* s);

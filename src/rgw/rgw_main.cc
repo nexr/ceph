@@ -335,9 +335,7 @@ int main(int argc, const char **argv)
 
   if (cct->_conf->rgw_use_ranger_authz) {
     prepare_cache_dir(cct.get());
-    if (cct->_conf->rgw_ranger_engine == "jni") {
-      init_global_ranger_jni_manager(cct.get(), store, true);
-    }
+    init_global_ranger_manager(cct.get(), store, true);
   }
 
   rgw_rest_init(g_ceph_context, store, store->svc.zone->get_zonegroup());
@@ -590,10 +588,9 @@ int main(int argc, const char **argv)
 
   derr << "shutting down" << dendl;
 
-  if ( cct->_conf->rgw_use_ranger_authz \
-    && cct->_conf->rgw_ranger_engine == "jni" )
+  if (cct->_conf->rgw_use_ranger_authz)
   {
-    destroy_global_ranger_jni_manager();
+    destroy_global_ranger_manager();
   }
 
   for (list<RGWFrontend *>::iterator liter = fes.begin(); liter != fes.end();
