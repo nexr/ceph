@@ -20,7 +20,7 @@ ceph 오브젝트 스토리지의 사용자 목록을 조회하여 상황에 맞
 설치
 ----
 
-모든 ceph-mgr 노드에서 다음과 같은 명령을 통해 objstore_usersync 모듈의 설치 여부를 확인할 수 있다.::
+모든 ceph-mgr 노드에서 다음과 같은 명령을 통해 objstore_usersync 모듈의 설치 여부를 확인할 수 있다. ::
 
   $ ceph mgr module ls |grep objstore_usersync
               "name": "objstore_usersync",

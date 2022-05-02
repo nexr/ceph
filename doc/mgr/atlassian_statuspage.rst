@@ -12,6 +12,7 @@ ceph-mgr의 모듈. nautilus version의 ceph을 기준으로 개발.
 ceph의 상태를 체크하고 연동된 [atlassian statuspage](https://www.atlassian.com/ko/software/statuspage)에 상태를 알려준다.
 
 ceph의 상태는 다음과 같이 statuspage의 component 상태로 전환된다.
+
 - HEALTH_OK -> Operational
 - HEALTH_WARN -> Degraded Performance
 - HEALTH_ERR -> Partial Outage
@@ -20,7 +21,7 @@ ceph의 상태는 다음과 같이 statuspage의 component 상태로 전환된�
 설치
 ----
 
-모든 ceph-mgr 노드에서 다음과 같은 명령을 통해 atlassian_statuspage 모듈의 설치 여부를 확인할 수 있다.::
+모든 ceph-mgr 노드에서 다음과 같은 명령을 통해 atlassian_statuspage 모듈의 설치 여부를 확인할 수 있다. ::
 
   $ systemctl restart ceph-mgr@* # 모든 ceph-mgr 노드에서 수행
   $ ceph mgr module ls |grep atlas
@@ -29,7 +30,7 @@ ceph의 상태는 다음과 같이 statuspage의 component 상태로 전환된�
 설정
 ----
 
-atlassian_statuspage 모듈의 email 모드를 사용하기 위해서는 활용 가능한 smtp 서버가 필요하다.::
+atlassian_statuspage 모듈의 email 모드를 사용하기 위해서는 활용 가능한 smtp 서버가 필요하다. ::
 
   $ ceph config set mgr mgr/atlassian_statuspage/interval <check_interval seconds>
 
