@@ -55,14 +55,26 @@ The following parameters in the Ceph configuration file are related to the Range
 
 - ``rgw_use_ranger_authz``: Should Ranger be used to authorize client requests. The default value is "false".
   If it is true, radosgw check ranger access policies when authorizing requests.
-- ``rgw_ranger_url``: URL to Ranger server. example) http[s]://1.2.3.4:6080/service
+- ``rgw_ranger_url``: URL to Ranger server. example) http[s]://1.2.3.4:6080
 - ``rgw_ranger_admin_user``: The Ranger admin user name to authenticate ranger requests.
 - ``rgw_ranger_admin_password``: The Ranger admin user password to authenticate ranger.
 - ``rgw_ranger_admin_password_path``: Path to a file containing the Ranger admin password. It override ``rgw_ranger_admin_password``.
 - ``rgw_ranger_tenant``: The ranger group name for tenant of this cluster. The default value is "nes".
 - ``rgw_ranger_verify_ssl``: Should RGW verify the Ranger server SSL certificate. The default value is "true".
+- ``rgw_ranger_cache_dir``: The directory path to save cached ranger policies.
+- ``rgw_ranger_cache_update_interval``: The interval (in seconds) to update cached ranger policy. The default value is 60.
+- ``rgw_ranger_use_cached_one_if_not_cache_updating``: If it's true, rgw use cached policy when cache update is not needed.
+  This option can reduce request latency dramatically, but some audit log could be lost while ``rgw_ranger_cache_update_interval``.
+- ``rgw_ranger_cache_age``: The age (in seconds) of cached ranger policy. The default value is 2592000 (30 days)
+  If the age is over, the cached policy replace with a remote policy.
+  If 0, cache eviction becomes diabled.
+- ``rgw_ranger_engine``: Ranger integration engine type. One of 'native', 'jni'.
+- ``rgw_ranger_jni_config_dir``: The directory path to jni class files. It's only used when ``rgw_ranger_engine`` is 'jni'.
+- ``rgw_ranger_jni_engine_jar``: The file path to jni engine jar. It's only user when ``rgw_ranger_engine`` is 'jni'.
+- ``rgw_ranger_audit_config_age``: The age (in seconds) of ranger audit config. If the age is over, ranger audit config replace with a new one.
+- ``rgw_ranger_audit_url``: URL to Solr server to log ranger audit. example) http[s]://1.2.3.4:6083/solr/ranger_audits
 
-Apache atlas config example
+Apache atlas config example 1: native ranger engine
 ---------------------------
 
 ::
@@ -74,8 +86,14 @@ Apache atlas config example
   ## rgw ranger feature on/off
   rgw_use_ranger_authz = true
 
+  ## set ranger engine type
+  rgw_ranger_engine = native
+
+  ## make engine to use cached one when cache_update not occurs
+  rgw_ranger_use_cached_one_if_not_cache_updating = true
+
   ## ranger rest endpoint config
-  rgw_ranger_url = http://192.168.80.61:6080/service
+  rgw_ranger_url = http://192.168.80.61:6080
   rgw_ranger_verify_ssl = false
   # rgw_ranger_tenant = nes
 
@@ -86,6 +104,39 @@ Apache atlas config example
 
 When use this config, "ranger" Ceph Object Gateway refers access policies of apache ranger(192.168.80.61:6080) to authorize client requests.
 If ``endpoints`` of user is not defined, ranger integration use policies of config-indicated ranger service.
+If ``rgw_ranger_engine`` is "native", ranger integration use cpp-based engine. (low latency, but no audit log)
+
+Apache atlas config example 2: jni ranger engine
+---------------------------
+
+::
+
+  [client.rgw.ranger]
+
+  ...
+
+  ## rgw ranger feature on/off
+  rgw_use_ranger_authz = true
+
+  ## set ranger engine type
+  rgw_ranger_engine = jni
+
+  ## make engine to use cached one when cache_update not occurs
+  rgw_ranger_use_cached_one_if_not_cache_updating = false
+
+  ## ranger rest endpoint config
+  rgw_ranger_url = http://192.168.80.61:6080
+  rgw_ranger_verify_ssl = false
+  # rgw_ranger_tenant = nes
+
+  ## ranger audit endpoint config
+  rgw_ranger_audit_url = http://192.168.80.61:6083/solr/ranger_audits
+
+
+When use this config, "ranger" Ceph Object Gateway refers access policies of apache ranger(192.168.80.61:6080) to authorize client requests.
+And result of authoizing process would be recorded to ranger audit server(192.168.80.61:6083).
+If ``endpoints`` of user is not defined, ranger integration use policies of config-indicated ranger service.
+If ``rgw_ranger_engine`` is "jni", ranger integration use java-based engine. (high latency, can record audit log)
 
 (Optional) Specify user-dedicated ranger endpoint
 =================================================
@@ -93,6 +144,9 @@ If ``endpoints`` of user is not defined, ranger integration use policies of conf
 Ranger Integration feature support ``endpoints`` of user infomation.
 If a 'ranger' type endpoint is defined in specific user infomation,
 requests related to the user would be allowed or denied based on the ranger service indicated by the endpoint information.
+
+If a 'ranger_audit' type endpoint is defined in specific user infomation,
+results related to the user would be recorded to the ranger audit server indicated by the endpoint information.
 
 For how to create/modify/delete user endpoint, refer to :ref:`radosgw_admin_user_endpoints` and :ref:`radosgw_adminops_user_endpoints`.
 
