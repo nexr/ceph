@@ -65,7 +65,7 @@ The following parameters in the Ceph configuration file are related to the Range
 - ``rgw_ranger_cache_update_interval``: The interval (in seconds) to update cached ranger policy. The default value is 60.
 - ``rgw_ranger_use_cached_one_if_not_cache_updating``: If it's true, rgw use cached policy when cache update is not needed.
   This option can reduce request latency dramatically, but some audit log could be lost while ``rgw_ranger_cache_update_interval``.
-- ``rgw_ranger_cache_age``: The age (in seconds) of cached ranger policy. The default value is 2592000 (30 days)
+- ``rgw_ranger_cache_age``: The age (in seconds) of cached ranger policy. The default value is 2592000 (30 days).
   If the age is over, the cached policy replace with a remote policy.
   If 0, cache eviction becomes diabled.
 - ``rgw_ranger_engine``: Ranger integration engine type. One of 'native', 'jni'.
