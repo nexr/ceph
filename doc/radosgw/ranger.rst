@@ -71,8 +71,8 @@ The following parameters in the Ceph configuration file are related to the Range
 - ``rgw_ranger_engine``: Ranger integration engine type. One of 'native', 'jni'.
 - ``rgw_ranger_jni_config_dir``: The directory path to jni class files. It's only used when ``rgw_ranger_engine`` is 'jni'.
 - ``rgw_ranger_jni_engine_jar``: The file path to jni engine jar. It's only user when ``rgw_ranger_engine`` is 'jni'.
-- ``rgw_ranger_audit_config_age``: The age (in seconds) of ranger audit config. If the age is over, ranger audit config replace with a new one.
 - ``rgw_ranger_audit_url``: URL to Solr server to log ranger audit. example) http[s]://1.2.3.4:6083/solr/ranger_audits
+- ``rgw_ranger_audit_config_age``: The age (in seconds) of ranger audit config. If the age is over, ranger audit config replace with a new one.
 
 Apache atlas config example 1: native ranger engine
 ---------------------------
