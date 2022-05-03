@@ -534,18 +534,6 @@ class ObjstoreUsersync(MgrModule):
             self.log.warning("Failed to add '%s' to nes tanant group" % user_name)
             return is_success
 
-        user_endpoint = { 'url': "", 'tenant': "" }
-        if user_name in self.endpoint_map['ranger']:
-            user_endpoint = self.endpoint_map['ranger'][user_name]
-
-        if user_endpoint[ 'url'    ] == endpoint[ 'url'    ] and \
-           user_endpoint[ 'tenant' ] == endpoint[ 'tenant' ]:
-            is_success = self._enable_ranger_service(user_name, endpoint)
-
-        if not is_success:
-            self.log.warning("Failed to create S3 service of '%s'" % user_name)
-            return is_success
-
         return is_success
 
 
