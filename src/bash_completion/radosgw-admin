@@ -19,6 +19,7 @@ _radosgw_admin()
 
         if [[ ${cur} == -* ]] ; then
             COMPREPLY=( $(compgen -W "--uid --subuser --access-key --os-user --email --auth_uid --secret --os-secret --gen-access-key --gen-secret \
+                                      --endpoint-type --endpoint-url --endpoint-admin --endpoint-admin-passwd --endpoint-admin-passwd-path --endpoint-tenant --endpoint-enabled \
                                       --access --display-name --bucket --object --date --conf --name --id --version -s -w" -- ${cur}) )
             return 0
         fi
@@ -36,6 +37,10 @@ _radosgw_admin()
                 COMPREPLY=( $(compgen -W "create modify info rm" -- ${cur}) )
                 return 0
                 ;;
+            endpoint)
+                COMPREPLY=( $(compgen -W "create modify rm" -- ${cur}) )
+                return 0
+                ;;
             subuser)
                 COMPREPLY=( $(compgen -W "create modify rm" -- ${cur}) )
                 return 0
@@ -49,7 +54,7 @@ _radosgw_admin()
                 return 0
                 ;;
             *)
-                COMPREPLY=( $(compgen -W "user subuser key buckets policy log" -- ${cur}) )
+                COMPREPLY=( $(compgen -W "user endpoint subuser key buckets policy log" -- ${cur}) )
                 return 0
             ;;
         esac
