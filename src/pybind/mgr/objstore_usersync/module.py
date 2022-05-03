@@ -564,6 +564,9 @@ class ObjstoreUsersync(MgrModule):
             self.log.warning("Failed to get service of '%s'" % user_name)
             return is_success
 
+        service_endpoint = self.ranger_service_initial_endpoint
+        if len(service_endpoint) == 0: service_endpoint = 'http://1.2.3.4:8080'
+
         s3_key_info = {
             'user': user_name,
             'access_key': 'accesskey',
@@ -579,9 +582,6 @@ class ObjstoreUsersync(MgrModule):
 
                 s3_key_info = each_key_info
                 break
-
-            service_endpoint = self.ranger_service_initial_endpoint
-            if len(service_endpoint) == 0: service_endpoint = 'http://1.2.3.4:8080'
 
         if not is_service_exist:
             service_define_data = {
