@@ -564,15 +564,15 @@ class ObjstoreUsersync(MgrModule):
             self.log.warning("Failed to get service of '%s'" % user_name)
             return is_success
 
-        if not is_service_exist:
+        s3_key_info = {
+            'user': user_name,
+            'access_key': 'accesskey',
+            'secret_key': 'secretkey'
+        }
+
+        if not is_service_enabled:
             user_info, is_success = self._get_objuser_info(user_name)
             if not is_success: return is_success
-
-            s3_key_info = {
-                'user': user_name,
-                'access_key': 'accesskey',
-                'secret_key': 'secretkey'
-            }
 
             for each_key_info in user_info['keys']:
                 if each_key_info['user'] != user_name: continue
@@ -583,6 +583,7 @@ class ObjstoreUsersync(MgrModule):
             service_endpoint = self.ranger_service_initial_endpoint
             if len(service_endpoint) == 0: service_endpoint = 'http://1.2.3.4:8080'
 
+        if not is_service_exist:
             service_define_data = {
                 'name': s3_key_info['user'],
                 'type': 's3',
@@ -635,6 +636,11 @@ class ObjstoreUsersync(MgrModule):
 
         elif not is_service_enabled:
             resp['isEnabled'] = True
+            resp['configs'] = {
+                'endpoint'  : service_endpoint,
+                'accesskey' : s3_key_info['access_key'],
+                'password'  : s3_key_info['secret_key'],
+            }
 
             resp, scode = self._request_ranger_rest("put", "/service/plugins/services/%d" % resp['id'], endpoint, resp)
             is_success  = (scode == 200)
