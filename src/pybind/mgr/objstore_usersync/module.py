@@ -300,7 +300,7 @@ class ObjstoreUsersync(MgrModule):
 
         sync_tenant = endpoint['tenant']
 
-        group_query_path = "/xusers/groups/groupName/%s" % sync_tenant
+        group_query_path = "/service/xusers/groups/groupName/%s" % sync_tenant
         resp, scode = self._request_ranger_rest("get", group_query_path, endpoint)
 
         if scode == 200:
@@ -312,7 +312,7 @@ class ObjstoreUsersync(MgrModule):
             self.log.info(group_create_try_msg)
 
             data = { 'name': sync_tenant, 'description': 'group for nes tenant' }
-            resp, scode = self._request_ranger_rest("post", "/xusers/groups", endpoint, data)
+            resp, scode = self._request_ranger_rest("post", "/service/xusers/groups", endpoint, data)
 
             if scode == 200:
                 endpoint['group_id'] = resp['vxGroup']['id']
@@ -402,7 +402,7 @@ class ObjstoreUsersync(MgrModule):
         need_continue = True
         offset = 0
         while need_continue:
-            user_list_path = "/xusers/%s/users?startIndex=%d" % (group_id, offset)
+            user_list_path = "/service/xusers/%s/users?startIndex=%d" % (group_id, offset)
             resp, scode = self._request_ranger_rest("get", user_list_path, endpoint)
             is_success  = (scode == 200)
 
@@ -448,7 +448,7 @@ class ObjstoreUsersync(MgrModule):
         if group_id == '':
             group_id = self._fetch_ranger_group_id(endpoint)
 
-        resp, scode = self._request_ranger_rest("get", "/xusers/users/userName/" + user_name, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/xusers/users/userName/" + user_name, endpoint)
 
         is_not_exist = ( scode == 200 and resp['vxUser']['isVisible'] == '0' ) or \
                        ( scode == 400 and \
@@ -472,7 +472,7 @@ class ObjstoreUsersync(MgrModule):
                 "firstName" : user_name,
             }
 
-            resp, scode = self._request_ranger_rest("post", "/users", endpoint, user_data)
+            resp, scode = self._request_ranger_rest("post", "/service/users", endpoint, user_data)
             is_success  = (scode == 200 or scode == 404) # scode 404 if user already exist
 
             if not is_success:
@@ -487,7 +487,7 @@ class ObjstoreUsersync(MgrModule):
                 "isVisible"   : 1,
             }
 
-            resp, scode = self._request_ranger_rest("post", "/xusers/users", endpoint, xuser_data)
+            resp, scode = self._request_ranger_rest("post", "/service/xusers/users", endpoint, xuser_data)
             is_success  = (scode == 200)
 
             if is_success:
@@ -501,7 +501,7 @@ class ObjstoreUsersync(MgrModule):
         else: # user already exist
             user_id = resp['vxUser']['id']
 
-        resp, scode = self._request_ranger_rest("get", "/xusers/%s/groups" % user_id, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/xusers/%s/groups" % user_id, endpoint)
         is_success  = (scode == 200)
 
         user_groups = []
@@ -527,7 +527,7 @@ class ObjstoreUsersync(MgrModule):
             "userId"        : user_id,
         }
 
-        resp, scode = self._request_ranger_rest("post", "/xusers/groupusers", endpoint, groupuser_data)
+        resp, scode = self._request_ranger_rest("post", "/service/xusers/groupusers", endpoint, groupuser_data)
         is_success  = (scode == 200)
 
         if not is_success:
@@ -567,7 +567,7 @@ class ObjstoreUsersync(MgrModule):
 
         endpoint = self.endpoint_map['ranger'][endp_key]
 
-        resp, scode = self._request_ranger_rest("get", "plugins/services/name/" + user_name, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + user_name, endpoint)
         is_success = (scode == 200 or scode == 404)
         is_service_exist = (scode == 200)
         is_service_enabled = (is_service_exist and resp['isEnabled'] == True)
@@ -609,7 +609,7 @@ class ObjstoreUsersync(MgrModule):
                 'isEnabled': True,
             }
 
-            resp, scode = self._request_ranger_rest("post", "/plugins/services", endpoint, service_define_data)
+            resp, scode = self._request_ranger_rest("post", "/service/plugins/services", endpoint, service_define_data)
             is_success  = (scode == 200)
 
             if not is_success:
@@ -638,7 +638,7 @@ class ObjstoreUsersync(MgrModule):
                 ]
             }
 
-            resp, scode = self._request_ranger_rest("post", "/plugins/policies", endpoint, owner_policy_data)
+            resp, scode = self._request_ranger_rest("post", "/service/plugins/policies", endpoint, owner_policy_data)
             is_success  = (scode == 200)
 
             if not is_success:
@@ -648,7 +648,7 @@ class ObjstoreUsersync(MgrModule):
         elif not is_service_enabled:
             resp['isEnabled'] = True
 
-            resp, scode = self._request_ranger_rest("put", "/plugins/services/%d" % resp['id'], endpoint, resp)
+            resp, scode = self._request_ranger_rest("put", "/service/plugins/services/%d" % resp['id'], endpoint, resp)
             is_success  = (scode == 200)
 
             if not is_success:
@@ -677,7 +677,7 @@ class ObjstoreUsersync(MgrModule):
 
         endpoint = self.endpoint_map['ranger'][endp_key]
 
-        resp, scode = self._request_ranger_rest("get", "plugins/services/name/" + user_name, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + user_name, endpoint)
         is_success = (scode == 200 or scode == 404)
         is_service_exist = (scode == 200)
         is_service_enabled = (is_service_exist and resp['isEnabled'] == True)
@@ -689,7 +689,7 @@ class ObjstoreUsersync(MgrModule):
         if is_service_enabled:
             resp['isEnabled'] = False
 
-            resp, scode = self._request_ranger_rest("put", "/plugins/services/%d" % resp['id'], endpoint, resp)
+            resp, scode = self._request_ranger_rest("put", "/service/plugins/services/%d" % resp['id'], endpoint, resp)
             is_success  = (scode == 200)
 
             if not is_success:
@@ -720,7 +720,7 @@ class ObjstoreUsersync(MgrModule):
         if group_id == '':
             group_id = self._fetch_ranger_group_id(endpoint)
 
-        resp, scode = self._request_ranger_rest("get", "/xusers/users/userName/" + user_name, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/xusers/users/userName/" + user_name, endpoint)
 
         is_not_exist = ( scode == 400 and \
                          resp['vxResponse']['messageList']['name'] == 'DATA_NOT_FOUND' )
@@ -738,7 +738,7 @@ class ObjstoreUsersync(MgrModule):
         else:
             user_id = resp['vxUser']['id']
 
-        resp, scode = self._request_ranger_rest("get", "/xusers/%s/groups" % user_id, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/xusers/%s/groups" % user_id, endpoint)
         is_success  = (scode == 200)
 
         user_groups = []
@@ -760,7 +760,7 @@ class ObjstoreUsersync(MgrModule):
 
         need_remove = (len(user_groups) == 1)
 
-        group_remove_user_path = "xusers/group/%s/user/%s" % (group_name, user_name)
+        group_remove_user_path = "/service/xusers/group/%s/user/%s" % (group_name, user_name)
 
         resp, scode = self._request_ranger_rest("delete", group_remove_user_path, endpoint)
         is_success  = (scode == 204)
@@ -775,7 +775,7 @@ class ObjstoreUsersync(MgrModule):
 
         hard_remove = self.ranger_user_hard_remove
 
-        remove_user_path = "/xusers/users/%s?forceDelete=%s" % (user_id, hard_remove)
+        remove_user_path = "/service/xusers/users/%s?forceDelete=%s" % (user_id, hard_remove)
         resp, scode = self._request_ranger_rest("delete", remove_user_path, endpoint)
         is_success  = (scode == 204)
 
