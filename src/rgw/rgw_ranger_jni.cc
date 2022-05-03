@@ -48,9 +48,6 @@ RGWRangerJniManager::RGWRangerJniManager(CephContext* const _cct, RGWRados* cons
   thread_pool_size = cct->_conf->rgw_thread_pool_size;
   threads = new RGWRangerJniThread* [thread_pool_size];
 
-  for (int i = 0; i < thread_pool_size; i++) {
-  }
-
   if (start_vm) {
     start_jvm();
     start_thread();
@@ -114,7 +111,7 @@ int RGWRangerJniManager::start_jvm() {
   }
   ldout(cct, 10) << __func__ << "(): JVM created!" << dendl;
 
-  // The jvm creation change locale implicitly.. (It's terrible!)
+  // XXX: The jvm creation change locale implicitly.. (It's terrible!)
   // restore locale to en_US
   std::setlocale(LC_ALL, "en_US.UTF-8");
 
