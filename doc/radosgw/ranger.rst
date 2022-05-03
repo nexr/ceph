@@ -26,7 +26,7 @@ In this case, by using the Ranger Integration feature, The Ceph Object Gateway c
 Requirements
 ============
 
-- **External Apache Ranger:** One or more running Ranger security policy system instance accessible by the Ceph Object Gateway. (Ranger version >= 1.1.0)
+- **External Apache Ranger:** One or more running Ranger security policy system instance accessible by the Ceph Object Gateway. (Ranger version >= 2.1.0)
 
 Install S3 ranger plugin to external ranger
 =============
