@@ -71,7 +71,7 @@ public class NesRangerEngine {
       conf.set("ranger.plugin." + serviceType + ".policy.rest.url", rangerUrl);
       conf.set("ranger.plugin." + serviceType + ".policy.cache.dir", cacheDir);
 
-			logger.debug("RangerPluginConfig: " + conf);
+      logger.debug("RangerPluginConfig: " + conf);
 
       basePlugin = new RangerBasePlugin(conf);
       try {
@@ -107,10 +107,7 @@ public class NesRangerEngine {
       request.setRemoteIPAddress(remoteAddr);
     }
 
-		logger.debug("RangerAccessRequestImpl: " + request);
-
     RangerAccessResult result = basePlugin.isAccessAllowed(request);
-		logger.debug("RangerAccessResult: " + result);
 
     boolean is_allowed = (result != null && result.getIsAllowed());
 
