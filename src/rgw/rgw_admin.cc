@@ -672,12 +672,12 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
     if (strcmp(cmd, "list") == 0)
       return OPT_USER_LIST;
   } else if (strcmp(prev_cmd, "endpoint") == 0) {
-		if (strcmp(cmd, "create") == 0)
-			return OPT_ENDPOINT_CREATE;
-		if (strcmp(cmd, "modify") == 0)
-			return OPT_ENDPOINT_MODIFY;
-		if (strcmp(cmd, "rm") == 0)
-			return OPT_ENDPOINT_RM;
+    if (strcmp(cmd, "create") == 0)
+      return OPT_ENDPOINT_CREATE;
+    if (strcmp(cmd, "modify") == 0)
+      return OPT_ENDPOINT_MODIFY;
+    if (strcmp(cmd, "rm") == 0)
+      return OPT_ENDPOINT_RM;
   } else if (strcmp(prev_cmd, "subuser") == 0) {
     if (strcmp(cmd, "create") == 0)
       return OPT_SUBUSER_CREATE;
@@ -733,7 +733,7 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
       if (strcmp(cmd, "enable") == 0)
         return OPT_BUCKET_SYNC_ENABLE;
     } else if ((strcmp(prev_cmd, "limit") == 0) &&
-	       (strcmp(cmd, "check") == 0)) {
+               (strcmp(cmd, "check") == 0)) {
       return OPT_BUCKET_LIMIT_CHECK;
     }
   } else if (strcmp(prev_cmd, "log") == 0) {
@@ -780,7 +780,7 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
     if (strcmp(cmd, "expire") == 0)
       return OPT_OBJECTS_EXPIRE;
   } else if ((prev_prev_cmd && strcmp(prev_prev_cmd, "objects") == 0) &&
-	     (strcmp(prev_cmd, "expire-stale") == 0)) {
+             (strcmp(prev_cmd, "expire-stale") == 0)) {
     if (strcmp(cmd, "list") == 0)
       return OPT_OBJECTS_EXPIRE_STALE_LIST;
     if (strcmp(cmd, "rm") == 0)
@@ -800,7 +800,7 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
     if (strcmp(cmd, "purge") == 0)
       return OPT_BI_PURGE;
   } else if ((prev_prev_cmd && strcmp(prev_prev_cmd, "global") == 0) &&
-	     (strcmp(prev_cmd, "quota") == 0)) {
+             (strcmp(prev_cmd, "quota") == 0)) {
     if (strcmp(cmd, "get") == 0)
       return OPT_GLOBAL_QUOTA_GET;
     if (strcmp(cmd, "set") == 0)
@@ -848,7 +848,7 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
     if (strcmp(cmd, "pull") == 0)
       return OPT_REALM_PULL;
   } else if ((prev_prev_cmd && strcmp(prev_prev_cmd, "zonegroup") == 0) &&
-	     (strcmp(prev_cmd, "placement") == 0)) {
+             (strcmp(prev_cmd, "placement") == 0)) {
     if (strcmp(cmd, "add") == 0)
       return OPT_ZONEGROUP_PLACEMENT_ADD;
     if (strcmp(cmd, "modify") == 0)
@@ -893,7 +893,7 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
     if (strcmp(cmd, "list") == 0)
       return OPT_ZONEGROUP_LIST;
   } else if ((prev_prev_cmd && strcmp(prev_prev_cmd, "zone") == 0) &&
-	     (strcmp(prev_cmd, "placement") == 0)) {
+             (strcmp(prev_cmd, "placement") == 0)) {
     if (strcmp(cmd, "add") == 0)
       return OPT_ZONE_PLACEMENT_ADD;
     if (strcmp(cmd, "modify") == 0)
@@ -937,7 +937,7 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
     if (strcmp(cmd, "process") == 0)
       return OPT_LC_PROCESS;
   } else if ((prev_prev_cmd && strcmp(prev_prev_cmd, "lc") == 0) &&
-	     strcmp(prev_cmd, "reshard") == 0) {
+              strcmp(prev_cmd, "reshard") == 0) {
     if (strcmp(cmd, "fix") == 0)
       return OPT_LC_RESHARD_FIX;
   } else if (strcmp(prev_cmd, "orphans") == 0) {
@@ -961,7 +961,7 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
       return 0;
     }
   } else if ((prev_prev_cmd && strcmp(prev_prev_cmd, "metadata") == 0) &&
-	     (strcmp(prev_cmd, "sync") == 0)) {
+             (strcmp(prev_cmd, "sync") == 0)) {
     if (strcmp(cmd, "status") == 0)
       return OPT_METADATA_SYNC_STATUS;
     if (strcmp(cmd, "init") == 0)
@@ -969,7 +969,7 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
     if (strcmp(cmd, "run") == 0)
       return OPT_METADATA_SYNC_RUN;
   } else if ((prev_prev_cmd && strcmp(prev_prev_cmd, "sync") == 0) &&
-	     (strcmp(prev_cmd, "error") == 0)) {
+             (strcmp(prev_cmd, "error") == 0)) {
     if (strcmp(cmd, "list") == 0)
       return OPT_SYNC_ERROR_LIST;
     if (strcmp(cmd, "trim") == 0)
@@ -1009,7 +1009,7 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
     if (strcmp(cmd, "status") == 0)
       return OPT_DATALOG_STATUS;
   } else if ((prev_prev_cmd && strcmp(prev_prev_cmd, "data") == 0) &&
-	     (strcmp(prev_cmd, "sync") == 0)) {
+             (strcmp(prev_cmd, "sync") == 0)) {
     if (strcmp(cmd, "status") == 0)
       return OPT_DATA_SYNC_STATUS;
     if (strcmp(cmd, "init") == 0)
@@ -1066,7 +1066,7 @@ static int get_cmd(const char *cmd, const char *prev_cmd, const char *prev_prev_
     if (strcmp(cmd, "resync") == 0)
       return OPT_MFA_RESYNC;
   } else if ((prev_prev_cmd && strcmp(prev_prev_cmd, "reshard") == 0) &&
-	     (strcmp(prev_cmd, "stale-instances") == 0)) {
+             (strcmp(prev_cmd, "stale-instances") == 0)) {
     if (strcmp(cmd, "list") == 0)
       return OPT_RESHARD_STALE_INSTANCES_LIST;
     if (match_str(cmd, "rm", "delete"))
@@ -1193,7 +1193,7 @@ static void show_reshard_status(
     formatter->open_object_section("entry");
     formatter->dump_string("reshard_status", to_string(entry.reshard_status));
     formatter->dump_string("new_bucket_instance_id",
-			   entry.new_bucket_instance_id);
+                           entry.new_bucket_instance_id);
     formatter->dump_int("num_shards", entry.num_shards);
     formatter->close_section();
   }
@@ -1645,13 +1645,13 @@ int do_check_object_locator(const string& tenant_name, const string& bucket_name
       if (key.name[0] == '_') {
         ret = check_obj_locator_underscore(bucket_info, obj, key, fix, remove_bad, f);
 
-	if (ret >= 0) {
+        if (ret >= 0) {
           ret = check_obj_tail_locator_underscore(bucket_info, obj, key, fix, f);
           if (ret < 0) {
               cerr << "ERROR: check_obj_tail_locator_underscore(): " << cpp_strerror(-ret) << std::endl;
               return -ret;
           }
-	}
+        }
       }
     }
     f->flush(cout);
@@ -2607,15 +2607,15 @@ static int check_pool_support_omap(const rgw_pool& pool)
 }
 
 int check_reshard_bucket_params(RGWRados *store,
-				const string& bucket_name,
-				const string& tenant,
-				const string& bucket_id,
-				bool num_shards_specified,
-				int num_shards,
-				int yes_i_really_mean_it,
-				rgw_bucket& bucket,
-				RGWBucketInfo& bucket_info,
-				map<string, bufferlist>& attrs)
+                                const string& bucket_name,
+                                const string& tenant,
+                                const string& bucket_id,
+                                bool num_shards_specified,
+                                int num_shards,
+                                int yes_i_really_mean_it,
+                                rgw_bucket& bucket,
+                                RGWBucketInfo& bucket_info,
+                                map<string, bufferlist>& attrs)
 {
   if (bucket_name.empty()) {
     cerr << "ERROR: bucket not specified" << std::endl;
@@ -2649,17 +2649,17 @@ int check_reshard_bucket_params(RGWRados *store,
 
   if (num_shards <= num_source_shards && !yes_i_really_mean_it) {
     cerr << "num shards is less or equal to current shards count" << std::endl
-	 << "do you really mean it? (requires --yes-i-really-mean-it)" << std::endl;
+         << "do you really mean it? (requires --yes-i-really-mean-it)" << std::endl;
     return -EINVAL;
   }
   return 0;
 }
 
 int create_new_bucket_instance(RGWRados *store,
-			       int new_num_shards,
-			       const RGWBucketInfo& bucket_info,
-			       map<string, bufferlist>& attrs,
-			       RGWBucketInfo& new_bucket_info)
+                               int new_num_shards,
+                               const RGWBucketInfo& bucket_info,
+                               map<string, bufferlist>& attrs,
+                               RGWBucketInfo& new_bucket_info)
 {
 
   store->create_bucket_id(&new_bucket_info.bucket.bucket_id);
@@ -3402,85 +3402,85 @@ int main(int argc, const char **argv)
   // not a raw op if 'period update' needs to commit to master
   bool raw_period_update = opt_cmd == OPT_PERIOD_UPDATE && !commit;
   std::set<int> raw_storage_ops_list = {OPT_ZONEGROUP_ADD, OPT_ZONEGROUP_CREATE, OPT_ZONEGROUP_DELETE,
-			 OPT_ZONEGROUP_GET, OPT_ZONEGROUP_LIST,
+                         OPT_ZONEGROUP_GET, OPT_ZONEGROUP_LIST,
                          OPT_ZONEGROUP_SET, OPT_ZONEGROUP_DEFAULT,
-			 OPT_ZONEGROUP_RENAME, OPT_ZONEGROUP_MODIFY,
-			 OPT_ZONEGROUP_REMOVE,
-			 OPT_ZONEGROUP_PLACEMENT_ADD, OPT_ZONEGROUP_PLACEMENT_RM,
-			 OPT_ZONEGROUP_PLACEMENT_MODIFY, OPT_ZONEGROUP_PLACEMENT_LIST,
-			 OPT_ZONEGROUP_PLACEMENT_GET,
-			 OPT_ZONEGROUP_PLACEMENT_DEFAULT,
-			 OPT_ZONE_CREATE, OPT_ZONE_DELETE,
+                         OPT_ZONEGROUP_RENAME, OPT_ZONEGROUP_MODIFY,
+                         OPT_ZONEGROUP_REMOVE,
+                         OPT_ZONEGROUP_PLACEMENT_ADD, OPT_ZONEGROUP_PLACEMENT_RM,
+                         OPT_ZONEGROUP_PLACEMENT_MODIFY, OPT_ZONEGROUP_PLACEMENT_LIST,
+                         OPT_ZONEGROUP_PLACEMENT_GET,
+                         OPT_ZONEGROUP_PLACEMENT_DEFAULT,
+                         OPT_ZONE_CREATE, OPT_ZONE_DELETE,
                          OPT_ZONE_GET, OPT_ZONE_SET, OPT_ZONE_RENAME,
                          OPT_ZONE_LIST, OPT_ZONE_MODIFY, OPT_ZONE_DEFAULT,
-			 OPT_ZONE_PLACEMENT_ADD, OPT_ZONE_PLACEMENT_RM,
-			 OPT_ZONE_PLACEMENT_MODIFY, OPT_ZONE_PLACEMENT_LIST,
-			 OPT_ZONE_PLACEMENT_GET,
-			 OPT_REALM_CREATE,
-			 OPT_PERIOD_DELETE, OPT_PERIOD_GET,
-			 OPT_PERIOD_PULL,
-			 OPT_PERIOD_GET_CURRENT, OPT_PERIOD_LIST,
-			 OPT_GLOBAL_QUOTA_GET, OPT_GLOBAL_QUOTA_SET,
-			 OPT_GLOBAL_QUOTA_ENABLE, OPT_GLOBAL_QUOTA_DISABLE,
-			 OPT_REALM_DELETE, OPT_REALM_GET, OPT_REALM_LIST,
-			 OPT_REALM_LIST_PERIODS,
-			 OPT_REALM_GET_DEFAULT,
-			 OPT_REALM_RENAME, OPT_REALM_SET,
-			 OPT_REALM_DEFAULT, OPT_REALM_PULL};
+                         OPT_ZONE_PLACEMENT_ADD, OPT_ZONE_PLACEMENT_RM,
+                         OPT_ZONE_PLACEMENT_MODIFY, OPT_ZONE_PLACEMENT_LIST,
+                         OPT_ZONE_PLACEMENT_GET,
+                         OPT_REALM_CREATE,
+                         OPT_PERIOD_DELETE, OPT_PERIOD_GET,
+                         OPT_PERIOD_PULL,
+                         OPT_PERIOD_GET_CURRENT, OPT_PERIOD_LIST,
+                         OPT_GLOBAL_QUOTA_GET, OPT_GLOBAL_QUOTA_SET,
+                         OPT_GLOBAL_QUOTA_ENABLE, OPT_GLOBAL_QUOTA_DISABLE,
+                         OPT_REALM_DELETE, OPT_REALM_GET, OPT_REALM_LIST,
+                         OPT_REALM_LIST_PERIODS,
+                         OPT_REALM_GET_DEFAULT,
+                         OPT_REALM_RENAME, OPT_REALM_SET,
+                         OPT_REALM_DEFAULT, OPT_REALM_PULL};
 
   std::set<int> readonly_ops_list = {
                          OPT_USER_INFO,
-			 OPT_USER_STATS,
-			 OPT_BUCKETS_LIST,
-			 OPT_BUCKET_LIMIT_CHECK,
-			 OPT_BUCKET_STATS,
-			 OPT_BUCKET_SYNC_STATUS,
-			 OPT_BUCKET_SYNC_MARKERS,
-			 OPT_LOG_LIST,
-			 OPT_LOG_SHOW,
-			 OPT_USAGE_SHOW,
-			 OPT_OBJECT_STAT,
-			 OPT_BI_GET,
-			 OPT_BI_LIST,
-			 OPT_OLH_GET,
-			 OPT_OLH_READLOG,
-			 OPT_GC_LIST,
-			 OPT_LC_LIST,
-			 OPT_ORPHANS_LIST_JOBS,
-			 OPT_ZONEGROUP_GET,
-			 OPT_ZONEGROUP_LIST,
-			 OPT_ZONEGROUP_PLACEMENT_LIST,
-			 OPT_ZONEGROUP_PLACEMENT_GET,
-			 OPT_ZONE_GET,
-			 OPT_ZONE_LIST,
-			 OPT_ZONE_PLACEMENT_LIST,
-			 OPT_ZONE_PLACEMENT_GET,
-			 OPT_METADATA_GET,
-			 OPT_METADATA_LIST,
-			 OPT_METADATA_SYNC_STATUS,
-			 OPT_MDLOG_LIST,
-			 OPT_MDLOG_STATUS,
-			 OPT_SYNC_ERROR_LIST,
-			 OPT_BILOG_LIST,
-			 OPT_BILOG_STATUS,
-			 OPT_DATA_SYNC_STATUS,
-			 OPT_DATALOG_LIST,
-			 OPT_DATALOG_STATUS,
-			 OPT_REALM_GET,
-			 OPT_REALM_GET_DEFAULT,
-			 OPT_REALM_LIST,
-			 OPT_REALM_LIST_PERIODS,
-			 OPT_PERIOD_GET,
-			 OPT_PERIOD_GET_CURRENT,
-			 OPT_PERIOD_LIST,
-			 OPT_GLOBAL_QUOTA_GET,
-			 OPT_SYNC_STATUS,
-			 OPT_ROLE_GET,
-			 OPT_ROLE_LIST,
-			 OPT_ROLE_POLICY_LIST,
-			 OPT_ROLE_POLICY_GET,
-			 OPT_RESHARD_LIST,
-			 OPT_RESHARD_STATUS,
+                         OPT_USER_STATS,
+                         OPT_BUCKETS_LIST,
+                         OPT_BUCKET_LIMIT_CHECK,
+                         OPT_BUCKET_STATS,
+                         OPT_BUCKET_SYNC_STATUS,
+                         OPT_BUCKET_SYNC_MARKERS,
+                         OPT_LOG_LIST,
+                         OPT_LOG_SHOW,
+                         OPT_USAGE_SHOW,
+                         OPT_OBJECT_STAT,
+                         OPT_BI_GET,
+                         OPT_BI_LIST,
+                         OPT_OLH_GET,
+                         OPT_OLH_READLOG,
+                         OPT_GC_LIST,
+                         OPT_LC_LIST,
+                         OPT_ORPHANS_LIST_JOBS,
+                         OPT_ZONEGROUP_GET,
+                         OPT_ZONEGROUP_LIST,
+                         OPT_ZONEGROUP_PLACEMENT_LIST,
+                         OPT_ZONEGROUP_PLACEMENT_GET,
+                         OPT_ZONE_GET,
+                         OPT_ZONE_LIST,
+                         OPT_ZONE_PLACEMENT_LIST,
+                         OPT_ZONE_PLACEMENT_GET,
+                         OPT_METADATA_GET,
+                         OPT_METADATA_LIST,
+                         OPT_METADATA_SYNC_STATUS,
+                         OPT_MDLOG_LIST,
+                         OPT_MDLOG_STATUS,
+                         OPT_SYNC_ERROR_LIST,
+                         OPT_BILOG_LIST,
+                         OPT_BILOG_STATUS,
+                         OPT_DATA_SYNC_STATUS,
+                         OPT_DATALOG_LIST,
+                         OPT_DATALOG_STATUS,
+                         OPT_REALM_GET,
+                         OPT_REALM_GET_DEFAULT,
+                         OPT_REALM_LIST,
+                         OPT_REALM_LIST_PERIODS,
+                         OPT_PERIOD_GET,
+                         OPT_PERIOD_GET_CURRENT,
+                         OPT_PERIOD_LIST,
+                         OPT_GLOBAL_QUOTA_GET,
+                         OPT_SYNC_STATUS,
+                         OPT_ROLE_GET,
+                         OPT_ROLE_LIST,
+                         OPT_ROLE_POLICY_LIST,
+                         OPT_ROLE_POLICY_GET,
+                         OPT_RESHARD_LIST,
+                         OPT_RESHARD_STATUS,
   };
 
   bool raw_storage_op = (raw_storage_ops_list.find(opt_cmd) != raw_storage_ops_list.end() ||
@@ -4061,7 +4061,7 @@ int main(int argc, const char **argv)
                                  endpoints, ptier_type,
                                  psync_from_all, sync_from, sync_from_rm,
                                  predirect_zone,
-				 store->svc.sync_modules->get_manager());
+                                 store->svc.sync_modules->get_manager());
         if (ret < 0) {
           cerr << "failed to add zone " << zone_name << " to zonegroup " << zonegroup.get_name() << ": "
                << cpp_strerror(-ret) << std::endl;
@@ -4805,7 +4805,7 @@ int main(int argc, const char **argv)
                                  endpoints, ptier_type,
                                  psync_from_all, sync_from, sync_from_rm,
                                  predirect_zone,
-				 store->svc.sync_modules->get_manager());
+                                 store->svc.sync_modules->get_manager());
         if (ret < 0) {
           cerr << "failed to update zonegroup: " << cpp_strerror(-ret) << std::endl;
           return -ret;
@@ -5305,7 +5305,7 @@ int main(int argc, const char **argv)
                               commit, remote, url, access_key, secret_key,
                               formatter, yes_i_really_mean_it);
       if (ret < 0) {
-	return -ret;
+        return -ret;
       }
     }
     return 0;
@@ -5578,34 +5578,34 @@ int main(int argc, const char **argv)
     if (! user_id.empty()) {
       user_ids.push_back(user_id.id);
       ret =
-	RGWBucketAdminOp::limit_check(store, bucket_op, user_ids, f,
-	  warnings_only);
+        RGWBucketAdminOp::limit_check(store, bucket_op, user_ids, f,
+                                      warnings_only);
     } else {
       /* list users in groups of max-keys, then perform user-bucket
        * limit-check on each group */
-     ret = store->meta_mgr->list_keys_init(metadata_key, &handle);
+      ret = store->meta_mgr->list_keys_init(metadata_key, &handle);
       if (ret < 0) {
-	cerr << "ERROR: buckets limit check can't get user metadata_key: "
-	     << cpp_strerror(-ret) << std::endl;
-	return -ret;
+        cerr << "ERROR: buckets limit check can't get user metadata_key: "
+             << cpp_strerror(-ret) << std::endl;
+        return -ret;
       }
 
       do {
-	ret = store->meta_mgr->list_keys_next(handle, max, user_ids,
-					      &truncated);
-	if (ret < 0 && ret != -ENOENT) {
-	  cerr << "ERROR: buckets limit check lists_keys_next(): "
-	       << cpp_strerror(-ret) << std::endl;
-	  break;
-	} else {
-	  /* ok, do the limit checks for this group */
-	  ret =
-	    RGWBucketAdminOp::limit_check(store, bucket_op, user_ids, f,
-	      warnings_only);
-	  if (ret < 0)
-	    break;
-	}
-	user_ids.clear();
+        ret = store->meta_mgr->list_keys_next(handle, max, user_ids,
+                                              &truncated);
+        if (ret < 0 && ret != -ENOENT) {
+          cerr << "ERROR: buckets limit check lists_keys_next(): "
+               << cpp_strerror(-ret) << std::endl;
+          break;
+        } else {
+          /* ok, do the limit checks for this group */
+          ret =
+            RGWBucketAdminOp::limit_check(store, bucket_op, user_ids, f,
+                                          warnings_only);
+          if (ret < 0)
+            break;
+        }
+        user_ids.clear();
       } while (truncated);
       store->meta_mgr->list_keys_complete(handle);
     }
@@ -5766,8 +5766,8 @@ int main(int argc, const char **argv)
 
       int r = store->log_show_init(oid, &h);
       if (r < 0) {
-	cerr << "error opening log " << oid << ": " << cpp_strerror(-r) << std::endl;
-	return -r;
+        cerr << "error opening log " << oid << ": " << cpp_strerror(-r) << std::endl;
+        return -r;
       }
 
       formatter->reset();
@@ -5778,8 +5778,8 @@ int main(int argc, const char **argv)
       // peek at first entry to get bucket metadata
       r = store->log_show_next(h, &entry);
       if (r < 0) {
-	cerr << "error reading log " << oid << ": " << cpp_strerror(-r) << std::endl;
-	return -r;
+        cerr << "error reading log " << oid << ": " << cpp_strerror(-r) << std::endl;
+        return -r;
       }
       formatter->dump_string("bucket_id", entry.bucket_id);
       formatter->dump_string("bucket_owner", entry.bucket_owner.to_str());
@@ -5807,27 +5807,26 @@ int main(int argc, const char **argv)
           goto next;
 
         if (show_log_entries) {
-
-	  rgw_format_ops_log_entry(entry, formatter);
-	  formatter->flush(cout);
+          rgw_format_ops_log_entry(entry, formatter);
+          formatter->flush(cout);
         }
 next:
-	r = store->log_show_next(h, &entry);
+        r = store->log_show_next(h, &entry);
       } while (r > 0);
 
       if (r < 0) {
-      	cerr << "error reading log " << oid << ": " << cpp_strerror(-r) << std::endl;
-	return -r;
+        cerr << "error reading log " << oid << ": " << cpp_strerror(-r) << std::endl;
+        return -r;
       }
       if (show_log_entries)
         formatter->close_section();
 
       if (show_log_sum) {
         formatter->open_object_section("log_sum");
-	formatter->dump_int("bytes_sent", agg_bytes_sent);
-	formatter->dump_int("bytes_received", agg_bytes_received);
-	formatter->dump_int("total_time", agg_time);
-	formatter->dump_int("total_entries", total_entries);
+        formatter->dump_int("bytes_sent", agg_bytes_sent);
+        formatter->dump_int("bytes_received", agg_bytes_received);
+        formatter->dump_int("total_time", agg_time);
+        formatter->dump_int("total_entries", total_entries);
         formatter->close_section();
       }
       formatter->close_section();
@@ -5837,8 +5836,8 @@ next:
     if (opt_cmd == OPT_LOG_RM) {
       int r = store->log_remove(oid);
       if (r < 0) {
-	cerr << "error removing log " << oid << ": " << cpp_strerror(-r) << std::endl;
-	return -r;
+        cerr << "error removing log " << oid << ": " << cpp_strerror(-r) << std::endl;
+        return -r;
       }
     }
   }
@@ -5907,8 +5906,8 @@ next:
 
 
     ret = RGWUsage::show(store, user_id, bucket_name, start_epoch, end_epoch,
-			 show_log_entries, show_log_sum, &categories,
-			 f);
+                         show_log_entries, show_log_sum, &categories,
+                         f);
     if (ret < 0) {
       cerr << "ERROR: failed to show usage" << std::endl;
       return 1;
@@ -5917,7 +5916,7 @@ next:
 
   if (opt_cmd == OPT_USAGE_TRIM) {
     if (user_id.empty() && bucket_name.empty() &&
-	start_date.empty() && end_date.empty() && !yes_i_really_mean_it) {
+        start_date.empty() && end_date.empty() && !yes_i_really_mean_it) {
       cerr << "usage trim without user/date/bucket specified will remove *all* users data" << std::endl;
       cerr << "do you really mean it? (requires --yes-i-really-mean-it)" << std::endl;
       return 1;
@@ -6347,10 +6346,10 @@ next:
     while (is_truncated) {
       map<string, rgw_bucket_dir_entry> result;
       int r =
-	store->cls_bucket_list_ordered(bucket_info, RGW_NO_SHARD, marker,
-				       prefix, NUM_ENTRIES, true, expansion_factor,
-				       result, &is_truncated, &marker,
-				       bucket_object_check_filter);
+        store->cls_bucket_list_ordered(bucket_info, RGW_NO_SHARD, marker,
+                                       prefix, NUM_ENTRIES, true, expansion_factor,
+                                       result, &is_truncated, &marker,
+                                       bucket_object_check_filter);
       if (r < 0 && r != -ENOENT) {
         cerr << "ERROR: failed operation r=" << r << std::endl;
       } else if (r == -ENOENT) {
@@ -6358,10 +6357,10 @@ next:
       }
 
       if (result.size() < NUM_ENTRIES / 8) {
-	++expansion_factor;
+        ++expansion_factor;
       } else if (result.size() > NUM_ENTRIES * 7 / 8 &&
-		 expansion_factor > 1) {
-	--expansion_factor;
+                 expansion_factor > 1) {
+        --expansion_factor;
       }
 
       map<string, rgw_bucket_dir_entry>::iterator iter;
@@ -6419,15 +6418,15 @@ next:
     map<string, bufferlist> attrs;
 
     int ret = check_reshard_bucket_params(store,
-					  bucket_name,
-					  tenant,
-					  bucket_id,
-					  num_shards_specified,
-					  num_shards,
-					  yes_i_really_mean_it,
-					  bucket,
-					  bucket_info,
-					  attrs);
+                                          bucket_name,
+                                          tenant,
+                                          bucket_id,
+                                          num_shards_specified,
+                                          num_shards,
+                                          yes_i_really_mean_it,
+                                          bucket,
+                                          bucket_info,
+                                          attrs);
     if (ret < 0) {
       return ret;
     }
@@ -6449,15 +6448,15 @@ next:
     map<string, bufferlist> attrs;
 
     int ret = check_reshard_bucket_params(store,
-					  bucket_name,
-					  tenant,
-					  bucket_id,
-					  num_shards_specified,
-					  num_shards,
-					  yes_i_really_mean_it,
-					  bucket,
-					  bucket_info,
-					  attrs);
+                                          bucket_name,
+                                          tenant,
+                                          bucket_id,
+                                          num_shards_specified,
+                                          num_shards,
+                                          yes_i_really_mean_it,
+                                          bucket,
+                                          bucket_info,
+                                          attrs);
     if (ret < 0) {
       return ret;
     }
@@ -6539,7 +6538,7 @@ next:
     int r = br.get_status(&status);
     if (r < 0) {
       cerr << "ERROR: could not get resharding status for bucket " <<
-	bucket_name << std::endl;
+      bucket_name << std::endl;
       return -r;
     }
 
@@ -6709,9 +6708,9 @@ next:
       RGWBucketAdminOp::remove_bucket(store, bucket_op, bypass_gc, true);
     } else {
       if (!yes_i_really_mean_it) {
-	cerr << "using --inconsistent_index can corrupt the bucket index " << std::endl
-	<< "do you really mean it? (requires --yes-i-really-mean-it)" << std::endl;
-	return 1;
+        cerr << "using --inconsistent_index can corrupt the bucket index " << std::endl
+        << "do you really mean it? (requires --yes-i-really-mean-it)" << std::endl;
+        return 1;
       }
       RGWBucketAdminOp::remove_bucket(store, bucket_op, bypass_gc, false);
     }
@@ -6726,27 +6725,27 @@ next:
       list<cls_rgw_gc_obj_info> result;
       int ret = store->list_gc_objs(&index, marker, 1000, !include_all, result, &truncated);
       if (ret < 0) {
-	cerr << "ERROR: failed to list objs: " << cpp_strerror(-ret) << std::endl;
-	return 1;
+        cerr << "ERROR: failed to list objs: " << cpp_strerror(-ret) << std::endl;
+        return 1;
       }
 
 
       list<cls_rgw_gc_obj_info>::iterator iter;
       for (iter = result.begin(); iter != result.end(); ++iter) {
-	cls_rgw_gc_obj_info& info = *iter;
-	formatter->open_object_section("chain_info");
-	formatter->dump_string("tag", info.tag);
-	formatter->dump_stream("time") << info.time;
-	formatter->open_array_section("objs");
+        cls_rgw_gc_obj_info& info = *iter;
+        formatter->open_object_section("chain_info");
+        formatter->dump_string("tag", info.tag);
+        formatter->dump_stream("time") << info.time;
+        formatter->open_array_section("objs");
         list<cls_rgw_obj>::iterator liter;
-	cls_rgw_obj_chain& chain = info.chain;
-	for (liter = chain.objs.begin(); liter != chain.objs.end(); ++liter) {
-	  cls_rgw_obj& obj = *liter;
+        cls_rgw_obj_chain& chain = info.chain;
+        for (liter = chain.objs.begin(); liter != chain.objs.end(); ++liter) {
+          cls_rgw_obj& obj = *liter;
           encode_json("obj", obj, formatter);
-	}
-	formatter->close_section(); // objs
-	formatter->close_section(); // obj_chain
-	formatter->flush(cout);
+        }
+        formatter->close_section(); // objs
+        formatter->close_section(); // obj_chain
+        formatter->flush(cout);
       }
     } while (truncated);
     formatter->close_section();
@@ -6845,8 +6844,8 @@ next:
   if (opt_cmd == OPT_ORPHANS_FIND) {
     if (!yes_i_really_mean_it) {
       cerr << "accidental removal of active objects can not be reversed; "
-	   << "do you really mean it? (requires --yes-i-really-mean-it)"
-	   << std::endl;
+           << "do you really mean it? (requires --yes-i-really-mean-it)"
+           << std::endl;
       return EINVAL;
     }
 
@@ -6915,9 +6914,9 @@ next:
     formatter->open_array_section("entries");
     for (const auto &it: m){
       if (!extra_info){
-	formatter->dump_string("job-id",it.first);
+        formatter->dump_string("job-id",it.first);
       } else {
-	encode_json("orphan_search_state", it.second, formatter);
+        encode_json("orphan_search_state", it.second, formatter);
       }
     }
     formatter->close_section();
@@ -6937,20 +6936,20 @@ next:
     string user_str = user_id.to_str();
     if (reset_stats) {
       if (!bucket_name.empty()) {
-	cerr << "ERROR: --reset-stats does not work on buckets and "
-	  "bucket specified" << std::endl;
-	return EINVAL;
+        cerr << "ERROR: --reset-stats does not work on buckets and "
+          "bucket specified" << std::endl;
+        return EINVAL;
       }
       if (sync_stats) {
-	cerr << "ERROR: sync-stats includes the reset-stats functionality, "
-	  "so at most one of the two should be specified" << std::endl;
-	return EINVAL;
+        cerr << "ERROR: sync-stats includes the reset-stats functionality, "
+          "so at most one of the two should be specified" << std::endl;
+        return EINVAL;
       }
       ret = store->cls_user_reset_stats(user_str);
       if (ret < 0) {
-	cerr << "ERROR: could not reset user stats: " << cpp_strerror(-ret) <<
-	  std::endl;
-	return -ret;
+        cerr << "ERROR: could not reset user stats: " << cpp_strerror(-ret) <<
+          std::endl;
+        return -ret;
       }
     }
 
@@ -6959,14 +6958,14 @@ next:
         int ret = rgw_bucket_sync_user_stats(store, tenant, bucket_name);
         if (ret < 0) {
           cerr << "ERROR: could not sync bucket stats: " <<
-	    cpp_strerror(-ret) << std::endl;
+            cpp_strerror(-ret) << std::endl;
           return -ret;
         }
       } else {
         int ret = rgw_user_sync_all_stats(store, user_id);
         if (ret < 0) {
           cerr << "ERROR: could not sync user stats: " <<
-	    cpp_strerror(-ret) << std::endl;
+            cpp_strerror(-ret) << std::endl;
           return -ret;
         }
       }
@@ -7103,7 +7102,7 @@ next:
       meta_log->init_list_entries(i, start_time.to_real_time(), end_time.to_real_time(), marker, &handle);
       bool truncated;
       do {
-	  int ret = meta_log->list_entries(handle, 1000, entries, NULL, &truncated);
+        int ret = meta_log->list_entries(handle, 1000, entries, NULL, &truncated);
         if (ret < 0) {
           cerr << "ERROR: meta_log->list_entries(): " << cpp_strerror(-ret) << std::endl;
           return -ret;
