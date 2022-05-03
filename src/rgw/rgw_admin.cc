@@ -5004,15 +5004,16 @@ int main(int argc, const char **argv)
   bool non_master_cmd = (!store->svc.zone->is_meta_master() && !yes_i_really_mean_it);
   std::set<int> non_master_ops_list = {OPT_USER_CREATE, OPT_USER_RM,
                                         OPT_USER_MODIFY, OPT_USER_ENABLE,
-                                        OPT_USER_SUSPEND, OPT_SUBUSER_CREATE,
-                                        OPT_SUBUSER_MODIFY, OPT_SUBUSER_RM,
-                                        OPT_BUCKET_LINK, OPT_BUCKET_UNLINK,
-                                        OPT_BUCKET_RESHARD, OPT_BUCKET_RM,
-                                        OPT_METADATA_PUT, OPT_METADATA_RM,
-                                        OPT_RESHARD_CANCEL, OPT_RESHARD_ADD,
-                                        OPT_MFA_CREATE, OPT_MFA_REMOVE,
-                                        OPT_MFA_RESYNC, OPT_CAPS_ADD,
-                                        OPT_CAPS_RM};
+                                        OPT_ENDPOINT_CREATE, OPT_ENDPOINT_MODIFY,
+                                        OPT_ENDPOINT_RM, OPT_USER_SUSPEND,
+                                        OPT_SUBUSER_CREATE, OPT_SUBUSER_MODIFY,
+                                        OPT_SUBUSER_RM, OPT_BUCKET_LINK,
+                                        OPT_BUCKET_UNLINK, OPT_BUCKET_RESHARD,
+                                        OPT_BUCKET_RM, OPT_METADATA_PUT,
+                                        OPT_METADATA_RM, OPT_RESHARD_CANCEL,
+                                        OPT_RESHARD_ADD, OPT_MFA_CREATE,
+                                        OPT_MFA_REMOVE, OPT_MFA_RESYNC,
+                                        OPT_CAPS_ADD, OPT_CAPS_RM};
 
   bool print_warning_message = (non_master_ops_list.find(opt_cmd) != non_master_ops_list.end() &&
                                 non_master_cmd);
