@@ -1368,7 +1368,6 @@ OPTION(rgw_opa_verify_ssl, OPT_BOOL) // should we try to verify OPA's ssl
 OPTION(rgw_use_opa_authz, OPT_BOOL) // should we use OPA to authorize client requests?
 
 OPTION(rgw_ranger_url, OPT_STR)  // url for Ranger server
-OPTION(rgw_ranger_audit_url, OPT_STR)  // url for Ranger audit server
 OPTION(rgw_ranger_admin_user, OPT_STR)  // The Ranger admin user name to authenticate client requests
 OPTION(rgw_ranger_admin_password, OPT_STR)  // The Ranger admin user password to authenticate client requests
 OPTION(rgw_ranger_admin_password_path, OPT_STR)  // Path to a file containing the Ranger admin password
@@ -1381,6 +1380,7 @@ OPTION(rgw_ranger_cache_age, OPT_INT) // The age (in seconds) of cached ranger p
 OPTION(rgw_ranger_engine, OPT_STR) // Ranger integration engine type. One of 'native', 'jni'
 OPTION(rgw_ranger_jni_config_dir, OPT_STR) // The directory path to jni class files
 OPTION(rgw_ranger_jni_engine_jar, OPT_STR) // The file path to jni engine jar
+OPTION(rgw_ranger_audit_url, OPT_STR)  // url for Ranger audit server
 OPTION(rgw_ranger_audit_config_age, OPT_INT) // The age (in seconds) of ranger audit config
 OPTION(rgw_use_ranger_authz, OPT_BOOL) // should we use Ranger to authorize client requests?
 
