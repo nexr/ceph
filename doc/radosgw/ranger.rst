@@ -121,9 +121,6 @@ Apache atlas config example 2: jni ranger engine
   ## set ranger engine type
   rgw_ranger_engine = jni
 
-  ## make engine to use cached one when cache_update not occurs
-  rgw_ranger_use_cached_one_if_not_cache_updating = false
-
   ## ranger rest endpoint config
   rgw_ranger_url = http://192.168.80.61:6080
   rgw_ranger_verify_ssl = false
