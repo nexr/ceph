@@ -256,8 +256,8 @@ int main(int argc, const char **argv)
   // global_pre_init() is not invoked twice.
   // claim the reference and release it after subsequent destructors have fired
   auto cct = global_init(&defaults, args, CEPH_ENTITY_TYPE_CLIENT,
-                        CODE_ENVIRONMENT_DAEMON,
-                        flags, "rgw_data", false);
+                         CODE_ENVIRONMENT_DAEMON,
+                         flags, "rgw_data", false);
 
   // maintain existing region root pool for new multisite objects
   if (!g_conf()->rgw_region_root_pool.empty()) {
@@ -312,12 +312,12 @@ int main(int argc, const char **argv)
 
   RGWRados *store =
     RGWStoreManager::get_storage(g_ceph_context,
-                                g_conf()->rgw_enable_gc_threads,
-                                g_conf()->rgw_enable_lc_threads,
-                                g_conf()->rgw_enable_quota_threads,
-                                g_conf()->rgw_run_sync_thread,
-                                g_conf().get_val<bool>("rgw_dynamic_resharding"),
-                                g_conf()->rgw_cache_enabled);
+                                 g_conf()->rgw_enable_gc_threads,
+                                 g_conf()->rgw_enable_lc_threads,
+                                 g_conf()->rgw_enable_quota_threads,
+                                 g_conf()->rgw_run_sync_thread,
+                                 g_conf().get_val<bool>("rgw_dynamic_resharding"),
+                                 g_conf()->rgw_cache_enabled);
   if (!store) {
     mutex.Lock();
     init_timer.cancel_all_events();
@@ -335,7 +335,7 @@ int main(int argc, const char **argv)
 
   if (cct->_conf->rgw_use_ranger_authz) {
     prepare_cache_dir(cct.get());
-    init_global_ranger_manager(cct.get(), store, true);
+    init_global_ranger_manager(cct.get(), store);
   }
 
   rgw_rest_init(g_ceph_context, store, store->svc.zone->get_zonegroup());
@@ -363,7 +363,7 @@ int main(int argc, const char **argv)
 
   /* warn about insecure keystone secret config options */
   if (!(g_ceph_context->_conf->rgw_keystone_admin_token.empty() ||
-       g_ceph_context->_conf->rgw_keystone_admin_password.empty())) {
+        g_ceph_context->_conf->rgw_keystone_admin_password.empty())) {
     dout(0) << "WARNING: rgw_keystone_admin_token and rgw_keystone_admin_password should be avoided as they can expose secrets.  Prefer the new rgw_keystone_admin_token_path and rgw_keystone_admin_password_path options, which read their secrets from files." << dendl;
   }
 
@@ -459,8 +459,8 @@ int main(int argc, const char **argv)
   if (cct->_conf.get_val<std::string>("rgw_scheduler_type") == "dmclock" &&
       !cct->check_experimental_feature_enabled("dmclock")){
     derr << "dmclock scheduler type is experimental and needs to be"
-        << "set in the option enable experimental data corrupting features"
-        << dendl;
+         << "set in the option enable experimental data corrupting features"
+         << dendl;
     return EINVAL;
   }
 

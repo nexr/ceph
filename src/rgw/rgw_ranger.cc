@@ -8,14 +8,14 @@
 
 RGWRangerManager* rgw_rm = nullptr;
 
-void init_global_ranger_manager(CephContext* const cct, RGWRados* store, bool start_vm) {
+void init_global_ranger_manager(CephContext* const cct, RGWRados* store) {
   if (rgw_rm != nullptr) { return; }
 
   string ranger_engine = cct->_conf->rgw_ranger_engine;
 
   if (ranger_engine == "jni") {
     ldout(cct, 10) << __func__ << "(): Init global RGWRangerJniManager instance" << dendl;
-    rgw_rjm = new RGWRangerJniManager(cct, store, start_vm);
+    rgw_rjm = new RGWRangerJniManager(cct, store, true);
     rgw_rm  = (RGWRangerManager*) rgw_rjm;
   }
   else if (ranger_engine == "native") {

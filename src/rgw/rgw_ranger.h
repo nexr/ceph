@@ -286,7 +286,7 @@ public:
 
 extern RGWRangerJniManager* rgw_rjm;
 
-void init_global_ranger_manager(CephContext* const cct, RGWRados* store, bool start_vm = false);
+void init_global_ranger_manager(CephContext* const cct, RGWRados* store);
 void destroy_global_ranger_manager();
 
 /* authorize request using Ranger */
