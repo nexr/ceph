@@ -4880,7 +4880,7 @@ int main(int argc, const char **argv)
 
         RGWZoneParams zone(zone_id, zone_name);
         int ret = zone.init(g_ceph_context, store->svc.sysobj);
-              if (ret < 0) {
+        if (ret < 0) {
           cerr << "failed to init zone: " << cpp_strerror(-ret) << std::endl;
           return -ret;
         }
