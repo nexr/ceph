@@ -106,7 +106,7 @@ public:
       req_wq(this, g_conf()->rgw_op_thread_timeout,
 	     g_conf()->rgw_op_thread_suicide_timeout, &m_tp) {
   }
-  
+
   virtual ~RGWProcess() = default;
 
   virtual void run() = 0;
@@ -146,7 +146,7 @@ public:
                  RGWFrontendConfig* const conf)
     : RGWProcess(cct, pe, num_threads, conf),
       max_connections(num_threads + (num_threads >> 3)) {
-    
+
     if (cct->_conf->rgw_lineage_enable) {
       rgw_lineage_man.reset(new RGWLineageManager(cct));
     }
@@ -195,6 +195,7 @@ extern int process_request(RGWRados* store,
                            int* http_ret = nullptr);
 
 extern int rgw_process_authenticated(RGWHandler_REST* handler,
+                                     RGWRados* store,
                                      RGWOp*& op,
                                      RGWRequest* req,
                                      req_state* s,

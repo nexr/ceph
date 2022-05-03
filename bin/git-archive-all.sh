@@ -223,6 +223,8 @@ else
     pushd $TMPDIR > /dev/null
     $TARCMD \
         --exclude="src/pybind/mgr/dashboard/frontend/node_modules" \
+        --exclude="src/rgw/ranger/engine/nesRangerEngine.jar" \
+        --exclude="src/rgw/ranger/engine/target" \
         --exclude="RPMS"   \
         --exclude=".*.sw*" \
         --exclude="tags"   \
@@ -233,6 +235,7 @@ else
         --exclude="alpine/APKBUILD" \
         --exclude="*.tar.bz2" \
         --exclude="dashboard_frontend.tar" \
+        --exclude="nes_ranger_java_engine.tar" \
         -cf ./$OLD_PWD_BASE.$FORMAT $dir_prefix
 
     popd > /dev/null

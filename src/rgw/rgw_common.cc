@@ -122,6 +122,8 @@ rgw_http_errors rgw_http_s3_errors({
     { ERR_SERVICE_UNAVAILABLE, {503, "ServiceUnavailable"}},
     { ERR_RATE_LIMITED, {503, "SlowDown"}},
     { ERR_ZERO_IN_URL, {400, "InvalidRequest" }},
+    { ERR_NO_SUCH_USER_ENDPOINT, {404, "NoSuchUserEndpoint"}},
+    { ERR_USER_ENDPOINT_EXIST, {409, "UserEndpointAlreadyExists"}},
 });
 
 rgw_http_errors rgw_http_swift_errors({
@@ -181,7 +183,7 @@ is_err() const
 }
 
 // The requestURI transferred from the frontend can be abs_path or absoluteURI
-// If it is absoluteURI, we should adjust it to abs_path for the following 
+// If it is absoluteURI, we should adjust it to abs_path for the following
 // S3 authorization and some other processes depending on the requestURI
 // The absoluteURI can start with "http://", "https://", "ws://" or "wss://"
 static string get_abs_path(const string& request_uri) {
@@ -191,7 +193,7 @@ static string get_abs_path(const string& request_uri) {
     if (boost::algorithm::starts_with(request_uri, ABS_PREFIXS[i])) {
       isAbs = true;
       break;
-    } 
+    }
   }
   if (!isAbs) {  // it is not a valid absolute uri
     return request_uri;
@@ -734,7 +736,7 @@ string calc_hash_sha256_close_stream(SHA256 **phash)
 
   delete hash;
   *phash = NULL;
-  
+
   return std::string(hex_str);
 }
 
@@ -859,7 +861,7 @@ int NameVal::parse()
     val = str.substr(delim_pos + 1);
   }
 
-  return ret; 
+  return ret;
 }
 
 int RGWHTTPArgs::parse()
@@ -877,7 +879,7 @@ int RGWHTTPArgs::parse()
     int fpos = str.find('&', pos);
     if (fpos  < pos) {
        end = true;
-       fpos = str.size(); 
+       fpos = str.size();
     }
     std::string nameval = url_decode(str.substr(pos, fpos - pos), true);
     NameVal nv(std::move(nameval));
@@ -889,7 +891,7 @@ int RGWHTTPArgs::parse()
       append(name, val);
     }
 
-    pos = fpos + 1;  
+    pos = fpos + 1;
   }
 
   return 0;
@@ -939,6 +941,7 @@ void RGWHTTPArgs::append(const string& name, const string& val)
   } else if  ((name.compare("subuser") == 0) ||
               (name.compare("key") == 0) ||
               (name.compare("caps") == 0) ||
+              (name.compare("endpoint") == 0) ||
               (name.compare("index") == 0) ||
               (name.compare("policy") == 0) ||
               (name.compare("quota") == 0) ||
@@ -1151,7 +1154,7 @@ bool verify_user_permission(const DoutPrefixProvider* dpp,
   return verify_user_permission(dpp, s, s->user_acl.get(), s->iam_user_policies, res, op);
 }
 
-bool verify_user_permission_no_policy(const DoutPrefixProvider* dpp, 
+bool verify_user_permission_no_policy(const DoutPrefixProvider* dpp,
                                       struct req_state * const s,
                                       const int perm)
 {
@@ -1165,7 +1168,7 @@ bool verify_requester_payer_permission(struct req_state *s)
 
   if (s->auth.identity->is_owner_of(s->bucket_info.owner))
     return true;
-  
+
   if (s->auth.identity->is_anonymous()) {
     return false;
   }
@@ -1253,7 +1256,7 @@ bool verify_bucket_permission_no_policy(const DoutPrefixProvider* dpp, struct re
 
 bool verify_bucket_permission(const DoutPrefixProvider* dpp, struct req_state * const s, const uint64_t op)
 {
-  return verify_bucket_permission(dpp, 
+  return verify_bucket_permission(dpp,
                                   s,
                                   s->bucket,
                                   s->user_acl.get(),

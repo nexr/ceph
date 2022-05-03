@@ -68,6 +68,9 @@ GTAGS
 
 .vscode
 
+# ranger_java_engine
+/src/rgw/ranger/engine/java/target/
+
 # dashboard
 /src/pybind/mgr/dashboard/frontend/src/environments/environment.ts
 /src/pybind/mgr/dashboard/frontend/src/environments/environment.prod.ts

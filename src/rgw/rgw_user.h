@@ -77,7 +77,7 @@ extern int rgw_get_user_info_by_uid(RGWRados *store,
                                     const rgw_user& user_id,
                                     RGWUserInfo& info,
                                     RGWObjVersionTracker *objv_tracker = NULL,
-                                    real_time *pmtime                     = NULL,
+                                    real_time *pmtime                  = NULL,
                                     rgw_cache_entry_info *cache_info   = NULL,
                                     map<string, bufferlist> *pattrs    = NULL);
 /**
@@ -182,11 +182,15 @@ struct RGWUserAdminOpState {
 
   std::set<string> mfa_ids;
 
+  RGWUserEndpoint user_endpoint;
+  bool endp_enabled_specified = false;
+
   // operation attributes
   bool existing_user;
   bool existing_key;
   bool existing_subuser;
   bool existing_email;
+  bool endpoint_specified;
   bool subuser_specified;
   bool gen_secret;
   bool gen_access;
@@ -208,11 +212,11 @@ struct RGWUserAdminOpState {
   bool system_specified;
   bool key_op;
   bool temp_url_key_specified;
-  bool found_by_uid; 
-  bool found_by_email;  
+  bool found_by_uid;
+  bool found_by_email;
   bool found_by_key;
   bool mfa_ids_specified;
- 
+
   // req parameters
   bool populated;
   bool initialized;
@@ -401,12 +405,18 @@ struct RGWUserAdminOpState {
     mfa_ids_specified = true;
   }
 
+  void set_user_endpoint(const RGWUserEndpoint _user_endpoint) {
+    user_endpoint = _user_endpoint;
+    endpoint_specified = true;
+  }
+
   bool is_populated() { return populated; }
   bool is_initialized() { return initialized; }
   bool has_existing_user() { return existing_user; }
   bool has_existing_key() { return existing_key; }
   bool has_existing_subuser() { return existing_subuser; }
   bool has_existing_email() { return existing_email; }
+  bool has_endpoint() { return endpoint_specified; }
   bool has_subuser() { return subuser_specified; }
   bool has_key_op() { return key_op; }
   bool has_caps_op() { return caps_specified; }
@@ -438,6 +448,7 @@ struct RGWUserAdminOpState {
   RGWQuotaInfo& get_bucket_quota() { return bucket_quota; }
   RGWQuotaInfo& get_user_quota() { return user_quota; }
   set<string>& get_mfa_ids() { return mfa_ids; }
+  RGWUserEndpoint& get_user_endpoint() { return user_endpoint; }
 
   rgw_user& get_user_id() { return user_id; }
   std::string get_subuser() { return subuser; }
@@ -450,6 +461,7 @@ struct RGWUserAdminOpState {
 
   RGWUserInfo&  get_user_info() { return info; }
 
+  RGWUserEndpoints* get_user_endpoints() { return &info.endpoints; }
   map<std::string, RGWAccessKey> *get_swift_keys() { return &info.swift_keys; }
   map<std::string, RGWAccessKey> *get_access_keys() { return &info.access_keys; }
   map<std::string, RGWSubUser> *get_subusers() { return &info.subusers; }
@@ -507,6 +519,7 @@ struct RGWUserAdminOpState {
     existing_key = false;
     existing_subuser = false;
     existing_email = false;
+    endpoint_specified = false;
     subuser_specified = false;
     caps_specified = false;
     purge_keys = false;
@@ -648,6 +661,32 @@ public:
   friend class RGWUser;
 };
 
+class RGWUserEndpointPool
+{
+  RGWUserEndpoints* endpoints;
+  bool endpoints_allowed;
+  RGWUser *user;
+
+private:
+  int check_op(RGWUserAdminOpState& op_state, std::string *err_msg = NULL);
+
+  int add(RGWUserAdminOpState& op_state, std::string *err_msg, bool defer_save);
+  int remove(RGWUserAdminOpState& op_state, std::string *err_msg, bool defer_save);
+  int modify(RGWUserAdminOpState& op_state, std::string *err_msg, bool defer_save);
+
+public:
+  explicit RGWUserEndpointPool(RGWUser *user);
+  ~RGWUserEndpointPool() {};
+
+  int init(RGWUserAdminOpState& op_state);
+
+  int add(RGWUserAdminOpState& op_state, std::string *err_msg = NULL);
+  int remove(RGWUserAdminOpState& op_state, std::string *err_msg = NULL);
+  int modify(RGWUserAdminOpState& op_state, std::string *err_msg = NULL);
+
+  friend class RGWUser;
+};
+
 class RGWUser
 {
 
@@ -686,6 +725,7 @@ public:
   RGWRados *get_store() { return store; }
 
   /* API Contracted Members */
+  RGWUserEndpointPool endpoints;
   RGWUserCapPool caps;
   RGWAccessKeyPool keys;
   RGWSubUserPool subusers;
@@ -711,6 +751,7 @@ public:
   friend class RGWAccessKeyPool;
   friend class RGWSubUserPool;
   friend class RGWUserCapPool;
+  friend class RGWUserEndpointPool;
 };
 
 /* Wrappers for admin API functionality */
@@ -735,6 +776,19 @@ public:
 };
 
 class RGWUserAdminOp_Subuser
+{
+public:
+  static int create(RGWRados *store,
+                  RGWUserAdminOpState& op_state, RGWFormatterFlusher& flusher);
+
+  static int modify(RGWRados *store,
+                  RGWUserAdminOpState& op_state, RGWFormatterFlusher& flusher);
+
+  static int remove(RGWRados *store,
+                  RGWUserAdminOpState& op_state, RGWFormatterFlusher& flusher);
+};
+
+class RGWUserAdminOp_Endpoint
 {
 public:
   static int create(RGWRados *store,

@@ -306,6 +306,15 @@ If successful, the response contains the user information.
 :Type: Container
 :Parent: ``user``
 
+.. versionadded:: Apex (nes 1.1.1)
+
+``endpoints``
+
+:Description: User endpoints.
+:Type: Container
+:Parent: ``user``
+
+
 Special Error Responses
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -325,6 +334,10 @@ then it will be modified.
 
 A ``tenant`` may either be specified as a part of uid or as an additional
 request param.
+
+.. versionadded:: Apex (nes 1.1.1)
+
+A ``endpoint-xxx`` may either be specified as a part of user info.
 
 :caps: users=write
 
@@ -425,6 +438,58 @@ A tenant name may also specified as a part of ``uid``, by following the syntax
 :Example: tenant1
 :Required: No
 
+.. versionadded:: Apex (nes 1.1.1)
+
+``endpoint-type``
+
+:Description: type of user endpoint.
+:Type: string
+:Example: ranger
+:Required: No
+
+``endpoint-url``
+
+:Description: url of user endpoint.
+:Type: string
+:Example: http://1.2.3.4:100/v2
+:Required: No
+
+``endpoint-tenant``
+
+:Description: tenant name of user endpoint.
+:Type: string
+:Example: nes [nes]
+:Required: No
+
+``endpoint-admin``
+
+:Description: admin user name of user endpoint.
+:Type: string
+:Example: admin
+:Required: No
+
+``endpoint-admin-passwd``
+
+:Description: admin password of user endpoint.
+:Type: string
+:Example: admin
+:Required: No
+
+``endpoint-admin-passwd-path``
+
+:Description: admin password path of user endpoint.
+:Type: string
+:Example: /var/lib/ceph/pw
+:Required: No
+
+``endpoint-enabled``
+
+:Description: enable flag of user endpoint.
+:Type: bool
+:Example: True [True]
+:Required: No
+
+
 Response Entities
 ~~~~~~~~~~~~~~~~~
 
@@ -488,6 +553,15 @@ If successful, the response contains the user information.
 :Description: User capabilities.
 :Type: Container
 :Parent: ``user``
+
+.. versionadded:: Apex (nes 1.1.1)
+
+``endpoints``
+
+:Description: User endpoints.
+:Type: Container
+:Parent: ``user``
+
 
 Special Error Responses
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -622,6 +696,58 @@ Request Parameters
 :Example: False [False]
 :Required: No
 
+.. versionadded:: Apex (nes 1.1.1)
+
+``endpoint-type``
+
+:Description: type of user endpoint.
+:Type: string
+:Example: ranger
+:Required: No
+
+``endpoint-url``
+
+:Description: url of user endpoint.
+:Type: string
+:Example: http://1.2.3.4:100/v2
+:Required: No
+
+``endpoint-tenant``
+
+:Description: tenant name of user endpoint.
+:Type: string
+:Example: nes [nes]
+:Required: No
+
+``endpoint-admin``
+
+:Description: admin user name of user endpoint.
+:Type: string
+:Example: admin
+:Required: No
+
+``endpoint-admin-passwd``
+
+:Description: admin password of user endpoint.
+:Type: string
+:Example: admin
+:Required: No
+
+``endpoint-admin-passwd-path``
+
+:Description: admin password path of user endpoint.
+:Type: string
+:Example: /var/lib/ceph/pw
+:Required: No
+
+``endpoint-enabled``
+
+:Description: enable flag of user endpoint.
+:Type: bool
+:Example: True [True]
+:Required: No
+
+
 Response Entities
 ~~~~~~~~~~~~~~~~~
 
@@ -683,6 +809,14 @@ If successful, the response contains the user information.
 ``caps``
 
 :Description: User capabilities.
+:Type: Container
+:Parent: ``user``
+
+.. versionadded:: Apex (nes 1.1.1)
+
+``endpoints``
+
+:Description: User endpoints.
 :Type: Container
 :Parent: ``user``
 
@@ -1215,6 +1349,360 @@ None.
 Response Entities
 ~~~~~~~~~~~~~~~~~
 
+None.
+
+.. _radosgw_adminops_user_endpoints:
+Create Endpoint
+==============
+
+.. versionadded:: Apex (nes 1.1.1)
+Create a new endpoint for user to communicate with specific external system.
+
+:caps: users=write
+
+Syntax
+~~~~~~
+
+::
+
+	PUT /{admin}/user?endpoint&format=json HTTP/1.1
+	Host {fqdn}
+
+
+Request Parameters
+~~~~~~~~~~~~~~~~~~
+
+``uid``
+
+:Description: The user ID under which a endpoint is to be created.
+:Type: String
+:Example: ``foo_user``
+:Required: Yes
+
+``endpoint-type``
+
+:Description: Specify the type of external systems to bind with user. ex)
+:Type: String
+:Example: ``ranger``, ``atlas``, E.T.C
+:Required: Yes
+
+``endpoint-url``
+
+:Description: Specify URL to communicating with external systems.
+:Type: String
+:Example: ``http://1.2.3.4:100/v2``
+:Required: No
+
+``endpoint-admin``
+
+:Description: Specify admin user name to authenticate as.
+:Type: String
+:Example: ``admin``
+:Required: No
+
+``endpoint-admin-passwd``
+
+:Description: Specify admin user password to authenticate as.
+:Type: String
+:Example: ``admin``
+:Required: No
+
+``endpoint-admin-passwd-path``
+
+:Description: Specify path of file containing admin user password.
+              this override ``endpoint-admin-passwd``.
+:Type: String
+:Example: ``/var/lib/ceph/pw``
+:Required: No
+
+``endpoint-tenant``
+
+:Description: Specify tenant name used when accessing external systems.
+:Type: String
+:Example: ``nes`` [``nes``]
+:Required: No
+
+``endpoint-enabled``
+
+:Description: Decide whether to use endpoint information.
+:Type: Boolean
+:Example: True [True]
+:Required: No
+
+Response Entities
+~~~~~~~~~~~~~~~~~
+
+If successful, the response contains the subuser information.
+
+
+``endpoints``
+
+:Description: User endpoints associated with the user account.
+:Type: Container
+
+``type``
+
+:Description: Endpoint type.
+:Type: String
+:Parent: ``endpoints``
+
+``enabled``
+
+:Description: Endpoint enable flag.
+:Type: Boolean
+:Parent: ``endpoints``
+
+``url``
+
+:Description: Endpoint url.
+:Type: String
+:Parent: ``endpoints``
+
+``tenant``
+
+:Description: Endpoint tenant name.
+:Type: String
+:Parent: ``endpoints``
+
+``admin_user``
+
+:Description: Endpoint admin user name.
+:Type: String
+:Parent: ``endpoints``
+
+``admin_password``
+
+:Description: Endpoint admin user password.
+:Type: String
+:Parent: ``endpoints``
+
+``admin_password_path``
+
+:Description: Endpoint admin user password file path.
+:Type: String
+:Parent: ``endpoints``
+
+
+Special Error Responses
+~~~~~~~~~~~~~~~~~~~~~~~
+
+``NoSuchUser``
+
+:Description: Invalid key type specified.
+:Code: 404 Not Found
+
+``UserEndpointAlreadyExists``
+
+:Description: Specified endpoint exists.
+:Code: 409 Conflict
+
+``InvalidArgument``
+
+:Description: Invalid argument specified.
+:Code: 400 Bad Request
+
+``InvalidAccess``
+
+:Description: Invalid access specified.
+:Code: 400 Bad Request
+
+Modify Endpoint
+==============
+
+.. versionadded:: Apex (nes 1.1.1)
+Modify an existing endpoint
+
+:caps: users=write
+
+Syntax
+~~~~~~
+
+::
+
+	POST /{admin}/user?endpoint&format=json HTTP/1.1
+	Host {fqdn}
+
+
+Request Parameters
+~~~~~~~~~~~~~~~~~~
+
+``uid``
+
+:Description: The user ID under which a endpoint is to be created.
+:Type: String
+:Example: ``foo_user``
+:Required: Yes
+
+``endpoint-type``
+
+:Description: Specify the type of external systems to bind with user. ex)
+:Type: String
+:Example: ``ranger``, ``atlas``, E.T.C
+:Required: Yes
+
+``endpoint-url``
+
+:Description: Specify URL to communicating with external systems.
+:Type: String
+:Example: ``http://1.2.3.4:100/v2``
+:Required: No
+
+``endpoint-admin``
+
+:Description: Specify admin user name to authenticate as.
+:Type: String
+:Example: ``admin``
+:Required: No
+
+``endpoint-admin-passwd``
+
+:Description: Specify admin user password to authenticate as.
+:Type: String
+:Example: ``admin``
+:Required: No
+
+``endpoint-admin-passwd-path``
+
+:Description: Specify path of file containing admin user password.
+              this override ``endpoint-admin-passwd``.
+:Type: String
+:Example: ``/var/lib/ceph/pw``
+:Required: No
+
+``endpoint-tenant``
+
+:Description: Specify tenant name used when accessing external systems.
+:Type: String
+:Example: ``nes`` [``nes``]
+:Required: No
+
+``endpoint-enabled``
+
+:Description: Decide whether to use endpoint information.
+:Type: Boolean
+:Example: True [True]
+:Required: No
+
+Response Entities
+~~~~~~~~~~~~~~~~~
+
+If successful, the response contains the subuser information.
+
+
+``endpoints``
+
+:Description: User endpoints associated with the user account.
+:Type: Container
+
+``type``
+
+:Description: Endpoint type.
+:Type: String
+:Parent: ``endpoints``
+
+``enabled``
+
+:Description: Endpoint enable flag.
+:Type: Boolean
+:Parent: ``endpoints``
+
+``url``
+
+:Description: Endpoint url.
+:Type: String
+:Parent: ``endpoints``
+
+``tenant``
+
+:Description: Endpoint tenant name.
+:Type: String
+:Parent: ``endpoints``
+
+``admin_user``
+
+:Description: Endpoint admin user name.
+:Type: String
+:Parent: ``endpoints``
+
+``admin_password``
+
+:Description: Endpoint admin user password.
+:Type: String
+:Parent: ``endpoints``
+
+``admin_password_path``
+
+:Description: Endpoint admin user password file path.
+:Type: String
+:Parent: ``endpoints``
+
+
+Special Error Responses
+~~~~~~~~~~~~~~~~~~~~~~~
+
+``NoSuchUser``
+
+:Description: Invalid key type specified.
+:Code: 404 Not Found
+
+``NoSuchUserEndpoint``
+
+:Description: Specified endpoint exists.
+:Code: 404 Not Found
+
+``InvalidArgument``
+
+:Description: Invalid argument specified.
+:Code: 400 Bad Request
+
+``InvalidAccess``
+
+:Description: Invalid access specified.
+:Code: 400 Bad Request
+
+
+Remove Endpoint
+===============
+
+.. versionadded:: Apex (nes 1.1.1)
+Remove an existing endpoint
+
+:caps: users=write
+
+Syntax
+~~~~~~
+
+::
+
+	DELETE /{admin}/user?endpoint&format=json HTTP/1.1
+	Host {fqdn}
+
+
+Request Parameters
+~~~~~~~~~~~~~~~~~~
+
+``uid``
+
+:Description: The user ID under which a endpoint is to be created.
+:Type: String
+:Example: ``foo_user``
+:Required: Yes
+
+``endpoint-type``
+
+:Description: Specify the type of external systems to bind with user. ex)
+:Type: String
+:Example: ``ranger``, ``atlas``, E.T.C
+:Required: Yes
+
+
+Response Entities
+~~~~~~~~~~~~~~~~~
+
+None.
+
+Special Error Responses
+~~~~~~~~~~~~~~~~~~~~~~~
 None.
 
 Get Bucket Info
@@ -1967,7 +2455,7 @@ Binding libraries
  - `QuentinPerez/go-radosgw`_
 
 ``Java``
- 
+
  - `twonote/radosgw-admin4j`_
 
 ``Python``

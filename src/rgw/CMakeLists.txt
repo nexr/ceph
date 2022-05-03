@@ -178,6 +178,16 @@ set(rgw_a_srcs
   rgw_sts.cc
   rgw_rest_sts.cc)
 
+list(APPEND rgw_a_srcs rgw_ranger.h
+  rgw_ranger.cc
+  rgw_ranger_native.cc
+  rgw_ranger_jni.cc)
+
+install(DIRECTORY
+  ranger
+  DESTINATION ${CEPH_INSTALL_DATADIR}/rgw
+  REGEX "\\..+\\.sw*" EXCLUDE)
+
 list(APPEND rgw_a_srcs rgw_lineage_interfaces.h
   rgw_lineage.cc
   rgw_lineage_atlas.cc
@@ -206,8 +216,11 @@ add_library(rgw_a STATIC
 
 add_dependencies(rgw_a civetweb_h)
 
+find_package(JNI REQUIRED)
+
 target_include_directories(rgw_a PUBLIC "${CMAKE_SOURCE_DIR}/src/dmclock/support/src")
 target_include_directories(rgw_a SYSTEM PUBLIC "../rapidjson/include")
+target_include_directories(rgw_a PRIVATE ${JNI_INCLUDE_DIRS})
 
 target_link_libraries(rgw_a
   PRIVATE
@@ -217,7 +230,8 @@ target_link_libraries(rgw_a
   ${CURL_LIBRARIES}
   ${EXPAT_LIBRARIES}
   ${OPENLDAP_LIBRARIES} ${CRYPTO_LIBS}
-  OATH::OATH)
+  OATH::OATH
+  ${JNI_LIBRARIES})
 
 if(WITH_CURL_OPENSSL)
   # used by rgw_http_client_curl.cc
@@ -266,6 +280,9 @@ if(WITH_RADOSGW_BEAST_FRONTEND AND WITH_RADOSGW_BEAST_OPENSSL)
 endif()
 
 add_executable(radosgw rgw_main.cc)
+
+target_include_directories(radosgw PUBLIC ${JNI_INCLUDE_DIRS})
+
 target_link_libraries(radosgw radosgw_a librados
   cls_rgw_client cls_otp_client cls_lock_client cls_refcount_client
   cls_log_client cls_timeindex_client

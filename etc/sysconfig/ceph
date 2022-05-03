@@ -6,12 +6,14 @@
 # Increase tcmalloc cache size
 TCMALLOC_MAX_TOTAL_THREAD_CACHE_BYTES=134217728
 
+LD_LIBRARY_PATH=/usr/lib/jvm/jre/lib/amd64/server:/usr/lib/jvm/jre/lib/amd64:/usr/lib/jvm/jre/lib:/usr/lib/jvm/jre/lib/server
+
 ## automatically restart systemd units on upgrade
 #
 # By default, it is left to the administrator to restart
 # ceph daemons (or their related systemd units) manually
 # when the 'ceph' package is upgraded. By setting this
-# parameter to "yes", package upgrade will trigger a 
+# parameter to "yes", package upgrade will trigger a
 # "systemctl try-restart" on all the ceph systemd units
 # currently active on the node.
 #

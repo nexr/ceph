@@ -1,4 +1,4 @@
-// -*- mode:C++; tab-width:8; c-basic-offset:2; indent-tabs-mode:t -*- 
+// -*- mode:C++; tab-width:8; c-basic-offset:2; indent-tabs-mode:t -*-
 // vim: ts=8 sw=2 smarttab
 
 /*
@@ -9,9 +9,9 @@
  *
  * This is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
- * License version 2.1, as published by the Free Software 
+ * License version 2.1, as published by the Free Software
  * Foundation.  See file COPYING.
- * 
+ *
  */
 
 #ifndef CEPH_RGW_COMMON_H
@@ -219,6 +219,8 @@ using ceph::crypto::MD5;
 #define ERR_NO_SUCH_CORS_CONFIGURATION 2045
 #define ERR_NO_SUCH_OBJECT_LOCK_CONFIGURATION  2046
 #define ERR_INVALID_RETENTION_PERIOD 2047
+#define ERR_NO_SUCH_USER_ENDPOINT 2060
+#define ERR_USER_ENDPOINT_EXIST  2061
 #define ERR_USER_SUSPENDED       2100
 #define ERR_INTERNAL_ERROR       2200
 #define ERR_NOT_IMPLEMENTED      2201
@@ -539,6 +541,127 @@ enum RGWOpType {
 class RGWAccessControlPolicy;
 class JSONObj;
 
+struct RGWUserEndpoint {
+  string type;
+  string url;
+  bool use_ssl;
+  string tenant;
+  string admin_user;
+  string admin_passwd;
+  string admin_passwd_path;
+  bool enabled;
+
+  RGWUserEndpoint() {
+    type = "";
+    url = "";
+    use_ssl = false;
+    tenant = "";
+    admin_user = "";
+    admin_passwd = "";
+    admin_passwd_path = "";
+    enabled = true;
+  }
+
+  RGWUserEndpoint(string _type,
+                  string _url,
+                  string _tenant,
+                  string _user,
+                  string _passwd,
+                  string _passwd_path,
+                  bool _enabled = true)
+  {
+    type = _type;
+    set_url(_url);
+    tenant = _tenant;
+    admin_user = _user;
+
+    admin_passwd = _passwd;
+    admin_passwd_path = _passwd_path;
+
+    enabled = _enabled;
+  }
+
+  void encode(bufferlist& bl) const {
+    ENCODE_START(1, 1, bl);
+    encode(type, bl);
+    encode(url, bl);
+    encode(use_ssl, bl);
+    encode(tenant, bl);
+    encode(admin_user, bl);
+    encode(admin_passwd, bl);
+    encode(admin_passwd_path, bl);
+    encode(enabled, bl);
+    ENCODE_FINISH(bl);
+  }
+
+  void decode(bufferlist::const_iterator& bl) {
+    DECODE_START_LEGACY_COMPAT_LEN_32(1, 1, 1, bl);
+    decode(type, bl);
+    decode(url, bl);
+    decode(use_ssl, bl);
+    decode(tenant, bl);
+    decode(admin_user, bl);
+    decode(admin_passwd, bl);
+    decode(admin_passwd_path, bl);
+    decode(enabled, bl);
+    DECODE_FINISH(bl);
+  }
+
+  void dump(Formatter *f) const;
+
+  void set_type(string _type) { type = _type; }
+  void set_url(string _url) {
+    url = _url;
+    use_ssl = boost::algorithm::starts_with(_url, "https://");
+  }
+  void set_tenant(string _tenant) { tenant = _tenant; }
+  void set_admin_user(string _user) { admin_user = _user; }
+  void set_admin_passwd(string _passwd) { admin_passwd = _passwd; }
+  void set_admin_passwd_path(string _path) { admin_passwd_path = _path; }
+  void set_enabled(bool flag) { enabled = flag; }
+};
+WRITE_CLASS_ENCODER(RGWUserEndpoint)
+void encode_json(const char *name, const RGWUserEndpoint& val, ceph::Formatter *f);
+
+struct RGWUserEndpoints {
+  map<string, RGWUserEndpoint> endps;
+
+  using iterator = map<string,RGWUserEndpoint>::iterator;
+  using const_iterator = map<string,RGWUserEndpoint>::const_iterator;
+
+  void encode(bufferlist& bl) const {
+    ENCODE_START(1, 1, bl);
+    encode(endps, bl);
+    ENCODE_FINISH(bl);
+  }
+
+  void decode(bufferlist::const_iterator& bl) {
+    DECODE_START_LEGACY_COMPAT_LEN_32(1, 1, 1, bl);
+    decode(endps, bl);
+    DECODE_FINISH(bl);
+  }
+
+  void add(RGWUserEndpoint endp) { endps[endp.type] = endp; }
+  void remove(string type) { endps.erase(type); }
+  RGWUserEndpoint* const get(string type) {
+    if (endps.count(type) > 0) {
+      return &(endps[type]);
+    }
+    else {
+      return nullptr;
+    }
+  }
+
+  int size() const { return endps.size(); }
+  bool empty() const { return endps.empty(); }
+  iterator begin() { return endps.begin(); }
+  const_iterator begin() const { return endps.begin(); }
+  iterator end() { return endps.end(); }
+  const_iterator end() const { return endps.end(); }
+};
+WRITE_CLASS_ENCODER(RGWUserEndpoints)
+void encode_json(const char *name, const RGWUserEndpoints& val, ceph::Formatter *f);
+
 struct RGWAccessKey {
   string id; // AccessKey
   string key; // SecretKey
@@ -696,7 +819,7 @@ struct rgw_placement_rule {
   const string& get_storage_class() const {
     return get_canonical_storage_class(storage_class);
   }
-  
+
   int compare(const rgw_placement_rule& r) const {
     int c = name.compare(r.name);
     if (c != 0) {
@@ -724,7 +847,7 @@ struct rgw_placement_rule {
     std::string s;
     ceph::decode(s, bl);
     from_str(s);
-  } 
+  }
 
   std::string to_str() const {
     if (standard_storage_class()) {
@@ -782,6 +905,7 @@ struct RGWUserInfo
   uint32_t type;
   set<string> mfa_ids;
   string assumed_role_arn;
+  RGWUserEndpoints endpoints;
 
   RGWUserInfo()
     : suspended(0),
@@ -804,7 +928,7 @@ struct RGWUserInfo
   }
 
   void encode(bufferlist& bl) const {
-     ENCODE_START(21, 9, bl);
+     ENCODE_START(22, 9, bl);
      encode((uint64_t)0, bl); // old auid
      string access_key;
      string secret_key;
@@ -847,16 +971,17 @@ struct RGWUserInfo
      encode(type, bl);
      encode(mfa_ids, bl);
      encode(assumed_role_arn, bl);
+     encode(endpoints, bl);
      ENCODE_FINISH(bl);
   }
   void decode(bufferlist::const_iterator& bl) {
-     DECODE_START_LEGACY_COMPAT_LEN_32(20, 9, 9, bl);
-     if (struct_v >= 2) {
-       uint64_t old_auid;
-       decode(old_auid, bl);
-     }
-     string access_key;
-     string secret_key;
+    DECODE_START_LEGACY_COMPAT_LEN_32(22, 9, 9, bl);
+    if (struct_v >= 2) {
+      uint64_t old_auid;
+      decode(old_auid, bl);
+    }
+    string access_key;
+    string secret_key;
     decode(access_key, bl);
     decode(secret_key, bl);
     if (struct_v < 6) {
@@ -930,6 +1055,9 @@ struct RGWUserInfo
     }
     if (struct_v >= 21) {
       decode(assumed_role_arn, bl);
+    }
+    if (struct_v >= 22) {
+      decode(endpoints, bl);
     }
     DECODE_FINISH(bl);
   }
@@ -1360,7 +1488,7 @@ enum RGWBucketIndexType {
   RGWBIType_Indexless = 1,
 };
 
-inline ostream& operator<<(ostream& out, const RGWBucketIndexType &index_type) 
+inline ostream& operator<<(ostream& out, const RGWBucketIndexType &index_type)
 {
   switch (index_type) {
     case RGWBIType_Normal:

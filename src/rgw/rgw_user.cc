@@ -86,7 +86,7 @@ int rgw_user_sync_all_stats(RGWRados *store, const rgw_user& user_id)
       RGWQuotaInfo bucket_quota;
       ret = store->check_bucket_shards(bucket_info, bucket_info.bucket, bucket_quota);
       if (ret < 0) {
-	ldout(cct, 0) << "ERROR in check_bucket_shards: " << cpp_strerror(-ret)<< dendl;
+        ldout(cct, 0) << "ERROR in check_bucket_shards: " << cpp_strerror(-ret)<< dendl;
       }
     }
   } while (is_truncated);
@@ -227,7 +227,7 @@ int rgw_store_user_info(RGWRados *store,
     for (; iter != info.access_keys.end(); ++iter) {
       RGWAccessKey& k = iter->second;
       if (old_info && old_info->access_keys.count(iter->first) != 0)
-	continue;
+        continue;
 
       ret = rgw_put_system_obj(store, store->svc.zone->get_zone_params().user_keys_pool, k.id,
                                link_bl, exclusive, NULL, real_time());
@@ -500,7 +500,7 @@ int rgw_delete_user(RGWRados *store, RGWUserInfo& info, RGWObjVersionTracker& ob
 
   string key;
   info.user_id.to_str(key);
-  
+
   rgw_raw_obj uid_obj(store->svc.zone->get_zone_params().user_uid_pool, key);
   ldout(store->ctx(), 10) << "removing user index: " << info.user_id << dendl;
   ret = store->meta_mgr->remove_entry(user_meta_handler, key, &objv_tracker);
@@ -774,6 +774,9 @@ static void dump_user_info(Formatter *f, RGWUserInfo &info,
   if (stats) {
     encode_json("stats", *stats, f);
   }
+
+  encode_json("endpoints", info.endpoints, f);
+
   f->close_section();
 }
 
@@ -919,7 +922,7 @@ int RGWAccessKeyPool::check_op(RGWUserAdminOpState& op_state,
   op_state.set_key_type(key_type);
 
   /* see if the access key was specified */
-  if (key_type == KEY_TYPE_S3 && !op_state.will_gen_access() && 
+  if (key_type == KEY_TYPE_S3 && !op_state.will_gen_access() &&
       op_state.get_access_key().empty()) {
     set_err_msg(err_msg, "empty access key");
     return -ERR_INVALID_ACCESS_KEY;
@@ -990,7 +993,7 @@ int RGWAccessKeyPool::generate_key(RGWUserAdminOpState& op_state, std::string *e
       set_err_msg(err_msg, "empty secret key");
       return -ERR_INVALID_SECRET_KEY;
     }
-  
+
     key = op_state.get_secret_key();
   } else {
     char secret_key_buf[SECRET_KEY_LEN + 1];
@@ -1161,7 +1164,7 @@ int RGWAccessKeyPool::add(RGWUserAdminOpState& op_state, std::string *err_msg)
 
 int RGWAccessKeyPool::add(RGWUserAdminOpState& op_state, std::string *err_msg, bool defer_user_update)
 {
-  int ret; 
+  int ret;
   std::string subprocess_msg;
 
   ret = check_op(op_state, &subprocess_msg);
@@ -1460,7 +1463,7 @@ int RGWSubUserPool::add(RGWUserAdminOpState& op_state, std::string *err_msg, boo
   if (key_type == KEY_TYPE_S3 && op_state.get_access_key().empty()) {
     op_state.set_gen_access();
   }
-  
+
   if (op_state.get_secret_key().empty()) {
     op_state.set_gen_secret();
   }
@@ -1724,7 +1727,192 @@ int RGWUserCapPool::remove(RGWUserAdminOpState& op_state, std::string *err_msg, 
   return 0;
 }
 
-RGWUser::RGWUser() : store(NULL), info_stored(false), caps(this), keys(this), subusers(this)
+RGWUserEndpointPool::RGWUserEndpointPool(RGWUser *usr)
+{
+  user = usr;
+
+  endpoints_allowed = false;
+}
+
+int RGWUserEndpointPool::init(RGWUserAdminOpState& op_state)
+{
+  if (!op_state.is_initialized()) {
+    endpoints_allowed = false;
+    return -EINVAL;
+  }
+
+  rgw_user& uid = op_state.get_user_id();
+  if (uid.compare(RGW_USER_ANON_ID) == 0) {
+    endpoints_allowed = false;
+    return -EACCES;
+  }
+
+  endpoints = op_state.get_user_endpoints();
+
+  endpoints_allowed = true;
+
+  return 0;
+}
+
+int RGWUserEndpointPool::add(RGWUserAdminOpState& op_state, std::string *err_msg, bool defer_save) {
+  int ret = 0;
+
+  std::string subprocess_msg;
+
+  ret = check_op(op_state, &subprocess_msg);
+  if (ret < 0) {
+    set_err_msg(err_msg, "unable to parse request, " + subprocess_msg);
+    return ret;
+  }
+
+  endpoints->add(op_state.get_user_endpoint());
+
+  if (!defer_save)
+    ret = user->update(op_state, err_msg);
+
+  if (ret < 0)
+    return ret;
+
+  return 0;
+}
+
+int RGWUserEndpointPool::add(RGWUserAdminOpState& op_state, std::string *err_msg)
+{
+  return add(op_state, err_msg, false);
+}
+
+int RGWUserEndpointPool::remove(RGWUserAdminOpState& op_state, std::string *err_msg, bool defer_save) {
+  int ret = 0;
+
+  std::string subprocess_msg;
+
+  ret = check_op(op_state, &subprocess_msg);
+  if (ret < 0) {
+    set_err_msg(err_msg, "unable to parse request, " + subprocess_msg);
+    return ret;
+  }
+
+  RGWUserEndpoint op_endp = op_state.get_user_endpoint();
+  endpoints->remove(op_endp.type);
+
+  if (!defer_save)
+    ret = user->update(op_state, err_msg);
+
+  if (ret < 0)
+    return ret;
+
+  return 0;
+}
+
+int RGWUserEndpointPool::remove(RGWUserAdminOpState& op_state, std::string *err_msg)
+{
+  return remove(op_state, err_msg, false);
+}
+
+int RGWUserEndpointPool::modify(RGWUserAdminOpState& op_state, std::string *err_msg, bool defer_save) {
+  int ret = 0;
+
+  std::string subprocess_msg;
+
+  ret = check_op(op_state, &subprocess_msg);
+  if (ret < 0) {
+    set_err_msg(err_msg, "unable to parse request, " + subprocess_msg);
+    return ret;
+  }
+
+  RGWUserEndpoint op_endp = op_state.get_user_endpoint();
+  string endp_type = op_endp.type;
+
+  if (endp_type[0] == '-') {
+    op_state.user_endpoint.set_type(endp_type.substr(1));
+    remove(op_state, &subprocess_msg, defer_save);
+    if (ret < 0) {
+      set_err_msg(err_msg, "unable to remove endpoint, " + subprocess_msg);
+      return ret;
+    }
+
+    return 0;
+  }
+
+  RGWUserEndpoint* user_endp = endpoints->get(endp_type);
+  if (user_endp == nullptr) {
+    add(op_state, &subprocess_msg, defer_save);
+    if (ret < 0) {
+      set_err_msg(err_msg, "unable to create endpoint, " + subprocess_msg);
+      return ret;
+    }
+
+    return 0;
+  }
+
+  string op_url = op_endp.url;
+  if (!op_url.empty()) {
+    user_endp->set_url((op_url == "-") ? "" : op_url);
+  }
+
+  string op_tenant = op_endp.tenant;
+  if (!op_tenant.empty()) {
+    user_endp->set_tenant((op_tenant == "-") ? "" : op_tenant);
+  }
+
+  string op_admin_user = op_endp.admin_user;
+  if (!op_admin_user.empty()) {
+    user_endp->set_admin_user((op_admin_user == "-") ? "" : op_admin_user);
+  }
+
+  string op_admin_passwd = op_endp.admin_passwd;
+  if (!op_admin_passwd.empty()) {
+    user_endp->set_admin_passwd((op_admin_passwd == "-") ? "" : op_admin_passwd);
+  }
+
+  string op_admin_passwd_path = op_endp.admin_passwd_path;
+  if (!op_admin_passwd_path.empty()) {
+    user_endp->set_admin_passwd_path((op_admin_passwd_path == "-") ? "" : op_admin_passwd_path);
+  }
+
+  if (op_state.endp_enabled_specified) {
+    user_endp->set_enabled(op_endp.enabled);
+  }
+
+  if (!defer_save)
+    ret = user->update(op_state, err_msg);
+
+  if (ret < 0)
+    return ret;
+
+  return 0;
+}
+
+int RGWUserEndpointPool::modify(RGWUserAdminOpState& op_state, std::string *err_msg)
+{
+  return modify(op_state, err_msg, false);
+}
+
+int RGWUserEndpointPool::check_op(RGWUserAdminOpState& op_state, std::string *err_msg)
+{
+  if (!op_state.is_populated()) {
+    set_err_msg(err_msg, "user info was not populated");
+    return -EINVAL;
+  }
+
+  if (!endpoints_allowed) {
+    set_err_msg(err_msg, "endpoints not allowed for this user");
+    return -EACCES;
+  }
+
+  RGWUserEndpoint* op_endp = &(op_state.get_user_endpoint());
+
+  if (op_endp->type.empty()) {
+    set_err_msg(err_msg, "empty endpoint type");
+    return -EINVAL;
+  }
+
+  return 0;
+}
+
+
+RGWUser::RGWUser() : store(NULL), info_stored(false),
+                     endpoints(this), caps(this), keys(this), subusers(this)
 {
   init_default();
 }
@@ -1767,6 +1955,7 @@ int RGWUser::init_storage(RGWRados *storage)
   clear_populated();
 
   /* API wrappers */
+  endpoints = RGWUserEndpointPool(this);
   keys = RGWAccessKeyPool(this);
   caps = RGWUserCapPool(this);
   subusers = RGWSubUserPool(this);
@@ -1819,13 +2008,14 @@ int RGWUser::init(RGWUserAdminOpState& op_state)
     found = (rgw_get_user_info_by_access_key(store, access_key, user_info, &op_state.objv) >= 0);
     op_state.found_by_key = found;
   }
-  
+
   op_state.set_existing_user(found);
   if (found) {
     op_state.set_user_info(user_info);
     op_state.set_populated();
 
     old_info = user_info;
+
     set_populated();
   }
 
@@ -1845,6 +2035,10 @@ int RGWUser::init(RGWUserAdminOpState& op_state)
 int RGWUser::init_members(RGWUserAdminOpState& op_state)
 {
   int ret = 0;
+
+  ret = endpoints.init(op_state);
+  if (ret < 0)
+    return ret;
 
   ret = keys.init(op_state);
   if (ret < 0)
@@ -1984,7 +2178,7 @@ int RGWUser::execute_add(RGWUserAdminOpState& op_state, std::string *err_msg)
     return -EINVAL;
   }
 
-		
+
   // set the user info
   user_id = uid;
   user_info.user_id = user_id;
@@ -2053,6 +2247,14 @@ int RGWUser::execute_add(RGWUserAdminOpState& op_state, std::string *err_msg)
     ret = caps.add(op_state, &subprocess_msg, defer_user_update);
     if (ret < 0) {
       set_err_msg(err_msg, "unable to add user capabilities, " + subprocess_msg);
+      return ret;
+    }
+  }
+
+  if (op_state.has_endpoint()) {
+    ret = endpoints.add(op_state, &subprocess_msg, defer_user_update);
+    if (ret < 0) {
+      set_err_msg(err_msg, "unable to add user endpoints, " + subprocess_msg);
       return ret;
     }
   }
@@ -2293,6 +2495,7 @@ int RGWUser::execute_modify(RGWUserAdminOpState& op_state, std::string *err_msg)
   if (op_state.mfa_ids_specified) {
     user_info.mfa_ids = op_state.mfa_ids;
   }
+
   op_state.set_user_info(user_info);
 
   // if we're supposed to modify keys, do so
@@ -2302,6 +2505,14 @@ int RGWUser::execute_modify(RGWUserAdminOpState& op_state, std::string *err_msg)
       set_err_msg(err_msg, "unable to create or modify keys, " + subprocess_msg);
       return ret;
     }
+  }
+
+  if (op_state.has_endpoint()) {
+		endpoints.modify(op_state, &subprocess_msg, true);
+		if (ret < 0) {
+			set_err_msg(err_msg, "unable to create or modify endpoint, " + subprocess_msg + to_string(ret));
+			return ret;
+		}
   }
 
   ret = update(op_state, err_msg);
@@ -2607,7 +2818,7 @@ int RGWUserAdminOp_Subuser::modify(RGWRados *store, RGWUserAdminOpState& op_stat
   ret = user.info(info, NULL);
   if (ret < 0)
     return ret;
- 
+
   if (formatter) {
     flusher.start(0);
 
@@ -2762,6 +2973,121 @@ int RGWUserAdminOp_Caps::remove(RGWRados *store, RGWUserAdminOpState& op_state,
   return 0;
 }
 
+int RGWUserAdminOp_Endpoint::create(RGWRados *store, RGWUserAdminOpState& op_state,
+                  RGWFormatterFlusher& flusher)
+{
+  RGWUserInfo info;
+  RGWUser user;
+  int ret = user.init(store, op_state);
+  if (ret < 0)
+    return ret;
+
+  if (!op_state.has_existing_user())
+    return -ERR_NO_SUCH_USER;
+
+  RGWUserEndpoints* endps = op_state.get_user_endpoints();
+  RGWUserEndpoint* found_endp = endps->get(op_state.user_endpoint.type);
+  if (found_endp != nullptr) {
+    return -ERR_USER_ENDPOINT_EXIST;
+  }
+
+  Formatter *formatter = flusher.get_formatter();
+
+  ret = user.endpoints.add(op_state, NULL);
+  if (ret < 0)
+    return ret;
+
+  ret = user.info(info, NULL);
+  if (ret < 0)
+    return ret;
+
+  if (formatter) {
+    flusher.start(0);
+
+    encode_json("endpoints", info.endpoints, formatter);
+    flusher.flush();
+  }
+
+  return 0;
+}
+
+int RGWUserAdminOp_Endpoint::modify(RGWRados *store, RGWUserAdminOpState& op_state,
+                  RGWFormatterFlusher& flusher)
+{
+  RGWUserInfo info;
+  RGWUser user;
+  int ret = user.init(store, op_state);
+  if (ret < 0)
+    return ret;
+
+  if (!op_state.has_existing_user())
+    return -ERR_NO_SUCH_USER;
+
+  RGWUserEndpoints* endps = op_state.get_user_endpoints();
+  RGWUserEndpoint* found_endp = endps->get(op_state.user_endpoint.type);
+  if (found_endp == nullptr) {
+    return -ERR_NO_SUCH_USER_ENDPOINT;
+  }
+
+  Formatter *formatter = flusher.get_formatter();
+
+  ret = user.endpoints.modify(op_state, NULL);
+  if (ret < 0)
+    return ret;
+
+  ret = user.info(info, NULL);
+  if (ret < 0)
+    return ret;
+
+  if (formatter) {
+    flusher.start(0);
+
+    encode_json("endpoints", info.endpoints, formatter);
+    flusher.flush();
+  }
+
+  return 0;
+}
+
+int RGWUserAdminOp_Endpoint::remove(RGWRados *store, RGWUserAdminOpState& op_state,
+                  RGWFormatterFlusher& flusher)
+{
+  RGWUserInfo info;
+  RGWUser user;
+  int ret = user.init(store, op_state);
+  if (ret < 0)
+    return ret;
+
+  if (!op_state.has_existing_user())
+    return -ERR_NO_SUCH_USER;
+
+  RGWUserEndpoints* endps = op_state.get_user_endpoints();
+  RGWUserEndpoint* found_endp = endps->get(op_state.user_endpoint.type);
+  if (found_endp == nullptr) {
+    return -ERR_NO_SUCH_USER_ENDPOINT;
+  }
+
+  Formatter *formatter = flusher.get_formatter();
+
+  ret = user.endpoints.remove(op_state, NULL);
+  if (ret < 0)
+    return ret;
+
+  ret = user.info(info, NULL);
+  if (ret < 0)
+    return ret;
+
+  if (formatter) {
+    flusher.start(0);
+
+    encode_json("endpoints", info.endpoints, formatter);
+    flusher.flush();
+  }
+
+  return 0;
+}
+
+
 struct RGWUserCompleteInfo {
   RGWUserInfo info;
   map<string, bufferlist> attrs;
@@ -2910,7 +3236,7 @@ public:
     int ret = store->list_raw_objects_next(no_filter, max, info->ctx,
                                            unfiltered_keys, truncated);
     if (ret < 0 && ret != -ENOENT)
-      return ret;		        
+      return ret;
     if (ret == -ENOENT) {
       if (truncated)
         *truncated = false;

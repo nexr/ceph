@@ -1367,6 +1367,23 @@ OPTION(rgw_opa_token, OPT_STR)  // Bearer token OPA uses to authenticate client 
 OPTION(rgw_opa_verify_ssl, OPT_BOOL) // should we try to verify OPA's ssl
 OPTION(rgw_use_opa_authz, OPT_BOOL) // should we use OPA to authorize client requests?
 
+OPTION(rgw_ranger_url, OPT_STR)  // url for Ranger server
+OPTION(rgw_ranger_admin_user, OPT_STR)  // The Ranger admin user name to authenticate client requests
+OPTION(rgw_ranger_admin_password, OPT_STR)  // The Ranger admin user password to authenticate client requests
+OPTION(rgw_ranger_admin_password_path, OPT_STR)  // Path to a file containing the Ranger admin password
+OPTION(rgw_ranger_tenant, OPT_STR)  // The ranger tenant name for nes
+OPTION(rgw_ranger_verify_ssl, OPT_BOOL) // should we try to verify Ranger's ssl
+OPTION(rgw_ranger_cache_dir, OPT_STR) // The directory path to save cached ranger policies
+OPTION(rgw_ranger_cache_update_interval, OPT_INT) // The interval (in seconds) to update cached ranger policy
+OPTION(rgw_ranger_use_cached_one_if_not_cache_updating, OPT_BOOL) // If it's true, rgw use cached policy when cache update is not needed
+OPTION(rgw_ranger_cache_age, OPT_INT) // The age (in seconds) of cached ranger policy. If 0, cache eviction becomes diabled
+OPTION(rgw_ranger_engine, OPT_STR) // Ranger integration engine type. One of 'native', 'jni'
+OPTION(rgw_ranger_jni_config_dir, OPT_STR) // The directory path to jni class files
+OPTION(rgw_ranger_jni_engine_jar, OPT_STR) // The file path to jni engine jar
+OPTION(rgw_ranger_audit_url, OPT_STR)  // url for Ranger audit server
+OPTION(rgw_ranger_audit_config_age, OPT_INT) // The age (in seconds) of ranger audit config
+OPTION(rgw_use_ranger_authz, OPT_BOOL) // should we use Ranger to authorize client requests?
+
 /* OpenLDAP-style LDAP parameter strings */
 /* rgw_ldap_uri  space-separated list of LDAP servers in URI format */
 OPTION(rgw_ldap_uri, OPT_STR)

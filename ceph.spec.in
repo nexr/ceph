@@ -462,6 +462,7 @@ Requires:       python%{_python_buildid}-bcrypt
 Requires:       python%{_python_buildid}-pecan
 Requires:       python%{_python_buildid}-requests
 Requires:       python%{_python_buildid}-six
+Requires:       python%{_python_buildid}-xmltodict
 %if 0%{?fedora} || 0%{?rhel}
 Requires:       python%{_python_buildid}-cherrypy
 Requires:       python%{_python_buildid}-werkzeug
@@ -647,6 +648,8 @@ Requires:	ceph-selinux = %{_epoch_prefix}%{version}-%{release}
 %endif
 Requires:	librados2 = %{_epoch_prefix}%{version}-%{release}
 Requires:	librgw2 = %{_epoch_prefix}%{version}-%{release}
+Requires:	librgw2 = %{_epoch_prefix}%{version}-%{release}
+Requires:	java
 %if 0%{?rhel} || 0%{?fedora}
 Requires:	mailcap
 %endif
@@ -1601,6 +1604,7 @@ fi
 %{_datadir}/ceph/mgr/localpool
 %{_datadir}/ceph/mgr/mgr_module.*
 %{_datadir}/ceph/mgr/mgr_util.*
+%{_datadir}/ceph/mgr/objstore_usersync
 %{_datadir}/ceph/mgr/orchestrator_cli
 %{_datadir}/ceph/mgr/orchestrator.*
 %{_datadir}/ceph/mgr/osd_perf_query
