@@ -40,7 +40,7 @@ ceph 오브젝트 스토리지의 사용자 목록을 조회하여 상황에 맞
   ## if 'ranger' in sync_target, ranger usersync config
 
   # ranger connection config
-  $ ceph config set mgr mgr/objstore_usersync/ranger_rest_url <ranger url> # ex) http[s]://x.x.x.x:yy/service
+  $ ceph config set mgr mgr/objstore_usersync/ranger_rest_url <ranger url> # ex) http[s]://x.x.x.x:yy
   $ ceph config set mgr mgr/objstore_usersync/ranger_rest_admin_user <ranger admin user name>
   ## choose one of bellow two password config.
   $ ceph config set mgr mgr/objstore_usersync/ranger_rest_admin_password <ranger admin password>
