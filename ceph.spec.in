@@ -1279,7 +1279,7 @@ install -m 0644 -D etc/sysconfig/ceph %{buildroot}%{_sysconfdir}/sysconfig/ceph
 %if 0%{?suse_version}
 install -m 0644 -D etc/sysconfig/ceph %{buildroot}%{_fillupdir}/sysconfig.%{name}
 %endif
-install -m 0644 -D etc/pofile.d/librados.sh %{buildroot}%{_sysconfdir}/pofile.d/librados.sh
+install -m 0644 -D etc/profile.d/librados.sh %{buildroot}%{_sysconfdir}/profile.d/librados.sh
 install -m 0644 -D systemd/ceph.tmpfiles.d %{buildroot}%{_tmpfilesdir}/ceph-common.conf
 install -m 0644 -D systemd/50-ceph.preset %{buildroot}%{_libexecdir}/systemd/system-preset/50-ceph.preset
 mkdir -p %{buildroot}%{_sbindir}
