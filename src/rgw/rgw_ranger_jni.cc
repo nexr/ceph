@@ -260,11 +260,10 @@ RGWRangerJniThread::RGWRangerJniThread(CephContext* const _cct, RGWRangerJniMana
 }
 
 bool RGWRangerJniThread::reserve() {
-  static std::mutex local_lock;
   ldout(cct, 2) << __func__ << "(): try to reserve ranger_jni thread (tid = " << get_thread_id() << ")" << dendl;
-  if (local_lock.try_lock()) {
+
+  if (reserved == false) {
     reserved = true;
-    local_lock.unlock();
     return true;
   }
   else {
