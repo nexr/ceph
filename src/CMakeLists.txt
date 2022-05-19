@@ -606,6 +606,10 @@ install(PROGRAMS
   DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/init.d
   RENAME ceph)
 
+install(DIRECTORY
+  ${CMAKE_SOURCE_DIR}/profile.d
+  DESTINATION ${CMAKE_INSTALL_SYSCONFDIR})
+
 install(FILES
   ${CMAKE_SOURCE_DIR}/share/id_rsa_drop.ceph.com
   ${CMAKE_SOURCE_DIR}/share/id_rsa_drop.ceph.com.pub

@@ -649,7 +649,6 @@ Requires:	ceph-selinux = %{_epoch_prefix}%{version}-%{release}
 Requires:	librados2 = %{_epoch_prefix}%{version}-%{release}
 Requires:	librgw2 = %{_epoch_prefix}%{version}-%{release}
 Requires:	librgw2 = %{_epoch_prefix}%{version}-%{release}
-Requires:	java
 %if 0%{?rhel} || 0%{?fedora}
 Requires:	mailcap
 %endif
@@ -696,6 +695,7 @@ Group:		System/Libraries
 %if 0%{?rhel} || 0%{?fedora}
 Obsoletes:	ceph-libs < %{_epoch_prefix}%{version}-%{release}
 %endif
+Requires:	java
 %description -n librados2
 RADOS is a reliable, autonomic distributed object storage cluster
 developed as part of the Ceph distributed storage system. This is a
@@ -1992,8 +1992,11 @@ fi
 %{_libdir}/librados_tp.so.*
 %endif
 %dir %{_sysconfdir}/ceph
+%{_sysconfdir}/profile.d/librados.sh
 
-%post -n librados2 -p /sbin/ldconfig
+%post -n librados2
+/sbin/ldconfig
+source %{_sysconfdir}/profile.d/librados.sh
 
 %postun -n librados2 -p /sbin/ldconfig
 
