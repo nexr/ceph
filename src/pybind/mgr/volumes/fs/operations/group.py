@@ -6,8 +6,9 @@ from contextlib import contextmanager
 import cephfs
 
 from .snapshot_util import mksnap, rmsnap
+from .pin_util import pin
 from .template import GroupTemplate
-from ..fs_util import listdir, get_ancestor_xattr
+from ..fs_util import listdir, listsnaps, get_ancestor_xattr
 from ..exception import VolumeException
 
 log = logging.getLogger(__name__)
@@ -61,6 +62,9 @@ class Group(GroupTemplate):
                 return []
             raise
 
+    def pin(self, pin_type, pin_setting):
+        return pin(self.fs, self.path, pin_type, pin_setting)
+
     def create_snapshot(self, snapname):
         snappath = os.path.join(self.path,
                                 self.vol_spec.snapshot_dir_prefix.encode('utf-8'),
@@ -77,7 +81,7 @@ class Group(GroupTemplate):
         try:
             dirpath = os.path.join(self.path,
                                    self.vol_spec.snapshot_dir_prefix.encode('utf-8'))
-            return listdir(self.fs, dirpath)
+            return listsnaps(self.fs, self.vol_spec, dirpath, filter_inherited_snaps=True)
         except VolumeException as ve:
             if ve.errno == -errno.ENOENT:
                 return []
@@ -176,3 +180,11 @@ def open_group(fs, vol_spec, groupname):
         else:
             raise VolumeException(-e.args[0], e.args[1])
     yield group
+
+@contextmanager
+def open_group_unique(fs, vol_spec, groupname, c_group, c_groupname):
+    if groupname == c_groupname:
+        yield c_group
+    else:
+        with open_group(fs, vol_spec, groupname) as group:
+            yield group

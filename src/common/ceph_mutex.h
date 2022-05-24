@@ -3,6 +3,9 @@
 
 #pragma once
 
+#include <utility>
+#include "common/containers.h"
+
 // What and why
 // ============
 //
@@ -11,7 +14,7 @@
 // and make_recursive_mutex() factory methods, which take a string
 // naming the mutex for the purposes of the lockdep debug variant.
 
-#ifdef WITH_SEASTAR
+#if defined(WITH_SEASTAR) && !defined(WITH_ALIEN)
 
 namespace ceph {
   // an empty class satisfying the mutex concept
@@ -25,8 +28,14 @@ namespace ceph {
     void unlock_shared() {}
   };
 
+  struct dummy_shared_mutex : dummy_mutex {
+    void lock_shared() {}
+    void unlock_shared() {}
+  };
+
   using mutex = dummy_mutex;
   using recursive_mutex = dummy_mutex;
+  using shared_mutex = dummy_shared_mutex;
   // in seastar, we should use a difference interface for enforcing the
   // semantics of condition_variable
 
@@ -40,11 +49,16 @@ namespace ceph {
     return {};
   }
 
+  template <typename ...Args>
+  shared_mutex make_shared_mutex(Args&& ...args) {
+    return {};
+  }
+
   #define ceph_mutex_is_locked(m) true
   #define ceph_mutex_is_locked_by_me(m) true
 }
 
-#else  // WITH_SEASTAR
+#else  // defined (WITH_SEASTAR) && !defined(WITH_ALIEN)
 //
 // For legacy Mutex users that passed recursive=true, use
 // ceph::make_recursive_mutex.  For legacy Mutex users that passed
@@ -140,3 +154,21 @@ namespace ceph {
 #endif	// CEPH_DEBUG_MUTEX
 
 #endif	// WITH_SEASTAR
+
+namespace ceph {
+
+template <class LockT,
+          class LockFactoryT>
+ceph::containers::tiny_vector<LockT> make_lock_container(
+  const std::size_t num_instances,
+  LockFactoryT&& lock_factory)
+{
+  return {
+    num_instances, [&](const std::size_t i, auto emplacer) {
+      // this will be called `num_instances` times
+      new (emplacer.data()) LockT {lock_factory(i)};
+    }
+  };
+}
+} // namespace ceph
+

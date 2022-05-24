@@ -7,11 +7,12 @@ overrides:
         ms inject delay type: osd
         ms inject internal delays: 0.002
         ms inject socket failures: 2500
+        mon client directed command retry: 5
 tasks:
 - install: null
 - ceph:
     fs: xfs
-    log-whitelist:
+    log-ignorelist:
       - overall HEALTH_
       - \(OSDMAP_FLAGS\)
       - \(OSD_

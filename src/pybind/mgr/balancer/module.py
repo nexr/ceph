@@ -48,16 +48,32 @@ class MappingState:
             return float(misplaced) / float(num)
         return 0.0
 
-class Plan:
-    def __init__(self, name, ms, pools):
-        self.mode = 'unknown'
+class Plan(object):
+    def __init__(self, name, mode, osdmap, pools):
         self.name = name
-        self.initial = ms
+        self.mode = mode
+        self.osdmap = osdmap
+        self.osdmap_dump = osdmap.dump()
         self.pools = pools
-
         self.osd_weights = {}
         self.compat_ws = {}
-        self.inc = ms.osdmap.new_incremental()
+        self.inc = osdmap.new_incremental()
+        self.pg_status = {}
+
+    def dump(self) -> str:
+        return json.dumps(self.inc.dump(), indent=4, sort_keys=True)
+
+    def show(self) -> str:
+        return 'upmap plan'
+
+
+class MsPlan(Plan):
+    """
+    Plan with a preloaded MappingState member.
+    """
+    def __init__(self, name, mode, ms, pools):
+        super(MsPlan, self).__init__(name, mode, ms.osdmap, pools)
+        self.initial = ms
 
     def final_state(self):
         self.inc.set_osd_reweights(self.osd_weights)
@@ -67,10 +83,7 @@ class Plan:
                             self.initial.raw_pool_stats,
                             'plan %s final' % self.name)
 
-    def dump(self):
-        return json.dumps(self.inc.dump(), indent=4)
-
-    def show(self):
+    def show(self) -> str:
         ls = []
         ls.append('# starting osdmap epoch %d' % self.initial.osdmap.get_epoch())
         ls.append('# starting crush version %d' %
@@ -143,6 +156,8 @@ class Eval:
         for t in ('pgs', 'objects', 'bytes'):
             if total[t] == 0:
                 r[t] = {
+                    'max': 0,
+                    'min': 0,
                     'avg': 0,
                     'stddev': 0,
                     'sum_weight': 0,
@@ -191,6 +206,8 @@ class Eval:
             stddev = math.sqrt(dev / float(max(num - 1, 1)))
             score = score / max(sum_weight, 1)
             r[t] = {
+                'max': max(count[t].values()),
+                'min': min(count[t].values()),
                 'avg': avg,
                 'stddev': stddev,
                 'sum_weight': sum_weight,
@@ -292,10 +309,10 @@ class Module(MgrModule):
             'runtime': True,
         },
         {
-            'name': 'upmap_max_iterations',
+            'name': 'upmap_max_optimizations',
             'type': 'uint',
             'default': 10,
-            'desc': 'maximum upmap optimization iterations',
+            'desc': 'maximum upmap optimizations to make per attempt',
             'runtime': True,
         },
         {
@@ -416,7 +433,7 @@ class Module(MgrModule):
         self.event = Event()
 
     def handle_command(self, inbuf, command):
-        self.log.warn("Handling command: '%s'" % str(command))
+        self.log.warning("Handling command: '%s'" % str(command))
         if command['prefix'] == 'balancer status':
             s = {
                 'plans': list(self.plans.keys()),
@@ -426,7 +443,7 @@ class Module(MgrModule):
                 'optimize_result': self.optimize_result,
                 'mode': self.get_module_option('mode'),
             }
-            return (0, json.dumps(s, indent=4), '')
+            return (0, json.dumps(s, indent=4, sort_keys=True), '')
         elif command['prefix'] == 'balancer mode':
             if command['mode'] == 'upmap':
                 min_compat_client = self.get_osdmap().dump().get('require_min_compat_client', '')
@@ -458,7 +475,7 @@ class Module(MgrModule):
             return (0, '', '')
         elif command['prefix'] == 'balancer pool ls':
             pool_ids = self.get_module_option('pool_ids')
-            if pool_ids is '':
+            if pool_ids == '':
                 return (0, '', '')
             pool_ids = pool_ids.split(',')
             pool_ids = [int(p) for p in pool_ids]
@@ -474,7 +491,7 @@ class Module(MgrModule):
                     should_prune = True
             if should_prune: # some pools were gone, prune
                 self.set_module_option('pool_ids', ','.join(final_ids))
-            return (0, json.dumps(final_names, indent=4), '')
+            return (0, json.dumps(sorted(final_names), indent=4, sort_keys=True), '')
         elif command['prefix'] == 'balancer pool add':
             raw_names = command['pools']
             pool_id_by_name = dict((p['pool_name'], p['pool']) for p in self.get_osdmap().dump().get('pools', []))
@@ -484,7 +501,7 @@ class Module(MgrModule):
             to_add = [str(pool_id_by_name[p]) for p in raw_names if p in pool_id_by_name]
             existing = self.get_module_option('pool_ids')
             final = to_add
-            if existing is not '':
+            if existing != '':
                 existing = existing.split(',')
                 final = set(to_add) | set(existing)
             self.set_module_option('pool_ids', ','.join(final))
@@ -492,7 +509,7 @@ class Module(MgrModule):
         elif command['prefix'] == 'balancer pool rm':
             raw_names = command['pools']
             existing = self.get_module_option('pool_ids')
-            if existing is '': # for idempotence
+            if existing == '': # for idempotence
                 return (0, '', '')
             existing = existing.split(',')
             osdmap = self.get_osdmap()
@@ -519,7 +536,19 @@ class Module(MgrModule):
                     ms = MappingState(osdmap, self.get("pg_stats"), self.get("pool_stats"), 'pool "%s"' % option)
                 else:
                     pools = plan.pools
-                    ms = plan.final_state()
+                    if plan.mode == 'upmap':
+                        # Note that for upmap, to improve the efficiency,
+                        # we use a basic version of Plan without keeping the obvious
+                        # *redundant* MS member.
+                        # Hence ms might not be accurate here since we are basically
+                        # using an old snapshotted osdmap vs a fresh copy of pg_stats.
+                        # It should not be a big deal though..
+                        ms = MappingState(plan.osdmap,
+                                          self.get("pg_stats"),
+                                          self.get("pool_stats"),
+                                          'plan "%s"' % plan.name)
+                    else:
+                        ms = plan.final_state()
             else:
                 ms = MappingState(self.get_osdmap(),
                                   self.get("pg_stats"),
@@ -564,7 +593,7 @@ class Module(MgrModule):
             self.plans = {}
             return (0, '', '')
         elif command['prefix'] == 'balancer ls':
-            return (0, json.dumps([p for p in self.plans], indent=4), '')
+            return (0, json.dumps([p for p in self.plans], indent=4, sort_keys=True), '')
         elif command['prefix'] == 'balancer dump':
             plan = self.plans.get(command['plan'])
             if not plan:
@@ -640,7 +669,7 @@ class Module(MgrModule):
                 osdmap = self.get_osdmap()
                 allow = self.get_module_option('pool_ids')
                 final = []
-                if allow is not '':
+                if allow != '':
                     allow = allow.split(',')
                     valid = [str(p['pool']) for p in osdmap.dump().get('pools', [])]
                     final = set(allow) & set(valid)
@@ -668,12 +697,21 @@ class Module(MgrModule):
             self.event.clear()
 
     def plan_create(self, name, osdmap, pools):
-        plan = Plan(name,
-                    MappingState(osdmap,
-                                 self.get("pg_stats"),
-                                 self.get("pool_stats"),
-                                 'plan %s initial' % name),
-                    pools)
+        mode = self.get_module_option('mode')
+        if mode == 'upmap':
+            # drop unnecessary MS member for upmap mode.
+            # this way we could effectively eliminate the usage of a
+            # complete pg_stats, which can become horribly inefficient
+            # as pg_num grows..
+            plan = Plan(name, mode, osdmap, pools)
+        else:
+            plan = MsPlan(name,
+                          mode,
+                          MappingState(osdmap,
+                                       self.get("pg_stats"),
+                                       self.get("pool_stats"),
+                                       'plan %s initial' % name),
+                          pools)
         return plan
 
     def plan_rm(self, name):
@@ -892,8 +930,7 @@ class Module(MgrModule):
 
     def optimize(self, plan):
         self.log.info('Optimize plan %s' % plan.name)
-        plan.mode = self.get_module_option('mode')
-        max_misplaced = float(self.get_ceph_option('target_max_misplaced_ratio'))
+        max_misplaced = self.get_ceph_option('target_max_misplaced_ratio')
         self.log.info('Mode %s, max misplaced %f' %
                       (plan.mode, max_misplaced))
 
@@ -902,6 +939,7 @@ class Module(MgrModule):
         degraded = info.get('degraded_ratio', 0.0)
         inactive = info.get('inactive_pgs_ratio', 0.0)
         misplaced = info.get('misplaced_ratio', 0.0)
+        plan.pg_status = info
         self.log.debug('unknown %f degraded %f inactive %f misplaced %g',
                        unknown, degraded, inactive, misplaced)
         if unknown > 0.0:
@@ -934,18 +972,17 @@ class Module(MgrModule):
                 detail = 'Unrecognized mode %s' % plan.mode
                 self.log.info(detail)
                 return -errno.EINVAL, detail
-        ##
 
     def do_upmap(self, plan):
         self.log.info('do_upmap')
-        max_iterations = self.get_module_option('upmap_max_iterations')
+        max_optimizations = self.get_module_option('upmap_max_optimizations')
         max_deviation = self.get_module_option('upmap_max_deviation')
+        osdmap_dump = plan.osdmap_dump
 
-        ms = plan.initial
         if len(plan.pools):
             pools = plan.pools
         else: # all
-            pools = [str(i['pool_name']) for i in ms.osdmap_dump.get('pools',[])]
+            pools = [str(i['pool_name']) for i in osdmap_dump.get('pools',[])]
         if len(pools) == 0:
             detail = 'No pools available'
             self.log.info(detail)
@@ -957,8 +994,7 @@ class Module(MgrModule):
         adjusted_pools = []
         inc = plan.inc
         total_did = 0
-        left = max_iterations
-        osdmap_dump = self.get_osdmap().dump()
+        left = max_optimizations
         pools_with_pg_merge = [p['pool_name'] for p in osdmap_dump.get('pools', [])
                                if p['pg_num'] > p['pg_num_target']]
         crush_rule_by_pool_name = dict((p['pool_name'], p['crush_rule']) for p in osdmap_dump.get('pools', []))
@@ -972,13 +1008,31 @@ class Module(MgrModule):
             adjusted_pools.append(pool)
         # shuffle so all pools get equal (in)attention
         random.shuffle(adjusted_pools)
+        pool_dump = osdmap_dump.get('pools', [])
         for pool in adjusted_pools:
-            did = ms.osdmap.calc_pg_upmaps(inc, max_deviation, left, [pool])
+            for p in pool_dump:
+                if p['pool_name'] == pool:
+                    pool_id = p['pool']
+                    break
+
+            # note that here we deliberately exclude any scrubbing pgs too
+            # since scrubbing activities have significant impacts on performance
+            num_pg_active_clean = 0
+            for p in plan.pg_status.get('pgs_by_pool_state', []):
+                pgs_pool_id = p['pool_id']
+                if pgs_pool_id != pool_id:
+                    continue
+                for s in p['pg_state_counts']:
+                    if s['state_name'] == 'active+clean':
+                        num_pg_active_clean += s['count']
+                        break
+            available = min(left, num_pg_active_clean)
+            did = plan.osdmap.calc_pg_upmaps(inc, max_deviation, available, [pool])
             total_did += did
             left -= did
             if left <= 0:
                 break
-        self.log.info('prepared %d/%d changes' % (total_did, max_iterations))
+        self.log.info('prepared %d/%d changes' % (total_did, max_optimizations))
         if total_did == 0:
             return -errno.EALREADY, 'Unable to find further optimization, ' \
                                     'or pool(s) pg_num is decreasing, ' \
@@ -993,7 +1047,7 @@ class Module(MgrModule):
         step = self.get_module_option('crush_compat_step')
         if step <= 0 or step >= 1.0:
             return -errno.EINVAL, '"crush_compat_step" must be in (0, 1)'
-        max_misplaced = float(self.get_ceph_option('target_max_misplaced_ratio'))
+        max_misplaced = self.get_ceph_option('target_max_misplaced_ratio')
         min_pg_per_osd = 2
 
         ms = plan.initial
@@ -1046,7 +1100,7 @@ class Module(MgrModule):
         metrics = self.get_module_option('crush_compat_metrics').split(',')
         key = metrics[0] # balancing using the first score metric
         if key not in ['pgs', 'bytes', 'objects']:
-            self.log.warn("Invalid crush_compat balancing key %s. Using 'pgs'." % key)
+            self.log.warning("Invalid crush_compat balancing key %s. Using 'pgs'." % key)
             key = 'pgs'
 
         # go
@@ -1180,8 +1234,13 @@ class Module(MgrModule):
                                 'change balancer mode and retry might help'
 
     def get_compat_weight_set_weights(self, ms):
-        if not CRUSHMap.have_default_choose_args(ms.crush_dump):
+        have_choose_args = CRUSHMap.have_default_choose_args(ms.crush_dump)
+        if have_choose_args:
+            # get number of buckets in choose_args
+            choose_args_len = len(CRUSHMap.get_default_choose_args(ms.crush_dump))
+        if not have_choose_args or choose_args_len != len(ms.crush_dump['buckets']):
             # enable compat weight-set first
+            self.log.debug('no choose_args or all buckets do not have weight-sets')
             self.log.debug('ceph osd crush weight-set create-compat')
             result = CommandResult('')
             self.send_command(result, 'mon', '', json.dumps({
@@ -1282,11 +1341,23 @@ class Module(MgrModule):
 
         # upmap
         incdump = plan.inc.dump()
-        for pgid in incdump.get('old_pg_upmap_items', []):
-            self.log.info('ceph osd rm-pg-upmap-items %s', pgid)
+        for item in incdump.get('new_pg_upmap', []):
+            self.log.info('ceph osd pg-upmap %s mappings %s', item['pgid'],
+                          item['osds'])
             result = CommandResult('foo')
             self.send_command(result, 'mon', '', json.dumps({
-                'prefix': 'osd rm-pg-upmap-items',
+                'prefix': 'osd pg-upmap',
+                'format': 'json',
+                'pgid': item['pgid'],
+                'id': item['osds'],
+            }), 'foo')
+            commands.append(result)
+
+        for pgid in incdump.get('old_pg_upmap', []):
+            self.log.info('ceph osd rm-pg-upmap %s', pgid)
+            result = CommandResult('foo')
+            self.send_command(result, 'mon', '', json.dumps({
+                'prefix': 'osd rm-pg-upmap',
                 'format': 'json',
                 'pgid': pgid,
             }), 'foo')
@@ -1304,6 +1375,16 @@ class Module(MgrModule):
                 'format': 'json',
                 'pgid': item['pgid'],
                 'id': osdlist,
+            }), 'foo')
+            commands.append(result)
+
+        for pgid in incdump.get('old_pg_upmap_items', []):
+            self.log.info('ceph osd rm-pg-upmap-items %s', pgid)
+            result = CommandResult('foo')
+            self.send_command(result, 'mon', '', json.dumps({
+                'prefix': 'osd rm-pg-upmap-items',
+                'format': 'json',
+                'pgid': pgid,
             }), 'foo')
             commands.append(result)
 

@@ -41,7 +41,7 @@ int KeyRing::from_ceph_context(CephContext *cct)
     if (ret < 0)
       lderr(cct) << "failed to load " << filename
 		 << ": " << cpp_strerror(ret) << dendl;
-  } else {
+  } else if (conf->key.empty() && conf->keyfile.empty()) {
     lderr(cct) << "unable to find a keyring on " << conf->keyring
 	       << ": " << cpp_strerror(ret) << dendl;
   }
@@ -81,11 +81,6 @@ int KeyRing::from_ceph_context(CephContext *cct)
   }
 
   return ret;
-}
-
-KeyRing *KeyRing::create_empty()
-{
-  return new KeyRing();
 }
 
 int KeyRing::set_modifier(const char *type,
@@ -165,15 +160,12 @@ void KeyRing::decode_plaintext(bufferlist::const_iterator& bli)
   bufferlist bl;
   bli.copy_all(bl);
   ConfFile cf;
-  std::deque<std::string> parse_errors;
 
-  if (cf.parse_bufferlist(&bl, &parse_errors, NULL) != 0) {
+  if (cf.parse_bufferlist(&bl, nullptr) != 0) {
     throw buffer::malformed_input("cannot parse buffer");
   }
 
-  for (ConfFile::const_section_iter_t s = cf.sections_begin();
-	    s != cf.sections_end(); ++s) {
-    string name = s->first;
+  for (auto& [name, section] : cf) {
     if (name == "global")
       continue;
 
@@ -185,17 +177,16 @@ void KeyRing::decode_plaintext(bufferlist::const_iterator& bli)
       throw buffer::malformed_input(oss.str().c_str());
     }
 
-    for (ConfSection::const_line_iter_t l = s->second.lines.begin();
-	 l != s->second.lines.end(); ++l) {
-      if (l->key.empty())
+    for (auto& [k, val] : section) {
+      if (k.empty())
         continue;
-      string k(l->key);
-      std::replace(k.begin(), k.end(), '_', ' ');
-      ret = set_modifier(k.c_str(), l->val.c_str(), ename, caps);
+      string key;
+      std::replace_copy(k.begin(), k.end(), back_inserter(key), '_', ' ');
+      ret = set_modifier(key.c_str(), val.c_str(), ename, caps);
       if (ret < 0) {
 	ostringstream oss;
-	oss << "error setting modifier for [" << name << "] type=" << k
-	    << " val=" << l->val;
+	oss << "error setting modifier for [" << name << "] type=" << key
+	    << " val=" << val;
 	throw buffer::malformed_input(oss.str().c_str());
       }
     }

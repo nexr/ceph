@@ -17,7 +17,7 @@
  *
  *     http://www.ssrc.ucsc.edu/Papers/weil-sc06.pdf
  *
- * LGPL2.1
+ * LGPL-2.1 or LGPL-3.0
  */
 
 
@@ -540,7 +540,7 @@ struct crush_work_bucket {
 	__u32 perm_x; /* @x for which *perm is defined */
 	__u32 perm_n; /* num elements of *perm that are permuted/defined */
 	__u32 *perm;  /* Permutation of the bucket's items */
-};
+} __attribute__ ((packed));
 
 struct crush_work {
 	struct crush_work_bucket **work; /* Per-bucket working store */

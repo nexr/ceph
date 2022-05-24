@@ -79,6 +79,7 @@ void SessionMap::dump()
 	     << " state " << p->second->get_state_name()
 	     << " completed " << p->second->info.completed_requests
 	     << " prealloc_inos " << p->second->info.prealloc_inos
+	     << " delegated_inos " << p->second->delegated_inos
 	     << " used_inos " << p->second->info.used_inos
 	     << dendl;
 }
@@ -570,25 +571,34 @@ void SessionMapStore::decode_legacy(bufferlist::const_iterator& p)
   }
 }
 
-void Session::dump(Formatter *f) const
+void Session::dump(Formatter *f, bool cap_dump) const
 {
   f->dump_int("id", info.inst.name.num());
   f->dump_object("entity", info.inst);
   f->dump_string("state", get_state_name());
   f->dump_int("num_leases", leases.size());
   f->dump_int("num_caps", caps.size());
+  if (cap_dump) {
+    f->open_array_section("caps");
+    for (const auto& cap : caps) {
+      f->dump_object("cap", *cap);
+    }
+    f->close_section();
+  }
   if (is_open() || is_stale()) {
     f->dump_unsigned("request_load_avg", get_load_avg());
   }
   f->dump_float("uptime", get_session_uptime());
   f->dump_unsigned("requests_in_flight", get_request_count());
-  f->dump_unsigned("completed_requests", get_num_completed_requests());
+  f->dump_unsigned("num_completed_requests", get_num_completed_requests());
+  f->dump_unsigned("num_completed_flushes", get_num_completed_flushes());
   f->dump_bool("reconnecting", reconnecting);
   f->dump_object("recall_caps", recall_caps);
   f->dump_object("release_caps", release_caps);
   f->dump_object("recall_caps_throttle", recall_caps_throttle);
   f->dump_object("recall_caps_throttle2o", recall_caps_throttle2o);
   f->dump_object("session_cache_liveness", session_cache_liveness);
+  f->dump_object("cap_acquisition", cap_acquisition);
   info.dump(f);
 }
 
@@ -601,7 +611,7 @@ void SessionMapStore::dump(Formatter *f) const
   f->close_section(); // Sessions
 }
 
-void SessionMapStore::generate_test_instances(list<SessionMapStore*>& ls)
+void SessionMapStore::generate_test_instances(std::list<SessionMapStore*>& ls)
 {
   // pretty boring for now
   ls.push_back(new SessionMapStore());
@@ -627,6 +637,7 @@ void SessionMap::wipe_ino_prealloc()
        p != session_map.end(); 
        ++p) {
     p->second->pending_prealloc_inos.clear();
+    p->second->delegated_inos.clear();
     p->second->info.prealloc_inos.clear();
     p->second->info.used_inos.clear();
   }
@@ -1015,7 +1026,8 @@ int Session::check_access(CInode *in, unsigned mask,
 // track total and per session load
 void SessionMap::hit_session(Session *session) {
   uint64_t sessions = get_session_count_in_state(Session::STATE_OPEN) +
-                      get_session_count_in_state(Session::STATE_STALE);
+                      get_session_count_in_state(Session::STATE_STALE) +
+                      get_session_count_in_state(Session::STATE_CLOSING);
   ceph_assert(sessions != 0);
 
   double total_load = total_load_avg.hit();
@@ -1076,6 +1088,13 @@ void SessionMap::handle_conf_change(const std::set<std::string>& changed)
     };
     apply_to_open_sessions(mut);
   }
+  if (changed.count("mds_session_cap_acquisition_decay_rate")) {
+    auto d = g_conf().get_val<double>("mds_session_cap_acquisition_decay_rate");
+    auto mut = [d](auto s) {
+      s->cap_acquisition = DecayCounter(d);
+    };
+    apply_to_open_sessions(mut);
+  }
 }
 
 void SessionMap::update_average_session_age() {
@@ -1098,8 +1117,15 @@ int SessionFilter::parse(
 
     auto eq = s.find("=");
     if (eq == std::string::npos || eq == s.size()) {
-      *ss << "Invalid filter '" << s << "'";
-      return -EINVAL;
+      // allow this to be a bare id for compatibility with pre-octopus asok
+      // 'session evict'.
+      std::string err;
+      id = strict_strtoll(s.c_str(), 10, &err);
+      if (!err.empty()) {
+	*ss << "Invalid filter '" << s << "'";
+	return -EINVAL;
+      }
+      return 0;
     }
 
     // Keys that start with this are to be taken as referring

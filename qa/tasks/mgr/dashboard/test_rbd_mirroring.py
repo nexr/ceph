@@ -30,7 +30,7 @@ class RbdMirroringTest(DashboardTestCase):
     def update_pool(cls, pool, mirror_mode):
         data = {'mirror_mode': mirror_mode}
         return cls._task_put('/api/block/mirroring/pool/{}'.format(pool),
-            data)
+                             data)
 
     @classmethod
     def list_peers(cls, pool):
@@ -51,12 +51,12 @@ class RbdMirroringTest(DashboardTestCase):
         data = {'cluster_name': cluster_name, 'client_id': client_id}
         data.update(kwargs)
         return cls._task_post('/api/block/mirroring/pool/{}/peer'.format(pool),
-            data)
+                              data)
 
     @classmethod
     def update_peer(cls, pool, peer_uuid, **kwargs):
         return cls._task_put('/api/block/mirroring/pool/{}/peer/{}'.format(pool, peer_uuid),
-            kwargs)
+                             kwargs)
 
     @classmethod
     def delete_peer(cls, pool, peer_uuid):
@@ -140,9 +140,12 @@ class RbdMirroringTest(DashboardTestCase):
         expected_peer = {
             'uuid': uuid,
             'cluster_name': 'remote',
+            'site_name': 'remote',
             'client_id': 'admin',
             'mon_host': '',
-            'key': ''
+            'key': '',
+            'direction': 'rx-tx',
+            'mirror_uuid': ''
         }
         peer = self.get_peer('rbd', uuid)
         self.assertEqual(expected_peer, peer)
@@ -175,3 +178,28 @@ class RbdMirroringTest(DashboardTestCase):
 
         self.update_pool('rbd', 'disabled')
         self.assertStatus(200)
+
+    def test_site_name(self):
+        expected_site_name = {'site_name': 'site-a'}
+        self._task_put('/api/block/mirroring/site_name', expected_site_name)
+        self.assertStatus(200)
+
+        site_name = self._get('/api/block/mirroring/site_name')
+        self.assertStatus(200)
+        self.assertEqual(expected_site_name, site_name)
+
+    def test_bootstrap(self):
+        self.update_pool('rbd', 'image')
+        token_data = self._task_post('/api/block/mirroring/pool/rbd/bootstrap/token', {})
+        self.assertStatus(200)
+
+        import_data = {
+            'token': token_data['token'],
+            'direction': 'invalid'}
+        self._task_post('/api/block/mirroring/pool/rbd/bootstrap/peer', import_data)
+        self.assertStatus(400)
+
+        # cannot import "youself" as peer
+        import_data['direction'] = 'rx'
+        self._task_post('/api/block/mirroring/pool/rbd/bootstrap/peer', import_data)
+        self.assertStatus(400)

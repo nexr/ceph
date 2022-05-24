@@ -254,8 +254,6 @@ private:
   int thread_pool_size;
   RGWRangerJniThread** threads;
 
-  RGWRados* store;
-
 protected:
   string app_id;
 
@@ -272,7 +270,7 @@ protected:
   time_t audit_conf_age;
 
 public:
-  RGWRangerJniManager(CephContext* const _cct, RGWRados* const _store, bool start_vm = false);
+  RGWRangerJniManager(CephContext* const _cct, bool start_vm = false);
   ~RGWRangerJniManager();
 
   void start_thread();
@@ -286,10 +284,12 @@ public:
 
 extern RGWRangerJniManager* rgw_rjm;
 
-void init_global_ranger_manager(CephContext* const cct, RGWRados* store);
+void init_global_ranger_manager(CephContext* const cct);
 void destroy_global_ranger_manager();
 
 /* authorize request using Ranger */
+int rgw_ranger_authorize(RGWOp*& op, req_state* s);
+// obsolete function
 int rgw_ranger_authorize(RGWRados* store, RGWOp*& op, req_state* s);
 
 void prepare_cache_dir(CephContext* const cct);

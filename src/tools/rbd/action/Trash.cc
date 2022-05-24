@@ -38,7 +38,8 @@ static const std::string EXPIRED_BEFORE("expired-before");
 static const std::string THRESHOLD("threshold");
 
 static bool is_not_trash_user(const librbd::trash_image_info_t &trash_info) {
-  return trash_info.source != RBD_TRASH_IMAGE_SOURCE_USER;
+  return trash_info.source != RBD_TRASH_IMAGE_SOURCE_USER &&
+    trash_info.source != RBD_TRASH_IMAGE_SOURCE_USER_PARENT;
 }
 
 void get_move_arguments(po::options_description *positional,
@@ -134,7 +135,7 @@ int execute_remove(const po::variables_map &vm,
     return r;
   }
 
-  io_ctx.set_osdmap_full_try();
+  io_ctx.set_pool_full_try();
   librbd::RBD rbd;
 
   utils::ProgressContext pc("Removing image", vm[at::NO_PROGRESS].as<bool>());
@@ -144,6 +145,9 @@ int execute_remove(const po::variables_map &vm,
     if (r == -ENOTEMPTY) {
       std::cerr << "rbd: image has snapshots - these must be deleted"
                 << " with 'rbd snap purge' before the image can be removed."
+                << std::endl;
+    } else if (r == -EUCLEAN) {
+      std::cerr << "rbd: error: image not fully moved to trash."
                 << std::endl;
     } else if (r == -EBUSY) {
       std::cerr << "rbd: error: image still has watchers"
@@ -269,6 +273,9 @@ int do_list(librbd::RBD &rbd, librados::IoCtx& io_ctx, bool long_flag,
       case RBD_TRASH_IMAGE_SOURCE_REMOVING:
         del_source = "REMOVING";
         break;
+      case RBD_TRASH_IMAGE_SOURCE_USER_PARENT:
+        del_source = "USER_PARENT";
+        break;
     }
 
     std::string time_str = ctime(&entry.deletion_time);
@@ -392,8 +399,8 @@ void get_purge_arguments(po::options_description *positional,
        "value range: 0.0-1.0");
 }
 
-int execute_purge (const po::variables_map &vm,
-                   const std::vector<std::string> &ceph_global_init_args) {
+int execute_purge(const po::variables_map &vm,
+                  const std::vector<std::string> &ceph_global_init_args) {
   std::string pool_name;
   std::string namespace_name;
   size_t arg_index = 0;
@@ -414,7 +421,7 @@ int execute_purge (const po::variables_map &vm,
     return r;
   }
 
-  io_ctx.set_osdmap_full_try();
+  io_ctx.set_pool_full_try();
 
   float threshold = -1;
   time_t expire_ts = 0;
@@ -438,10 +445,19 @@ int execute_purge (const po::variables_map &vm,
   r = rbd.trash_purge_with_progress(io_ctx, expire_ts, threshold, pc);
   if (r < 0) {
     pc.fail();
-  } else {
-    pc.finish();
+    if (r == -ENOTEMPTY || r == -EBUSY || r == -EMLINK || r == -EUCLEAN) {
+      std::cerr << "rbd: some expired images could not be removed"
+                << std::endl
+                << "Ensure that they are closed/unmapped, do not have "
+                << "snapshots (including trashed snapshots with linked "
+                << "clones), are not in a group and were moved to the "
+                << "trash successfully."
+                << std::endl;
+    }
+    return r;
   }
 
+  pc.finish();
   return 0;
 }
 
@@ -487,7 +503,7 @@ int execute_restore(const po::variables_map &vm,
                 << std::endl;
     } else if (r == -EEXIST) {
       std::cerr << "rbd: error: an image with the same name already exists, "
-                << "try again with with a different name"
+                << "try again with a different name"
                 << std::endl;
     } else {
       std::cerr << "rbd: restore error: " << cpp_strerror(r) << std::endl;
@@ -497,7 +513,6 @@ int execute_restore(const po::variables_map &vm,
 
   return r;
 }
-
 
 Shell::Action action_move(
   {"trash", "move"}, {"trash", "mv"}, "Move an image to the trash.", "",
@@ -511,7 +526,6 @@ Shell::Action action_purge(
   {"trash", "purge"}, {}, "Remove all expired images from trash.", "",
   &get_purge_arguments, &execute_purge);
 
-Shell::SwitchArguments switched_arguments({"long", "l"});
 Shell::Action action_list(
   {"trash", "list"}, {"trash", "ls"}, "List trash images.", "",
   &get_list_arguments, &execute_list);

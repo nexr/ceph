@@ -26,7 +26,6 @@
 #include "gtest/gtest.h"
 #include "common/ceph_argparse.h"
 #include "common/debug.h"
-#include "global/global_init.h"
 
 #define dout_context g_ceph_context
 #define dout_subsys ceph_subsys_rgw
@@ -334,7 +333,7 @@ TEST(LibRGW, DELETE_OBJECT) {
   }
 }
 
-TEST(LibRGW, CLEANUP4) {
+TEST(LibRGW, CLEANUP) {
   int ret;
   if (object_fh) {
     ret = rgw_fh_rele(fs, object_fh, RGW_FH_RELE_FLAG_NONE);

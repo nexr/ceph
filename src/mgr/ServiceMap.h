@@ -25,19 +25,19 @@ struct ServiceMap {
     std::map<std::string,std::string> metadata;  ///< static metadata
     std::map<std::string,std::string> task_status; ///< running task status
 
-    void encode(bufferlist& bl, uint64_t features) const;
-    void decode(bufferlist::const_iterator& p);
-    void dump(Formatter *f) const;
+    void encode(ceph::buffer::list& bl, uint64_t features) const;
+    void decode(ceph::buffer::list::const_iterator& p);
+    void dump(ceph::Formatter *f) const;
     static void generate_test_instances(std::list<Daemon*>& ls);
   };
 
   struct Service {
-    map<std::string,Daemon> daemons;
-    std::string summary;   ///< summary status string for 'ceph -s'
+    std::map<std::string,Daemon> daemons;
+    std::string summary;   ///< summary status std::string for 'ceph -s'
 
-    void encode(bufferlist& bl, uint64_t features) const;
-    void decode(bufferlist::const_iterator& p);
-    void dump(Formatter *f) const;
+    void encode(ceph::buffer::list& bl, uint64_t features) const;
+    void decode(ceph::buffer::list::const_iterator& p);
+    void dump(ceph::Formatter *f) const;
     static void generate_test_instances(std::list<Service*>& ls);
 
     std::string get_summary() const {
@@ -108,11 +108,11 @@ struct ServiceMap {
 
   epoch_t epoch = 0;
   utime_t modified;
-  map<std::string,Service> services;
+  std::map<std::string,Service> services;
 
-  void encode(bufferlist& bl, uint64_t features) const;
-  void decode(bufferlist::const_iterator& p);
-  void dump(Formatter *f) const;
+  void encode(ceph::buffer::list& bl, uint64_t features) const;
+  void decode(ceph::buffer::list::const_iterator& p);
+  void dump(ceph::Formatter *f) const;
   static void generate_test_instances(std::list<ServiceMap*>& ls);
 
   std::pair<Daemon*,bool> get_daemon(const std::string& service,

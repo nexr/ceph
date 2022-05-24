@@ -18,8 +18,8 @@
 #include "auth/AuthClientHandler.h"
 #include "CephxProtocol.h"
 #include "auth/RotatingKeyRing.h"
+#include "include/common_fwd.h"
 
-class CephContext;
 class KeyRing;
 
 class CephxClientHandler : public AuthClientHandler {
@@ -46,6 +46,10 @@ public:
       keyring(rsecrets->get_keyring())
   {
     reset();
+  }
+
+  CephxClientHandler* clone() const override {
+    return new CephxClientHandler(*this);
   }
 
   void reset() override;

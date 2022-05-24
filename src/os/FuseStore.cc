@@ -2,15 +2,13 @@
 // vim: ts=8 sw=2 smarttab
 
 #include "include/compat.h"
+#include "include/ceph_fuse.h"
 #include "FuseStore.h"
 #include "os/ObjectStore.h"
 #include "include/stringify.h"
 #include "common/errno.h"
 
-#define FUSE_USE_VERSION 30
-#include <fuse.h>
 #include <fuse_lowlevel.h>
-#include "include/ceph_fuse.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -1024,9 +1022,7 @@ static int os_unlink(const char *path)
   switch (f) {
   case FN_OBJECT_OMAP_VAL:
     {
-      set<string> keys;
-      keys.insert(key);
-      t.omap_rmkeys(cid, oid, keys);
+      t.omap_rmkey(cid, oid, key);
     }
     break;
 

@@ -30,7 +30,6 @@ ClusterState::ClusterState(
   const MgrMap& mgrmap)
   : monc(monc_),
     objecter(objecter_),
-    lock("ClusterState"),
     mgr_map(mgrmap),
     asok_hook(NULL)
 {}
@@ -68,12 +67,22 @@ void ClusterState::load_digest(MMgrDigest *m)
   mon_status_json = std::move(m->mon_status_json);
 }
 
-void ClusterState::ingest_pgstats(MPGStats *stats)
+void ClusterState::ingest_pgstats(ref_t<MPGStats> stats)
 {
   std::lock_guard l(lock);
 
   const int from = stats->get_orig_source().num();
-  pending_inc.update_stat(from, std::move(stats->osd_stat));
+  bool is_in = with_osdmap([from](const OSDMap& osdmap) {
+    return osdmap.is_in(from);
+  });
+
+  if (is_in) {
+    pending_inc.update_stat(from, std::move(stats->osd_stat));
+  } else {
+    osd_stat_t empty_stat;
+    empty_stat.seq = stats->osd_stat.seq;
+    pending_inc.update_stat(from, std::move(empty_stat));
+  }
 
   for (auto p : stats->pg_stat) {
     pg_t pgid = p.first;
@@ -84,7 +93,7 @@ void ClusterState::ingest_pgstats(MPGStats *stats)
     auto r = existing_pools.find(pgid.pool());
     if (r == existing_pools.end()) {
       dout(15) << " got " << pgid
-	       << " reported at " << pg_stats.reported_epoch << ":"
+               << " reported at " << pg_stats.reported_epoch << ":"
                << pg_stats.reported_seq
                << " state " << pg_state_string(pg_stats.state)
                << " but pool not in " << existing_pools
@@ -93,7 +102,7 @@ void ClusterState::ingest_pgstats(MPGStats *stats)
     }
     if (pgid.ps() >= r->second) {
       dout(15) << " got " << pgid
-	       << " reported at " << pg_stats.reported_epoch << ":"
+               << " reported at " << pg_stats.reported_epoch << ":"
                << pg_stats.reported_seq
                << " state " << pg_state_string(pg_stats.state)
                << " but > pg_num " << r->second
@@ -104,10 +113,10 @@ void ClusterState::ingest_pgstats(MPGStats *stats)
     // from another OSD
     const auto q = pg_map.pg_stat.find(pgid);
     if (q != pg_map.pg_stat.end() &&
-	q->second.get_version_pair() > pg_stats.get_version_pair()) {
+        q->second.get_version_pair() > pg_stats.get_version_pair()) {
       dout(15) << " had " << pgid << " from "
-	       << q->second.reported_epoch << ":"
-	       << q->second.reported_seq << dendl;
+               << q->second.reported_epoch << ":"
+               << q->second.reported_seq << dendl;
       continue;
     }
 
@@ -159,7 +168,7 @@ void ClusterState::notify_osdmap(const OSDMap &osd_map)
   // checking osds that went up/down)
   set<int> need_check_down_pg_osds;
   PGMapUpdater::check_down_pgs(osd_map, pg_map, true,
-			       need_check_down_pg_osds, &pending_inc);
+                               need_check_down_pg_osds, &pending_inc);
 
   dout(30) << " pg_map before:\n";
   JSONFormatter jf(true);
@@ -183,17 +192,19 @@ class ClusterSocketHook : public AdminSocketHook {
   ClusterState *cluster_state;
 public:
   explicit ClusterSocketHook(ClusterState *o) : cluster_state(o) {}
-  bool call(std::string_view admin_command, const cmdmap_t& cmdmap,
-	    std::string_view format, bufferlist& out) override {
-    stringstream ss;
-    bool r = true;
+  int call(std::string_view admin_command, const cmdmap_t& cmdmap,
+           Formatter *f,
+           std::ostream& errss,
+           bufferlist& out) override {
+    stringstream outss;
+    int r = 0;
     try {
-      r = cluster_state->asok_command(admin_command, cmdmap, format, ss);
-    } catch (const bad_cmd_get& e) {
-      ss << e.what();
-      r = true;
+      r = cluster_state->asok_command(admin_command, cmdmap, f, outss);
+      out.append(outss);
+    } catch (const TOPNSPC::common::bad_cmd_get& e) {
+      errss << e.what();
+      r = -EINVAL;
     }
-    out.append(ss);
     return r;
   }
 };
@@ -202,9 +213,9 @@ void ClusterState::final_init()
 {
   AdminSocket *admin_socket = g_ceph_context->get_admin_socket();
   asok_hook = new ClusterSocketHook(this);
-  int r = admin_socket->register_command("dump_osd_network",
-		      "dump_osd_network name=value,type=CephInt,req=false", asok_hook,
-		      "Dump osd heartbeat network ping times");
+  int r = admin_socket->register_command(
+    "dump_osd_network name=value,type=CephInt,req=false", asok_hook,
+    "Dump osd heartbeat network ping times");
   ceph_assert(r == 0);
 }
 
@@ -216,21 +227,23 @@ void ClusterState::shutdown()
   asok_hook = NULL;
 }
 
-bool ClusterState::asok_command(std::string_view admin_command, const cmdmap_t& cmdmap,
-		       std::string_view format, ostream& ss)
+bool ClusterState::asok_command(
+  std::string_view admin_command,
+  const cmdmap_t& cmdmap,
+  Formatter *f,
+  ostream& ss)
 {
   std::lock_guard l(lock);
-  Formatter *f = Formatter::create(format, "json-pretty", "json-pretty");
   if (admin_command == "dump_osd_network") {
     int64_t value = 0;
     // Default to health warning level if nothing specified
-    if (!(cmd_getval(g_ceph_context, cmdmap, "value", value))) {
+    if (!(TOPNSPC::common::cmd_getval(cmdmap, "value", value))) {
       // Convert milliseconds to microseconds
       value = static_cast<int64_t>(g_ceph_context->_conf.get_val<double>("mon_warn_on_slow_ping_time")) * 1000;
       if (value == 0) {
         double ratio = g_conf().get_val<double>("mon_warn_on_slow_ping_ratio");
-	value = g_conf().get_val<int64_t>("osd_heartbeat_grace");
-	value *= 1000000 * ratio; // Seconds of grace to microseconds at ratio
+        value = g_conf().get_val<int64_t>("osd_heartbeat_grace");
+        value *= 1000000 * ratio; // Seconds of grace to microseconds at ratio
       }
     } else {
       // Convert user input to microseconds
@@ -272,56 +285,56 @@ bool ClusterState::asok_command(std::string_view admin_command, const cmdmap_t& 
     for (auto i : pg_map.osd_stat) {
       for (auto j : i.second.hb_pingtime) {
 
-	if (j.second.last_update == 0)
-	  continue;
-	auto stale_time = g_ceph_context->_conf.get_val<int64_t>("osd_mon_heartbeat_stat_stale");
-	if (now.sec() - j.second.last_update > stale_time) {
-	  dout(20) << __func__ << " time out heartbeat for osd " << i.first
-	           << " last_update " << j.second.last_update << dendl;
-	   continue;
-	}
-	mgr_ping_time_t item;
-	item.pingtime = std::max(j.second.back_pingtime[0], j.second.back_pingtime[1]);
-	item.pingtime = std::max(item.pingtime, j.second.back_pingtime[2]);
-	if (!value || item.pingtime >= value) {
-	  item.from = i.first;
-	  item.to = j.first;
-	  item.times[0] = j.second.back_pingtime[0];
-	  item.times[1] = j.second.back_pingtime[1];
-	  item.times[2] = j.second.back_pingtime[2];
-	  item.min[0] = j.second.back_min[0];
-	  item.min[1] = j.second.back_min[1];
-	  item.min[2] = j.second.back_min[2];
-	  item.max[0] = j.second.back_max[0];
-	  item.max[1] = j.second.back_max[1];
-	  item.max[2] = j.second.back_max[2];
-	  item.last = j.second.back_last;
-	  item.back = true;
-	  item.last_update = j.second.last_update;
-	  sorted.emplace(item);
-	}
+        if (j.second.last_update == 0)
+          continue;
+        auto stale_time = g_ceph_context->_conf.get_val<int64_t>("osd_mon_heartbeat_stat_stale");
+        if (now.sec() - j.second.last_update > stale_time) {
+          dout(20) << __func__ << " time out heartbeat for osd " << i.first
+                   << " last_update " << j.second.last_update << dendl;
+           continue;
+        }
+        mgr_ping_time_t item;
+        item.pingtime = std::max(j.second.back_pingtime[0], j.second.back_pingtime[1]);
+        item.pingtime = std::max(item.pingtime, j.second.back_pingtime[2]);
+        if (!value || item.pingtime >= value) {
+          item.from = i.first;
+          item.to = j.first;
+          item.times[0] = j.second.back_pingtime[0];
+          item.times[1] = j.second.back_pingtime[1];
+          item.times[2] = j.second.back_pingtime[2];
+          item.min[0] = j.second.back_min[0];
+          item.min[1] = j.second.back_min[1];
+          item.min[2] = j.second.back_min[2];
+          item.max[0] = j.second.back_max[0];
+          item.max[1] = j.second.back_max[1];
+          item.max[2] = j.second.back_max[2];
+          item.last = j.second.back_last;
+          item.back = true;
+          item.last_update = j.second.last_update;
+          sorted.emplace(item);
+        }
 
-	if (j.second.front_last == 0)
-	  continue;
-	item.pingtime = std::max(j.second.front_pingtime[0], j.second.front_pingtime[1]);
-	item.pingtime = std::max(item.pingtime, j.second.front_pingtime[2]);
-	if (!value || item.pingtime >= value) {
-	  item.from = i.first;
-	  item.to = j.first;
-	  item.times[0] = j.second.front_pingtime[0];
-	  item.times[1] = j.second.front_pingtime[1];
-	  item.times[2] = j.second.front_pingtime[2];
-	  item.min[0] = j.second.front_min[0];
-	  item.min[1] = j.second.front_min[1];
-	  item.min[2] = j.second.front_min[2];
-	  item.max[0] = j.second.front_max[0];
-	  item.max[1] = j.second.front_max[1];
-	  item.max[2] = j.second.front_max[2];
-	  item.last = j.second.front_last;
-	  item.back = false;
-	  item.last_update = j.second.last_update;
-	  sorted.emplace(item);
-	}
+        if (j.second.front_last == 0)
+          continue;
+        item.pingtime = std::max(j.second.front_pingtime[0], j.second.front_pingtime[1]);
+        item.pingtime = std::max(item.pingtime, j.second.front_pingtime[2]);
+        if (!value || item.pingtime >= value) {
+          item.from = i.first;
+          item.to = j.first;
+          item.times[0] = j.second.front_pingtime[0];
+          item.times[1] = j.second.front_pingtime[1];
+          item.times[2] = j.second.front_pingtime[2];
+          item.min[0] = j.second.front_min[0];
+          item.min[1] = j.second.front_min[1];
+          item.min[2] = j.second.front_min[2];
+          item.max[0] = j.second.front_max[0];
+          item.max[1] = j.second.front_max[1];
+          item.max[2] = j.second.front_max[2];
+          item.last = j.second.front_last;
+          item.back = false;
+          item.last_update = j.second.last_update;
+          sorted.emplace(item);
+        }
       }
     }
 
@@ -367,7 +380,5 @@ bool ClusterState::asok_command(std::string_view admin_command, const cmdmap_t& 
   } else {
     ceph_abort_msg("broken asok registration");
   }
-  f->flush(ss);
-  delete f;
   return true;
 }

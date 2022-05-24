@@ -44,7 +44,7 @@ An example configuration that can be used to observe reduced bandwidth usage::
              plugin=clay \
              k=4 m=2 d=5 \
              crush-failure-domain=host
-        $ ceph osd pool create claypool 12 12 erasure CLAYprofile
+        $ ceph osd pool create claypool erasure CLAYprofile
 
 
 Creating a clay profile
@@ -88,7 +88,7 @@ Where:
 
 :Description: Number of OSDs requested to send data during recovery of
               a single chunk. *d* needs to be chosen such that
-              k+1 <= d <= k+m-1. Larger the *d*, the better the savings.
+              k+1 <= d <= k+m-1. The larger the *d*, the better the savings.
 
 :Type: Integer
 :Required: No.
@@ -120,7 +120,7 @@ Where:
 ``crush-root={root}``
 
 :Description: The name of the crush bucket used for the first step of
-              the CRUSH rule. For intance **step take default**.
+              the CRUSH rule. For instance **step take default**.
 
 :Type: String
 :Required: No.

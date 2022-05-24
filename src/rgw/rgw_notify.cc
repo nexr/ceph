@@ -23,7 +23,7 @@ void populate_record_from_request(const req_state *s,
         rgw_pubsub_s3_record& record) { 
   record.eventTime = mtime;
   record.eventName = to_string(event_type);
-  record.userIdentity = s->user->user_id.id;    // user that triggered the change
+  record.userIdentity = s->user->get_id().id;    // user that triggered the change
   record.x_amz_request_id = s->req_id;          // request ID of the original change
   record.x_amz_id_2 = s->host_id;               // RGW on which the change was made
   // configurationId is filled from notification configuration
@@ -69,9 +69,9 @@ int publish(const req_state* s,
         const ceph::real_time& mtime, 
         const std::string& etag, 
         EventType event_type,
-        RGWRados* store) {
-    RGWUserPubSub ps_user(store, s->user->user_id);
-    RGWUserPubSub::Bucket ps_bucket(&ps_user, s->bucket);
+        rgw::sal::RGWRadosStore* store) {
+    RGWPubSub ps_user(store, s->user->get_id().tenant);
+    RGWPubSub::Bucket ps_bucket(&ps_user, s->bucket);
     rgw_pubsub_bucket_topics bucket_topics;
     auto rc = ps_bucket.get_topics(&bucket_topics);
     if (rc < 0) {

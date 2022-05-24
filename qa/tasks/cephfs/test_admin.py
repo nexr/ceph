@@ -1,12 +1,16 @@
+import errno
 import json
+import logging
+import time
 
 from teuthology.orchestra.run import CommandFailedError
 
-from unittest import case
 from tasks.cephfs.cephfs_test_case import CephFSTestCase
 from tasks.cephfs.fuse_mount import FuseMount
 
 from tasks.cephfs.filesystem import FileLayout
+
+log = logging.getLogger(__name__)
 
 class TestAdminCommands(CephFSTestCase):
     """
@@ -23,6 +27,12 @@ class TestAdminCommands(CephFSTestCase):
 
         s = self.fs.mon_manager.raw_cluster_cmd("fs", "status")
         self.assertTrue("active" in s)
+
+        mdsmap = json.loads(self.fs.mon_manager.raw_cluster_cmd("fs", "status", "--format=json-pretty"))["mdsmap"]
+        self.assertEqual(mdsmap[0]["state"], "active")
+
+        mdsmap = json.loads(self.fs.mon_manager.raw_cluster_cmd("fs", "status", "--format=json"))["mdsmap"]
+        self.assertEqual(mdsmap[0]["state"], "active")
 
     def _setup_ec_pools(self, n, metadata=True, overwrites=True):
         if metadata:
@@ -65,7 +75,7 @@ class TestAdminCommands(CephFSTestCase):
         """
 
         p = self.fs.add_data_pool("foo")
-        self.mount_a.run_shell(["mkdir", "subdir"])
+        self.mount_a.run_shell("mkdir subdir")
         self.fs.set_dir_layout(self.mount_a, "subdir", FileLayout(pool=p))
 
     def test_add_data_pool_non_alphamueric_name_as_subdir(self):
@@ -90,6 +100,7 @@ class TestAdminCommands(CephFSTestCase):
         That a new file system warns/fails with an EC default data pool.
         """
 
+        self.mount_a.umount_wait(require_clean=True)
         self.fs.delete_all_filesystems()
         n = "test_new_default_ec"
         self._setup_ec_pools(n)
@@ -108,6 +119,7 @@ class TestAdminCommands(CephFSTestCase):
         That a new file system succeeds with an EC default data pool with --force.
         """
 
+        self.mount_a.umount_wait(require_clean=True)
         self.fs.delete_all_filesystems()
         n = "test_new_default_ec_force"
         self._setup_ec_pools(n)
@@ -118,6 +130,7 @@ class TestAdminCommands(CephFSTestCase):
         That a new file system fails with an EC default data pool without overwrite.
         """
 
+        self.mount_a.umount_wait(require_clean=True)
         self.fs.delete_all_filesystems()
         n = "test_new_default_ec_no_overwrite"
         self._setup_ec_pools(n, overwrites=False)
@@ -145,6 +158,7 @@ class TestAdminCommands(CephFSTestCase):
         """
         That the application metadata set on the pools of a newly created filesystem are as expected.
         """
+        self.mount_a.umount_wait(require_clean=True)
         self.fs.delete_all_filesystems()
         fs_name = "test_fs_new_pool_application"
         keys = ['metadata', 'data']
@@ -157,6 +171,77 @@ class TestAdminCommands(CephFSTestCase):
         for i in range(2):
             self._check_pool_application_metadata_key_value(
                 pool_names[i], 'cephfs', keys[i], fs_name)
+
+
+class TestDump(CephFSTestCase):
+    CLIENTS_REQUIRED = 0
+    MDSS_REQUIRED = 1
+
+    def test_fs_dump_epoch(self):
+        """
+        That dumping a specific epoch works.
+        """
+
+        status1 = self.fs.status()
+        status2 = self.fs.status(epoch=status1["epoch"]-1)
+        self.assertEqual(status1["epoch"], status2["epoch"]+1)
+
+    def test_fsmap_trim(self):
+        """
+        That the fsmap is trimmed normally.
+        """
+
+        paxos_service_trim_min = 25
+        self.config_set('mon', 'paxos_service_trim_min', paxos_service_trim_min)
+        mon_max_mdsmap_epochs = 20
+        self.config_set('mon', 'mon_max_mdsmap_epochs', mon_max_mdsmap_epochs)
+
+        status = self.fs.status()
+        epoch = status["epoch"]
+
+        # for N mutations
+        mutations = paxos_service_trim_min + mon_max_mdsmap_epochs
+        b = False
+        for i in range(mutations):
+            self.fs.set_joinable(b)
+            b = not b
+
+        time.sleep(10) # for tick/compaction
+
+        try:
+            self.fs.status(epoch=epoch)
+        except CommandFailedError as e:
+            self.assertEqual(e.exitstatus, errno.ENOENT, "invalid error code when trying to fetch FSMap that was trimmed")
+        else:
+            self.fail("trimming did not occur as expected")
+
+    def test_fsmap_force_trim(self):
+        """
+        That the fsmap is trimmed forcefully.
+        """
+
+        status = self.fs.status()
+        epoch = status["epoch"]
+
+        paxos_service_trim_min = 1
+        self.config_set('mon', 'paxos_service_trim_min', paxos_service_trim_min)
+        mon_mds_force_trim_to = epoch+1
+        self.config_set('mon', 'mon_mds_force_trim_to', mon_mds_force_trim_to)
+
+        # force a new fsmap
+        self.fs.set_joinable(False)
+        time.sleep(10) # for tick/compaction
+
+        status = self.fs.status()
+        log.debug(f"new epoch is {status['epoch']}")
+        self.fs.status(epoch=epoch+1) # epoch+1 is not trimmed, may not == status["epoch"]
+
+        try:
+            self.fs.status(epoch=epoch)
+        except CommandFailedError as e:
+            self.assertEqual(e.exitstatus, errno.ENOENT, "invalid error code when trying to fetch FSMap that was trimmed")
+        else:
+            self.fail("trimming did not occur as expected")
 
 
 class TestConfigCommands(CephFSTestCase):
@@ -187,7 +272,7 @@ class TestConfigCommands(CephFSTestCase):
         """
 
         if not isinstance(self.mount_a, FuseMount):
-            raise case.SkipTest("Test only applies to FUSE clients")
+            self.skipTest("Test only applies to FUSE clients")
 
         test_key = "client_cache_size"
         test_val = "123"

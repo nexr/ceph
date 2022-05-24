@@ -64,7 +64,7 @@ Options
    be set with bitsperosd bits per OSD. That is, the pg_num map
    attribute will be set to numosd shifted by bitsperosd.
    If --pgp-bits is specified, then the pgp_num map attribute will
-   be set to numosd shifted by bits. 
+   be set to numosd shifted by bits.
 
 .. option:: --create-from-conf
 
@@ -73,7 +73,7 @@ Options
 .. option:: --test-map-pgs [--pool poolid] [--range-first <first> --range-last <last>]
 
    will print out the mappings from placement groups to OSDs.
-   If range is specified, then it iterates from first to last in the directory 
+   If range is specified, then it iterates from first to last in the directory
    specified by argument to osdmaptool.
    Eg: **osdmaptool --test-map-pgs --range-first 0 --range-last 2 osdmap_dir**.
    This will iterate through the files named 0,1,2 in osdmap_dir.
@@ -130,6 +130,10 @@ Options
 .. option:: --clear-temp
 
    clears pg_temp and primary_temp variables.
+
+.. option:: --clean-temps
+
+   clean pg_temps.
 
 .. option:: --health
 

@@ -33,6 +33,7 @@ struct MetaSession {
     STATE_CLOSING,
     STATE_CLOSED,
     STATE_STALE,
+    STATE_REJECTED,
   } state;
 
   enum {
@@ -53,7 +54,7 @@ struct MetaSession {
   xlist<MetaRequest*> unsafe_requests;
   std::set<ceph_tid_t> flushing_caps_tids;
 
-  MClientCapRelease::ref release;
+  ceph::ref_t<MClientCapRelease> release;
 
   MetaSession(mds_rank_t mds_num, ConnectionRef con,
 	      const entity_addrvec_t& addrs)
@@ -65,7 +66,7 @@ struct MetaSession {
 
   const char *get_state_name() const;
 
-  void dump(Formatter *f) const;
+  void dump(Formatter *f, bool cap_dump=false) const;
 
   void enqueue_cap_release(inodeno_t ino, uint64_t cap_id, ceph_seq_t iseq,
       ceph_seq_t mseq, epoch_t osd_barrier);

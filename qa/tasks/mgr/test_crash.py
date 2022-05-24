@@ -1,9 +1,10 @@
+
+
+from tasks.mgr.mgr_test_case import MgrTestCase
+
 import json
 import logging
 import datetime
-
-from .mgr_test_case import MgrTestCase
-
 
 log = logging.getLogger(__name__)
 UUID = 'd5775432-0742-44a3-a435-45095e32e6b1'
@@ -13,6 +14,7 @@ DATEFMT = '%Y-%m-%d %H:%M:%S.%f'
 class TestCrash(MgrTestCase):
 
     def setUp(self):
+        super(TestCrash, self).setUp()
         self.setup_mgrs()
         self._load_module('crash')
 

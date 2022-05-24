@@ -14,7 +14,9 @@ virtual machines quickly, because the client doesn't have to download an entire
 image each time it spins up a new virtual machine.
 
 
-.. ditaa::  +---------------------------------------------------+
+.. ditaa::
+
+            +---------------------------------------------------+
             |                       QEMU                        |
             +---------------------------------------------------+
             |                      librbd                       |
@@ -141,7 +143,7 @@ configuration (like any Ceph configuration option) as part of the
 .. important:: If you set rbd_cache=true, you must set cache=writeback
    or risk data loss. Without cache=writeback, QEMU will not send
    flush requests to librbd. If QEMU exits uncleanly in this
-   configuration, filesystems on top of rbd can be corrupted.
+   configuration, file systems on top of rbd can be corrupted.
 
 .. _RBD caching: ../rbd-config-ref/#rbd-cache-config-settings
 

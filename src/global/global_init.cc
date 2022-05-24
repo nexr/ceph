@@ -38,7 +38,6 @@
 
 #define dout_context g_ceph_context
 #define dout_subsys ceph_subsys_
-
 static void global_init_set_globals(CephContext *cct)
 {
   g_ceph_context = cct;
@@ -114,6 +113,10 @@ void global_pre_init(
     }
   }
 
+  if (conf.get_val<bool>("no_config_file")) {
+    flags |= CINIT_FLAG_NO_DEFAULT_CONFIG_FILE;
+  }
+
   int ret = conf.parse_config_files(c_str_or_null(conf_file_list),
 				    &cerr, flags);
   if (ret == -EDOM) {
@@ -129,7 +132,8 @@ void global_pre_init(
 	     << conf_file_list << std::endl;
         _exit(1);
       } else {
-	cerr << "did not load config file, using default settings." << std::endl;
+	cerr << "did not load config file, using default settings."
+	     << std::endl;
       }
     }
   }
@@ -145,23 +149,6 @@ void global_pre_init(
   // command line (as passed by caller)
   conf.parse_argv(args);
 
-  if (conf->log_early &&
-      !cct->_log->is_started()) {
-    cct->_log->start();
-  }
-
-  if (!conf->no_mon_config) {
-    // make sure our mini-session gets legacy values
-    conf.apply_changes(nullptr);
-
-    MonClient mc_bootstrap(g_ceph_context);
-    if (mc_bootstrap.get_monmap_and_config() < 0) {
-      cct->_log->flush();
-      cerr << "failed to fetch mon config (--no-mon-config to skip)"
-	   << std::endl;
-      _exit(1);
-    }
-  }
   if (!cct->_log->is_started()) {
     cct->_log->start();
   }
@@ -170,7 +157,7 @@ void global_pre_init(
   conf.do_argv_commands();
 
   // Now we're ready to complain about config file parse errors
-  g_conf().complain_about_parse_errors(g_ceph_context);
+  g_conf().complain_about_parse_error(g_ceph_context);
 }
 
 boost::intrusive_ptr<CephContext>
@@ -334,6 +321,28 @@ global_init(const std::map<std::string,std::string> *defaults,
 #  endif
 #endif
 
+  //
+  // Utterly important to run first network connection after setuid().
+  // In case of rdma transport uverbs kernel module starts returning
+  // -EACCESS on each operation if credentials has been changed, see
+  // callers of ib_safe_file_access() for details.
+  //
+  // fork() syscall also matters, so daemonization won't work in case
+  // of rdma.
+  //
+  if (!g_conf()->no_mon_config) {
+    // make sure our mini-session gets legacy values
+    g_conf().apply_changes(nullptr);
+
+    MonClient mc_bootstrap(g_ceph_context);
+    if (mc_bootstrap.get_monmap_and_config() < 0) {
+      g_ceph_context->_log->flush();
+      cerr << "failed to fetch mon config (--no-mon-config to skip)"
+	   << std::endl;
+      _exit(1);
+    }
+  }
+
   // Expand metavariables. Invoke configuration observers. Open log file.
   g_conf().apply_changes(nullptr);
 
@@ -370,7 +379,7 @@ global_init(const std::map<std::string,std::string> *defaults,
   }
 
   // Now we're ready to complain about config file parse errors
-  g_conf().complain_about_parse_errors(g_ceph_context);
+  g_conf().complain_about_parse_error(g_ceph_context);
 
   // test leak checking
   if (g_conf()->debug_deliberately_leak_memory) {
@@ -390,7 +399,7 @@ global_init(const std::map<std::string,std::string> *defaults,
 
   return boost::intrusive_ptr<CephContext>{g_ceph_context, false};
 }
-
+namespace TOPNSPC::common {
 void intrusive_ptr_add_ref(CephContext* cct)
 {
   cct->get();
@@ -400,7 +409,7 @@ void intrusive_ptr_release(CephContext* cct)
 {
   cct->put();
 }
-
+}
 void global_print_banner(void)
 {
   output_ceph_version();
@@ -414,7 +423,7 @@ int global_init_prefork(CephContext *cct)
   const auto& conf = cct->_conf;
   if (!conf->daemonize) {
 
-    if (pidfile_write(conf) < 0)
+    if (pidfile_write(conf->pid_file) < 0)
       exit(1);
 
     if ((cct->get_init_flags() & CINIT_FLAG_DEFER_DROP_PRIVILEGES) &&
@@ -480,6 +489,9 @@ int reopen_as_null(CephContext *cct, int fd)
 
 void global_init_postfork_start(CephContext *cct)
 {
+  // reexpand the meta in child process
+  cct->_conf.finalize_reexpand_meta();
+
   // restart log thread
   cct->_log->start();
   cct->notify_post_fork();
@@ -495,7 +507,7 @@ void global_init_postfork_start(CephContext *cct)
   reopen_as_null(cct, STDIN_FILENO);
 
   const auto& conf = cct->_conf;
-  if (pidfile_write(conf) < 0)
+  if (pidfile_write(conf->pid_file) < 0)
     exit(1);
 
   if ((cct->get_init_flags() & CINIT_FLAG_DEFER_DROP_PRIVILEGES) &&

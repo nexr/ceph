@@ -748,6 +748,13 @@ Request Parameters
 :Required: No
 
 
+``op-mask``
+
+:Description: The op-mask of the user to be modified.
+:Type: String
+:Example: ``read, write, delete, *``
+:Required: No
+
 Response Entities
 ~~~~~~~~~~~~~~~~~
 
@@ -2008,7 +2015,7 @@ Request Parameters
 :Description: The bucket id to unlink.
 :Type: String
 :Example: ``dev.6607669.420``
-:Required: Yes
+:Required: No
 
 ``uid``
 

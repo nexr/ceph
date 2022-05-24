@@ -1,4 +1,4 @@
-#!/usr/bin/env nosetests 
+#!/usr/bin/env python3
 # -*- mode:python; tab-width:4; indent-tabs-mode:t; coding:utf-8 -*-
 # vim: ts=4 sw=4 smarttab expandtab fileencoding=utf-8
 #
@@ -318,44 +318,6 @@ class TestMonitor(TestArgparse):
 
     def test_quorum_status(self):
         self.assert_valid_command(['quorum_status'])
-
-    def test_mon_status(self):
-        self.assert_valid_command(['mon_status'])
-
-    def test_sync_force(self):
-        self.assert_valid_command(['sync',
-                                   'force',
-                                   '--yes-i-really-mean-it',
-                                   '--i-know-what-i-am-doing'])
-        self.assert_valid_command(['sync',
-                                   'force',
-                                   '--yes-i-really-mean-it'])
-        self.assert_valid_command(['sync',
-                                   'force'])
-        assert_equal({}, validate_command(sigdict, ['sync']))
-        assert_equal({}, validate_command(sigdict, ['sync',
-                                                    'force',
-                                                    '--yes-i-really-mean-it',
-                                                    '--i-know-what-i-am-doing',
-                                                    'toomany']))
-
-    def test_heap(self):
-        assert_equal({}, validate_command(sigdict, ['heap']))
-        assert_equal({}, validate_command(sigdict, ['heap', 'invalid']))
-        self.assert_valid_command(['heap', 'dump'])
-        self.assert_valid_command(['heap', 'start_profiler'])
-        self.assert_valid_command(['heap', 'stop_profiler'])
-        self.assert_valid_command(['heap', 'release'])
-        self.assert_valid_command(['heap', 'stats'])
-
-    def test_quorum(self):
-        assert_equal({}, validate_command(sigdict, ['quorum']))
-        assert_equal({}, validate_command(sigdict, ['quorum', 'invalid']))
-        self.assert_valid_command(['quorum', 'enter'])
-        self.assert_valid_command(['quorum', 'exit'])
-        assert_equal({}, validate_command(sigdict, ['quorum',
-                                                    'enter',
-                                                    'toomany']))
 
     def test_tell(self):
         assert_equal({}, validate_command(sigdict, ['tell']))
@@ -1071,11 +1033,17 @@ class TestOSD(TestArgparse):
         self.assert_valid_command(['osd', 'pool', 'create',
                                    'poolname', '128', '128',
                                    'erasure', 'A-Za-z0-9-_.', 'ruleset^^'])
+        self.assert_valid_command(['osd', 'pool', 'create', 'poolname'])
         assert_equal({}, validate_command(sigdict, ['osd', 'pool', 'create']))
+        # invalid pg_num and pgp_num, like "-1", could spill over to
+        # erasure_code_profile and rule as they are valid profile and rule
+        # names, so validate_commands() cannot identify such cases.
+        # but if they are matched by profile and rule, the "rule" argument
+        # won't get a chance to be matched anymore.
         assert_equal({}, validate_command(sigdict, ['osd', 'pool', 'create',
-                                                    'poolname']))
-        assert_equal({}, validate_command(sigdict, ['osd', 'pool', 'create',
-                                                    'poolname', '-1']))
+                                                    'poolname',
+                                                    '-1', '-1',
+                                                    'ruleset']))
         assert_equal({}, validate_command(sigdict, ['osd', 'pool', 'create',
                                                     'poolname',
                                                     '128', '128',
@@ -1298,7 +1266,6 @@ class TestValidate(TestCase):
 
         self.sig = parse_funcsig(self.prefix + self.args_dict)
 
-    @nottest
     def arg_kwarg_test(self, prefix, args, sig, arg_type=0):
         """
         Runs validate in different arg/kargs ways.
@@ -1337,7 +1304,8 @@ class TestValidate(TestCase):
             self.arg_kwarg_test(self.prefix, self.args, self.sig, arg_type)
 
 # Local Variables:
-# compile-command: "cd ../.. ; make -j4 &&
-#  PYTHONPATH=pybind nosetests --stop \
-#  test/pybind/test_ceph_argparse.py # test_ceph_argparse.py:TestOSD.test_rm"
+# compile-command: "cd ../../..; cmake --build build --target get_command_descriptions -j4 &&
+#  CEPH_BIN=build/bin \
+#  PYTHONPATH=src/pybind nosetests --stop \
+#  src/test/pybind/test_ceph_argparse.py:TestOSD.test_rm"
 # End:

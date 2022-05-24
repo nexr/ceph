@@ -26,20 +26,16 @@ class KernelMount(CephFSMount):
         self.ipmi_password = ipmi_password
         self.ipmi_domain = ipmi_domain
 
-    def mount(self, mount_path=None, mount_fs_name=None):
+    def mount(self, mount_path=None, mount_fs_name=None, mountpoint=None, mount_options=[]):
+        if mountpoint is not None:
+            self.mountpoint = mountpoint
         self.setupfs(name=mount_fs_name)
 
         log.info('Mounting kclient client.{id} at {remote} {mnt}...'.format(
             id=self.client_id, remote=self.client_remote, mnt=self.mountpoint))
 
-        self.client_remote.run(
-            args=[
-                'mkdir',
-                '--',
-                self.mountpoint,
-            ],
-            timeout=(5*60),
-        )
+        self.client_remote.run(args=['mkdir', '-p', self.mountpoint],
+                               timeout=(5*60))
 
         if mount_path is None:
             mount_path = "/"
@@ -49,6 +45,9 @@ class KernelMount(CephFSMount):
 
         if mount_fs_name is not None:
             opts += ",mds_namespace={0}".format(mount_fs_name)
+
+        for mount_opt in mount_options :
+            opts += ",{0}".format(mount_opt)
 
         self.client_remote.run(
             args=[
@@ -74,6 +73,9 @@ class KernelMount(CephFSMount):
         self.mounted = True
 
     def umount(self, force=False):
+        if not self.is_mounted():
+            return
+
         log.debug('Unmounting client client.{id}...'.format(id=self.client_id))
 
         cmd=['sudo', 'umount', self.mountpoint]
@@ -187,6 +189,7 @@ class KernelMount(CephFSMount):
                 self.mountpoint,
             ],
             timeout=(5*60),
+            check_status=False,
         )
 
     def _find_debug_dir(self):
@@ -258,3 +261,10 @@ class KernelMount(CephFSMount):
         epoch, barrier = int(first_line_tokens[1]), int(first_line_tokens[3])
 
         return epoch, barrier
+
+    def get_op_read_count(self):
+        buf = self.read_debug_file("metrics/size")
+        if buf is None:
+            return 0
+        else:
+            return int(re.findall(r'read.*', buf)[0].split()[1])

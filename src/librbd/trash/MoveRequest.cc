@@ -5,7 +5,6 @@
 #include "common/dout.h"
 #include "common/errno.h"
 #include "cls/rbd/cls_rbd_client.h"
-#include "librbd/ExclusiveLock.h"
 #include "librbd/ImageCtx.h"
 #include "librbd/ImageState.h"
 #include "librbd/Utils.h"
@@ -102,7 +101,10 @@ template <typename I>
 void MoveRequest<I>::handle_directory_remove(int r) {
   ldout(m_cct, 10) << "r=" << r << dendl;
 
-  if (r < 0 && r != -ENOENT) {
+  if (r == -ENOENT) {
+    r = 0;
+  }
+  if (r < 0) {
     lderr(m_cct) << "failed to remove image from directory: " << cpp_strerror(r)
                  << dendl;
   }

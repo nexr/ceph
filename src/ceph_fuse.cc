@@ -40,7 +40,7 @@
 #include <sys/types.h>
 #include <fcntl.h>
 
-#include <fuse.h>
+#include "include/ceph_fuse.h"
 #include <fuse_lowlevel.h>
 
 #define dout_context g_ceph_context
@@ -167,9 +167,8 @@ int main(int argc, const char **argv, const char *envp[]) {
   }
 
   {
-    g_ceph_context->_conf.finalize_reexpand_meta();
     common_init_finish(g_ceph_context);
-   
+
     init_async_signal_handler();
     register_async_signal_handler(SIGHUP, sighup_handler);
 
@@ -275,7 +274,7 @@ int main(int argc, const char **argv, const char *envp[]) {
       cerr << "ceph-fuse[" << getpid() << "]: ceph client failed with " << cpp_strerror(-r) << std::endl;
       goto out_init_failed;
     }
-    
+
     client->update_metadata("mount_point", cfuse->get_mount_point());
     perms = client->pick_my_perms();
     {

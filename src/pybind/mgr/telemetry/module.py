@@ -159,7 +159,8 @@ class Module(MgrModule):
         },
         {
             "cmd": "telemetry send "
-                   "name=endpoint,type=CephChoices,strings=ceph|device,n=N,req=false",
+                   "name=endpoint,type=CephChoices,strings=ceph|device,n=N,req=false "
+                   "name=license,type=CephString,req=false",
             "desc": "Force sending data to Ceph telemetry",
             "perm": "rw"
         },
@@ -172,6 +173,11 @@ class Module(MgrModule):
         {
             "cmd": "telemetry show-device",
             "desc": "Show last device report or device report to be sent",
+            "perm": "r"
+        },
+        {
+            "cmd": "telemetry show-all",
+            "desc": "Show report of all channels",
             "perm": "r"
         },
         {
@@ -207,10 +213,6 @@ class Module(MgrModule):
             self.log.debug(' %s = %s', opt['name'], getattr(self, opt['name']))
         # wake up serve() thread
         self.event.set()
-
-    @staticmethod
-    def parse_timestamp(timestamp):
-        return datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S.%f')
 
     def load(self):
         self.last_upload = self.get_store('last_upload', None)
@@ -365,6 +367,8 @@ class Module(MgrModule):
             r.append('crash')
         if self.channel_device:
             r.append('device')
+        if self.channel_ident:
+            r.append('ident')
         return r
 
     def gather_device_report(self):
@@ -396,21 +400,29 @@ class Module(MgrModule):
             if not anon_host:
                 anon_host = str(uuid.uuid1())
                 self.set_store('host-id/%s' % host, anon_host)
+            serial = None
             for dev, rep in m.items():
                 rep['host_id'] = anon_host
+                if serial is None and 'serial_number' in rep:
+                    serial = rep['serial_number']
 
             # anonymize device id
             anon_devid = self.get_store('devid-id/%s' % devid)
             if not anon_devid:
-                anon_devid = devid[:devid.rfind('_')] + '_' + str(uuid.uuid1())
+                # ideally devid is 'vendor_model_serial',
+                # but can also be 'model_serial', 'serial'
+                if '_' in devid:
+                    anon_devid = f"{devid.rsplit('_', 1)[0]}_{uuid.uuid1()}"
+                else:
+                    anon_devid = str(uuid.uuid1())
                 self.set_store('devid-id/%s' % devid, anon_devid)
             self.log.info('devid %s / %s, host %s / %s' % (devid, anon_devid,
                                                            host, anon_host))
 
             # anonymize the smartctl report itself
-            serial = devid.rsplit('_', 1)[1]
-            m_str = json.dumps(m)
-            m = json.loads(m_str.replace(serial, 'deleted'))
+            if serial:
+                m_str = json.dumps(m)
+                m = json.loads(m_str.replace(serial, 'deleted'))
 
             if anon_host not in res:
                 res[anon_host] = {}
@@ -429,7 +441,7 @@ class Module(MgrModule):
         if not channels:
             channels = self.get_active_channels()
         report = {
-            'leaderboard': False,
+            'leaderboard': self.leaderboard,
             'report_version': 1,
             'report_timestamp': datetime.utcnow().isoformat(),
             'report_id': self.report_id,
@@ -439,8 +451,6 @@ class Module(MgrModule):
         }
 
         if 'ident' in channels:
-            if self.leaderboard:
-                report['leaderboard'] = True
             for option in ['description', 'contact', 'organization']:
                 report[option] = getattr(self, option)
 
@@ -451,7 +461,7 @@ class Module(MgrModule):
             fs_map = self.get('fs_map')
             df = self.get('df')
 
-            report['created'] = self.parse_timestamp(mon_map['created']).isoformat()
+            report['created'] = mon_map['created']
 
             # mons
             v1_mons = 0
@@ -685,7 +695,7 @@ class Module(MgrModule):
             proxies['http'] = self.proxy
             proxies['https'] = self.proxy
         try:
-            resp = requests.put(url=url, json=report)
+            resp = requests.put(url=url, json=report, proxies=proxies)
             resp.raise_for_status()
         except Exception as e:
             fail_reason = 'Failed to send %s to %s: %s' % (what, url, str(e))
@@ -739,34 +749,53 @@ class Module(MgrModule):
             for opt in self.MODULE_OPTIONS:
                 r[opt['name']] = getattr(self, opt['name'])
             r['last_upload'] = time.ctime(self.last_upload) if self.last_upload else self.last_upload
-            return 0, json.dumps(r, indent=4), ''
+            return 0, json.dumps(r, indent=4, sort_keys=True), ''
         elif command['prefix'] == 'telemetry on':
             if command.get('license') != LICENSE:
                 return -errno.EPERM, '', "Telemetry data is licensed under the " + LICENSE_NAME + " (" + LICENSE_URL + ").\nTo enable, add '--license " + LICENSE + "' to the 'ceph telemetry on' command."
-            self.set_module_option('enabled', True)
-            self.set_module_option('last_opt_revision', REVISION)
+            self.on()
             return 0, '', ''
         elif command['prefix'] == 'telemetry off':
-            self.set_module_option('enabled', False)
-            self.set_module_option('last_opt_revision', REVISION)
+            self.off()
             return 0, '', ''
         elif command['prefix'] == 'telemetry send':
+            if self.last_opt_revision < LAST_REVISION_RE_OPT_IN and command.get('license') != LICENSE:
+                self.log.debug('A telemetry send attempt while opted-out. Asking for license agreement')
+                return -errno.EPERM, '', "Telemetry data is licensed under the " + LICENSE_NAME + " (" + LICENSE_URL + ").\nTo manually send telemetry data, add '--license " + LICENSE + "' to the 'ceph telemetry send' command.\nPlease consider enabling the telemetry module with 'ceph telemetry on'."
             self.last_report = self.compile_report()
             return self.send(self.last_report, command.get('endpoint'))
 
         elif command['prefix'] == 'telemetry show':
-            report = self.compile_report(
-                channels=command.get('channels', None)
-            )
-            report = json.dumps(report, indent=4)
+            report = self.get_report(channels=command.get('channels', None))
+            report = json.dumps(report, indent=4, sort_keys=True)
             if self.channel_device:
-               report += '\n \nDevice report is generated separately. To see it run \'ceph telemetry show-device\'.'
+                report += '\n \nDevice report is generated separately. To see it run \'ceph telemetry show-device\'.'
             return 0, report, ''
         elif command['prefix'] == 'telemetry show-device':
-            return 0, json.dumps(self.gather_device_report(), indent=4, sort_keys=True), ''
+            return 0, json.dumps(self.get_report('device'), indent=4, sort_keys=True), ''
+        elif command['prefix'] == 'telemetry show-all':
+            return 0, json.dumps(self.get_report('all'), indent=4, sort_keys=True), ''
         else:
             return (-errno.EINVAL, '',
                     "Command not found '{0}'".format(command['prefix']))
+
+    def on(self):
+        self.set_module_option('enabled', True)
+        self.set_module_option('last_opt_revision', REVISION)
+
+    def off(self):
+        self.set_module_option('enabled', False)
+        self.set_module_option('last_opt_revision', 1)
+
+    def get_report(self, report_type='default', channels=None):
+        if report_type == 'default':
+            return self.compile_report(channels=channels)
+        elif report_type == 'device':
+            return self.gather_device_report()
+        elif report_type == 'all':
+            return {'report': self.compile_report(channels=channels),
+                    'device_report': self.gather_device_report()}
+        return {}
 
     def self_test(self):
         report = self.compile_report()

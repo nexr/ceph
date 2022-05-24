@@ -24,7 +24,7 @@
 void MDSContext::complete(int r) {
   MDSRank *mds = get_mds();
   ceph_assert(mds != nullptr);
-  ceph_assert(mds->mds_lock.is_locked_by_me());
+  ceph_assert(ceph_mutex_is_locked_by_me(mds->mds_lock));
   dout(10) << "MDSContext::complete: " << typeid(*this).name() << dendl;
   return Context::complete(r);
 }
@@ -107,8 +107,11 @@ void MDSIOContextBase::complete(int r) {
     return;
   }
 
-  if (r == -EBLACKLISTED) {
-    derr << "MDSIOContextBase: blacklisted!  Restarting..." << dendl;
+  // It's possible that the osd op requests will be stuck and then times out
+  // after "rados_osd_op_timeout", the mds won't know what we should it, just
+  // respawn it.
+  if (r == -EBLACKLISTED || r == -ETIMEDOUT) {
+    derr << "MDSIOContextBase: failed with " << r << ", restarting..." << dendl;
     mds->respawn();
   } else {
     MDSContext::complete(r);

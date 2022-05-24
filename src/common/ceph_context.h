@@ -25,11 +25,13 @@
 #include <typeinfo>
 #include <typeindex>
 
+#include "include/common_fwd.h"
 #include "include/any.h"
 
 #include "common/cmdparse.h"
 #include "common/code_environment.h"
-#ifdef WITH_SEASTAR
+#include "msg/msg_types.h"
+#if defined(WITH_SEASTAR) && !defined(WITH_ALIEN)
 #include "crimson/common/config_proxy.h"
 #include "crimson/common/perf_counters_collection.h"
 #else
@@ -42,11 +44,15 @@
 #include "crush/CrushLocation.h"
 
 class AdminSocket;
-class CephContextServiceThread;
-class CephContextHook;
-class CephContextObs;
 class CryptoHandler;
 class CryptoRandom;
+class MonMap;
+
+namespace ceph::common {
+  class CephContextServiceThread;
+  class CephContextObs;
+  class CephContextHook;
+}
 
 namespace ceph {
   class PluginRegistry;
@@ -56,7 +62,8 @@ namespace ceph {
   }
 }
 
-#ifdef WITH_SEASTAR
+#if defined(WITH_SEASTAR) && !defined(WITH_ALIEN)
+namespace crimson::common {
 class CephContext {
 public:
   CephContext();
@@ -65,6 +72,7 @@ public:
 	      int = 0)
     : CephContext{}
   {}
+  CephContext(CephContext&&) = default;
   ~CephContext();
 
   uint32_t get_module_type() const;
@@ -74,15 +82,19 @@ public:
   }
   CryptoRandom* random() const;
   PerfCountersCollectionImpl* get_perfcounters_collection();
-  ceph::common::ConfigProxy& _conf;
-  ceph::common::PerfCountersCollection& _perf_counters_collection;
+  crimson::common::ConfigProxy& _conf;
+  crimson::common::PerfCountersCollection& _perf_counters_collection;
   CephContext* get();
   void put();
 private:
   std::unique_ptr<CryptoRandom> _crypto_random;
   unsigned nref;
 };
+}
 #else
+#ifdef __cplusplus
+namespace ceph::common {
+#endif
 /* A CephContext represents the context held by a single library user.
  * There can be multiple CephContexts in the same process.
  *
@@ -102,10 +114,10 @@ public:
   CephContext& operator =(CephContext&&) = delete;
 
   bool _finished = false;
+  ~CephContext();
 
   // ref count!
 private:
-  ~CephContext();
   std::atomic<unsigned> nref;
 public:
   CephContext *get() {
@@ -160,8 +172,14 @@ public:
   /**
    * process an admin socket command
    */
-  void do_command(std::string_view command, const cmdmap_t& cmdmap,
-		  std::string_view format, ceph::bufferlist *out);
+  int do_command(std::string_view command, const cmdmap_t& cmdmap,
+		 Formatter *f,
+		 std::ostream& errss,
+		 ceph::bufferlist *out);
+  int _do_command(std::string_view command, const cmdmap_t& cmdmap,
+		  Formatter *f,
+		  std::ostream& errss,
+		  ceph::bufferlist *out);
 
   static constexpr std::size_t largest_singleton = 8 * 72;
 
@@ -201,7 +219,7 @@ public:
   bool check_experimental_feature_enabled(const std::string& feature,
 					  std::ostream *message);
 
-  PluginRegistry *get_plugin_registry() {
+  ceph::PluginRegistry *get_plugin_registry() {
     return _plugin_registry;
   }
 
@@ -242,6 +260,21 @@ public:
   void notify_pre_fork();
   void notify_post_fork();
 
+  /**
+   * update CephContext with a copy of the passed in MonMap mon addrs
+   *
+   * @param mm MonMap to extract and update mon addrs
+   */
+  void set_mon_addrs(const MonMap& mm);
+  void set_mon_addrs(const std::vector<entity_addrvec_t>& in) {
+    auto ptr = std::make_shared<std::vector<entity_addrvec_t>>(in);
+    atomic_store_explicit(&_mon_addrs, std::move(ptr), std::memory_order_relaxed);
+  }
+  std::shared_ptr<std::vector<entity_addrvec_t>> get_mon_addrs() const {
+    auto ptr = atomic_load_explicit(&_mon_addrs, std::memory_order_relaxed);
+    return ptr;
+  }
+
 private:
 
 
@@ -258,6 +291,8 @@ private:
   std::string _set_gid_string;
 
   int _crypto_inited;
+
+  std::shared_ptr<std::vector<entity_addrvec_t>> _mon_addrs;
 
   /* libcommon service thread.
    * SIGHUP wakes this thread, which then reopens logfiles */
@@ -313,12 +348,12 @@ private:
   ceph::spinlock _feature_lock;
   std::set<std::string> _experimental_features;
 
-  PluginRegistry *_plugin_registry;
+  ceph::PluginRegistry* _plugin_registry;
 
   md_config_obs_t *_lockdep_obs;
 
 public:
-  CrushLocation crush_location;
+  TOPNSPC::crush::CrushLocation crush_location;
 private:
 
   enum {
@@ -354,6 +389,9 @@ private:
 
   friend class CephContextObs;
 };
+#ifdef __cplusplus
+}
+#endif
 #endif	// WITH_SEASTAR
 
 #endif

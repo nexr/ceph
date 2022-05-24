@@ -95,9 +95,19 @@ void Inode::make_long_path(filepath& p)
     dn->dir->parent_inode->make_long_path(p);
     p.push_dentry(dn->name);
   } else if (snapdir_parent) {
-    snapdir_parent->make_nosnap_relative_path(p);
-    string empty;
-    p.push_dentry(empty);
+    make_nosnap_relative_path(p);
+  } else
+    p = filepath(ino);
+}
+
+void Inode::make_short_path(filepath& p)
+{
+  if (!dentries.empty()) {
+    Dentry *dn = get_first_parent();
+    ceph_assert(dn->dir && dn->dir->parent_inode);
+    p = filepath(dn->name, dn->dir->parent_inode->ino);
+  } else if (snapdir_parent) {
+    make_nosnap_relative_path(p);
   } else
     p = filepath(ino);
 }
@@ -528,7 +538,7 @@ void Inode::dump(Formatter *f) const
 
   if (!dentries.empty()) {
     f->open_array_section("parents");
-    for (const auto &dn : dentries) {
+    for (const auto &&dn : dentries) {
       f->open_object_section("dentry");
       f->dump_stream("dir_ino") << dn->dir->parent_inode->ino;
       f->dump_string("name", dn->name);

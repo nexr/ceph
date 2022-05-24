@@ -27,7 +27,7 @@
 #include "NVMEDevice.h"
 #endif
 
-#if defined(HAVE_PMEM)
+#if defined(HAVE_BLUESTORE_PMEM)
 #include "PMEMDevice.h"
 #include "libpmem.h"
 #endif
@@ -64,9 +64,7 @@ uint64_t IOContext::get_num_ios() const
   // that to the bytes value.
   uint64_t ios = 0;
 #if defined(HAVE_LIBAIO) || defined(HAVE_POSIXAIO)
-  for (auto& p : pending_aios) {
-    ios += p.iov.size();
-  }
+  ios += pending_aios.size();
 #endif
 #ifdef HAVE_SPDK
   ios += total_nseg;
@@ -96,7 +94,7 @@ BlockDevice *BlockDevice::create(CephContext* cct, const string& path,
       type = "ust-nvme";
   }
 
-#if defined(HAVE_PMEM)
+#if defined(HAVE_BLUESTORE_PMEM)
   if (type == "kernel") {
     int is_pmem = 0;
     size_t map_len = 0;
@@ -115,7 +113,7 @@ BlockDevice *BlockDevice::create(CephContext* cct, const string& path,
 
   dout(1) << __func__ << " path " << path << " type " << type << dendl;
 
-#if defined(HAVE_PMEM)
+#if defined(HAVE_BLUESTORE_PMEM)
   if (type == "pmem") {
     return new PMEMDevice(cct, cb, cbpriv);
   }
@@ -125,12 +123,13 @@ BlockDevice *BlockDevice::create(CephContext* cct, const string& path,
     return new KernelDevice(cct, cb, cbpriv, d_cb, d_cbpriv);
   }
 #endif
+#ifndef WITH_SEASTAR
 #if defined(HAVE_SPDK)
   if (type == "ust-nvme") {
     return new NVMEDevice(cct, cb, cbpriv);
   }
 #endif
-
+#endif
 
   derr << __func__ << " unknown backend " << type << dendl;
   ceph_abort();

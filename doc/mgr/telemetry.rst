@@ -7,10 +7,15 @@ The telemetry module sends anonymous data about the cluster back to the Ceph
 developers to help understand how Ceph is used and what problems users may
 be experiencing.
 
+This data is visualized on `public dashboards <https://telemetry-public.ceph.com/>`_
+that allow the community to quickly see summary statistics on how many clusters
+are reporting, their total capacity and OSD count, and version distribution
+trends.
+
 Channels
 --------
 
-The telemetry report is broken down into several "channels," each with
+The telemetry report is broken down into several "channels", each with
 a different type of information.  Assuming telemetry has been enabled,
 individual channels can be turned on and off.  (If telemetry is off,
 the per-channel setting has no effect.)
@@ -18,7 +23,7 @@ the per-channel setting has no effect.)
 * **basic** (default: on): Basic information about the cluster
 
     - capacity of the cluster
-    - number of monitors, managers, OSDs, MDSs, radosgws, or other daemons
+    - number of monitors, managers, OSDs, MDSs, object gateways, or other daemons
     - software version currently being used
     - number and types of RADOS pools and CephFS file systems
     - names of configuration options that have been changed from their
@@ -46,11 +51,11 @@ data like pool names, object names, object contents, hostnames, or device
 serial numbers.
 
 It contains counters and statistics on how the cluster has been
-deployed, the version of Ceph, the distribition of the hosts and other
+deployed, the version of Ceph, the distribution of the hosts and other
 parameters which help the project to gain a better understanding of
 the way Ceph is used.
 
-Data is sent over HTTPS to *telemetry.ceph.com*.
+Data is sent secured to *https://telemetry.ceph.com*.
 
 Enabling the module
 -------------------
@@ -123,6 +128,16 @@ The see the current configuration::
 
   ceph telemetry status
 
+Manually sending telemetry
+--------------------------
+
+To ad hoc send telemetry data::
+
+  ceph telemetry send
+
+In case telemetry is not enabled (with 'ceph telemetry on'), you need to add
+'--license sharing-1-0' to 'ceph telemetry send' command.
+
 Sending telemetry through a proxy
 ---------------------------------
 
@@ -137,8 +152,8 @@ You can also include a *user:pass* if needed::
   ceph config set mgr mgr/telemetry/proxy https://ceph:telemetry@10.0.0.1:8080
 
 
-Contact and Description
------------------------
+Status
+--------
 
 A contact and description can be added to the report.  This is
 completely optional, and disabled by default.::
@@ -146,3 +161,4 @@ completely optional, and disabled by default.::
   ceph config set mgr mgr/telemetry/contact 'John Doe <john.doe@example.com>'
   ceph config set mgr mgr/telemetry/description 'My first Ceph cluster'
   ceph config set mgr mgr/telemetry/channel_ident true
+

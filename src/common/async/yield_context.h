@@ -22,31 +22,31 @@
 
 #ifndef HAVE_BOOST_CONTEXT
 
-// hide the dependencies on boost::context and boost::coroutines
-namespace boost::asio {
+// hide the dependency on boost::context
 struct yield_context;
-}
 
 #else // HAVE_BOOST_CONTEXT
-#ifndef BOOST_COROUTINES_NO_DEPRECATION_WARNING
-#define BOOST_COROUTINES_NO_DEPRECATION_WARNING
-#endif
-#include <boost/asio/spawn.hpp>
+#include <spawn/spawn.hpp>
+
+// use explicit executor types instead of the type-erased boost::asio::executor.
+// coroutines wrap the default io_context executor with a strand executor
+using yield_context = spawn::basic_yield_context<
+    boost::asio::executor_binder<void(*)(),
+        boost::asio::strand<boost::asio::io_context::executor_type>>>;
 
 #endif // HAVE_BOOST_CONTEXT
 
-
-/// optional-like wrapper for a boost::asio::yield_context and its associated
+/// optional-like wrapper for a spawn::yield_context and its associated
 /// boost::asio::io_context. operations that take an optional_yield argument
 /// will, when passed a non-empty yield context, suspend this coroutine instead
 /// of the blocking the thread of execution
 class optional_yield {
   boost::asio::io_context *c = nullptr;
-  boost::asio::yield_context *y = nullptr;
+  yield_context *y = nullptr;
  public:
   /// construct with a valid io and yield_context
   explicit optional_yield(boost::asio::io_context& c,
-                          boost::asio::yield_context& y) noexcept
+                          yield_context& y) noexcept
     : c(&c), y(&y) {}
 
   /// type tag to construct an empty object
@@ -60,7 +60,7 @@ class optional_yield {
   boost::asio::io_context& get_io_context() const noexcept { return *c; }
 
   /// return a reference to the yield_context. only valid if non-empty
-  boost::asio::yield_context& get_yield_context() const noexcept { return *y; }
+  yield_context& get_yield_context() const noexcept { return *y; }
 };
 
 // type tag object to construct an empty optional_yield

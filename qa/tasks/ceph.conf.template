@@ -16,6 +16,9 @@
 	mon max pg per osd = 10000        # >= luminous
 	mon pg warn max object skew = 0
 
+	# disable pg_autoscaler by default for new pools
+        osd_pool_default_pg_autoscale_mode = off
+
 	osd pool default size = 2
 
 	mon osd allow primary affinity = true
@@ -36,9 +39,7 @@
 
 	mon cluster log file level = debug
 	debug asserts on shutdown = true
-
-	# we see this fail in qa on *nautilus*; bump up retries
-	mon_client_directed_command_retry = 4
+	mon health detail to clog = false
 
 [osd]
         osd journal size = 100
@@ -75,6 +76,7 @@
 	debug auth = 20
 	mon reweight min pgs per osd = 4
 	mon reweight min bytes per osd = 10
+	mgr/telemetry/nag = false
 
 [mon]
 	debug ms = 1
@@ -87,6 +89,14 @@
 	mon osd reporter subtree level = osd
 	mon osd prime pg temp = true
 	mon reweight min bytes per osd = 10
+
+	# rotate auth tickets quickly to exercise renewal paths
+	auth mon ticket ttl = 660      # 11m
+	auth service ticket ttl = 240  # 4m
+
+	# don't complain about insecure global_id in the test suite
+	mon_warn_on_insecure_global_id_reclaim = false
+	mon_warn_on_insecure_global_id_reclaim_allowed = false
 
 [client]
 	rgw cache enabled = true

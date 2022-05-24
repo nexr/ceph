@@ -53,7 +53,8 @@ struct failure_reporter_t {
   MonOpRequestRef op;       ///< failure op request
 
   failure_reporter_t() {}
-  explicit failure_reporter_t(utime_t s) : failed_since(s) {}
+  failure_reporter_t(utime_t s, MonOpRequestRef op)
+    : failed_since(s), op(op) {}
   ~failure_reporter_t() { }
 };
 
@@ -76,20 +77,15 @@ struct failure_info_t {
     return max_failed_since;
   }
 
-  // set the message for the latest report.  return any old op request we had,
-  // if any, so we can discard it.
-  MonOpRequestRef add_report(int who, utime_t failed_since,
-			     MonOpRequestRef op) {
-    map<int, failure_reporter_t>::iterator p = reporters.find(who);
-    if (p == reporters.end()) {
-      if (max_failed_since != utime_t() && max_failed_since < failed_since)
+  // set the message for the latest report.
+  void add_report(int who, utime_t failed_since, MonOpRequestRef op) {
+    [[maybe_unused]] auto [it, new_reporter] =
+      reporters.insert_or_assign(who, failure_reporter_t{failed_since, op});
+    if (new_reporter) {
+      if (max_failed_since != utime_t() && max_failed_since < failed_since) {
 	max_failed_since = failed_since;
-      p = reporters.insert(map<int, failure_reporter_t>::value_type(who, failure_reporter_t(failed_since))).first;
+      }
     }
-
-    MonOpRequestRef ret = p->second.op;
-    p->second.op = op;
-    return ret;
   }
 
   void take_report_messages(list<MonOpRequestRef>& ls) {
@@ -103,14 +99,9 @@ struct failure_info_t {
     }
   }
 
-  MonOpRequestRef cancel_report(int who) {
-    map<int, failure_reporter_t>::iterator p = reporters.find(who);
-    if (p == reporters.end())
-      return MonOpRequestRef();
-    MonOpRequestRef ret = p->second.op;
-    reporters.erase(p);
+  void cancel_report(int who) {
+    reporters.erase(who);
     max_failed_since = utime_t();
-    return ret;
   }
 };
 
@@ -120,11 +111,11 @@ class LastEpochClean {
     vector<epoch_t> epoch_by_pg;
     ps_t next_missing = 0;
     epoch_t floor = std::numeric_limits<epoch_t>::max();
-    void report(ps_t pg, epoch_t last_epoch_clean);
+    void report(unsigned pg_num, ps_t pg, epoch_t last_epoch_clean);
   };
   std::map<uint64_t, Lec> report_by_pool;
 public:
-  void report(const pg_t& pg, epoch_t last_epoch_clean);
+  void report(unsigned pg_num, const pg_t& pg, epoch_t last_epoch_clean);
   void remove_pool(uint64_t pool);
   epoch_t get_lower_bound(const OSDMap& latest) const;
 
@@ -229,6 +220,7 @@ public:
   map<int, failure_info_t> failure_info;
   map<int,utime_t>    down_pending_out;  // osd down -> out
   bool priority_convert = false;
+  map<int64_t,set<snapid_t>> pending_pseudo_purged_snaps;
   std::shared_ptr<PriorityCache::PriCache> rocksdb_binned_kv_cache = nullptr;
   std::shared_ptr<PriorityCache::Manager> pcm = nullptr;
   ceph::mutex balancer_lock = ceph::make_mutex("OSDMonitor::balancer_lock");
@@ -248,6 +240,8 @@ public:
 
   bool check_failures(utime_t now);
   bool check_failure(utime_t now, int target_osd, failure_info_t& fi);
+  utime_t get_grace_time(utime_t now, int target_osd, failure_info_t& fi) const;
+  bool is_failure_stale(utime_t now, failure_info_t& fi) const;
   void force_failure(int target_osd, int by);
 
   bool _have_pending_crush();
@@ -266,7 +260,8 @@ public:
     OSDMap::Incremental& pending_inc;
     // lock to protect pending_inc form changing
     // when checking is done
-    Mutex pending_inc_lock = {"CleanUpmapJob::pending_inc_lock"};
+    ceph::mutex pending_inc_lock =
+      ceph::make_mutex("CleanUpmapJob::pending_inc_lock");
 
     CleanUpmapJob(CephContext *cct, const OSDMap& om, OSDMap::Incremental& pi)
       : ParallelPGMapper::Job(&om),
@@ -372,7 +367,8 @@ private:
   void check_osdmap_subs();
   void share_map_with_random_osd();
 
-  Mutex prime_pg_temp_lock = {"OSDMonitor::prime_pg_temp_lock"};
+  ceph::mutex prime_pg_temp_lock =
+    ceph::make_mutex("OSDMonitor::prime_pg_temp_lock");
   struct PrimeTempJob : public ParallelPGMapper::Job {
     OSDMonitor *osdmon;
     PrimeTempJob(const OSDMap& om, OSDMonitor *m)
@@ -434,6 +430,9 @@ private:
   bool prepare_mark_me_down(MonOpRequestRef op);
   void process_failures();
   void take_all_failures(list<MonOpRequestRef>& ls);
+
+  bool preprocess_mark_me_dead(MonOpRequestRef op);
+  bool prepare_mark_me_dead(MonOpRequestRef op);
 
   bool preprocess_full(MonOpRequestRef op);
   bool prepare_full(MonOpRequestRef op);
@@ -527,6 +526,7 @@ private:
                        const unsigned pool_type,
                        const uint64_t expected_num_objects,
                        FastReadType fast_read,
+		       const string& pg_autoscale_mode,
 		       ostream *ss);
   int prepare_new_pool(MonOpRequestRef op);
 
@@ -534,16 +534,23 @@ private:
   void clear_pool_flags(int64_t pool_id, uint64_t flags);
   bool update_pools_status();
 
-  string make_snap_epoch_key(int64_t pool, epoch_t epoch);
-  string make_snap_key(int64_t pool, snapid_t snap);
-  string make_snap_key_value(int64_t pool, snapid_t snap, snapid_t num,
-			     epoch_t epoch, bufferlist *v);
-  string make_snap_purged_key(int64_t pool, snapid_t snap);
-  string make_snap_purged_key_value(int64_t pool, snapid_t snap, snapid_t num,
+  bool _is_removed_snap(int64_t pool_id, snapid_t snapid);
+  bool _is_pending_removed_snap(int64_t pool_id, snapid_t snapid);
+
+  string make_purged_snap_epoch_key(epoch_t epoch);
+  string make_purged_snap_key(int64_t pool, snapid_t snap);
+  string make_purged_snap_key_value(int64_t pool, snapid_t snap, snapid_t num,
 				    epoch_t epoch, bufferlist *v);
+
   bool try_prune_purged_snaps();
-  int lookup_pruned_snap(int64_t pool, snapid_t snap,
+  int lookup_purged_snap(int64_t pool, snapid_t snap,
 			 snapid_t *begin, snapid_t *end);
+
+  void insert_purged_snap_update(
+    int64_t pool,
+    snapid_t start, snapid_t end,
+    epoch_t epoch,
+    MonitorDBStore::TransactionRef t);
 
   bool prepare_set_flag(MonOpRequestRef op, int flag);
   bool prepare_unset_flag(MonOpRequestRef op, int flag);
@@ -609,6 +616,8 @@ private:
   bool preprocess_remove_snaps(MonOpRequestRef op);
   bool prepare_remove_snaps(MonOpRequestRef op);
 
+  bool preprocess_get_purged_snaps(MonOpRequestRef op);
+
   int load_metadata(int osd, map<string, string>& m, ostream *err);
   void count_metadata(const string& field, Formatter *f);
 
@@ -652,6 +661,10 @@ protected:
   epoch_t send_pg_creates(int osd, Connection *con, epoch_t next) const;
 
   int32_t _allocate_osd_id(int32_t* existing_id);
+
+  int get_grace_interval_threshold();
+  bool grace_interval_threshold_exceeded(int last_failed);
+  void set_default_laggy_params(int target_osd);
 
 public:
   OSDMonitor(CephContext *cct, Monitor *mn, Paxos *p, const string& service_name);
@@ -723,10 +736,6 @@ public:
     op->mark_osdmon_event(__func__);
     send_incremental(op, start);
   }
-
-  void get_removed_snaps_range(
-    epoch_t start, epoch_t end,
-    mempool::osdmap::map<int64_t,OSDMap::snap_interval_set_t> *gap_removed_snaps);
 
   int get_version(version_t ver, bufferlist& bl) override;
   int get_version(version_t ver, uint64_t feature, bufferlist& bl);

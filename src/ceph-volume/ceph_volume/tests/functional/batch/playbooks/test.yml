@@ -9,7 +9,6 @@
         state: stopped
       with_items: "{{ osd_ids }}"
 
-
 - hosts: mons
   become: yes
   tasks:
@@ -21,17 +20,10 @@
       command: "ceph --cluster {{ cluster }} osd purge osd.{{ item }} --yes-i-really-mean-it"
       with_items: "{{ osd_ids }}"
 
-
 - hosts: osds
   become: yes
   tasks:
 
-    - name: rescan pvs
-      command: "pvscan --cache"
-    - name: rescan vgs
-      command: "vgscan"
-    - name: list lvs
-      command: "lvs"
     - name: zap devices used for OSDs
       command: "ceph-volume --cluster {{ cluster }} lvm zap {{ item }} --destroy"
       with_items: "{{ devices }}"

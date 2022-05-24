@@ -34,7 +34,7 @@ POOL_ARGS = POOL_PROPERTIES + [x for x,_ in POOL_QUOTA_PROPERTIES]
 def humanify_command(command):
     out = [command['prefix']]
 
-    for arg, val in command.iteritems():
+    for arg, val in command.items():
         if arg != 'prefix':
             out.append("%s=%s" % (str(arg), str(val)))
 
@@ -129,8 +129,7 @@ def crush_rule_osds(node_buckets, rule):
                 if node_id >= 0:
                     osds.add(node_id)
                 else:
-                    for desc_node in nodes_by_id[node_id]:
-                        osds |= _gather_osds(desc_node, steps[1:])
+                    osds |= _gather_osds(nodes_by_id[node_id], steps[1:])
         elif step['op'] == 'chooseleaf_firstn':
             # Choose all descendents of the current node of type 'type',
             # and select all leaves beneath those
