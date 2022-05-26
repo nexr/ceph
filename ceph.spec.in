@@ -1694,6 +1694,7 @@ fi
 %files mgr-modules-core
 %dir %{_datadir}/ceph/mgr
 %{_datadir}/ceph/mgr/alerts
+%{_datadir}/ceph/mgr/atlassian_statuspage
 %{_datadir}/ceph/mgr/balancer
 %{_datadir}/ceph/mgr/crash
 %{_datadir}/ceph/mgr/devicehealth
@@ -1701,6 +1702,7 @@ fi
 %{_datadir}/ceph/mgr/insights
 %{_datadir}/ceph/mgr/iostat
 %{_datadir}/ceph/mgr/localpool
+%{_datadir}/ceph/mgr/objstore_usersync
 %{_datadir}/ceph/mgr/orchestrator
 %{_datadir}/ceph/mgr/osd_perf_query
 %{_datadir}/ceph/mgr/osd_support
