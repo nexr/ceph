@@ -1137,7 +1137,7 @@ class RGWOp_Endpoint_Create : public RGWRESTOp {
 public:
   RGWOp_Endpoint_Create() {}
 
-  int check_caps(RGWUserCaps& caps) override {
+  int check_caps(const RGWUserCaps& caps) override {
     return caps.check_cap("users", RGW_CAP_WRITE);
   }
 
@@ -1188,7 +1188,7 @@ class RGWOp_Endpoint_Modify : public RGWRESTOp {
 public:
   RGWOp_Endpoint_Modify() {}
 
-  int check_caps(RGWUserCaps& caps) override {
+  int check_caps(const RGWUserCaps& caps) override {
     return caps.check_cap("users", RGW_CAP_WRITE);
   }
 
@@ -1253,7 +1253,7 @@ class RGWOp_Endpoint_Remove : public RGWRESTOp {
 public:
   RGWOp_Endpoint_Remove() {}
 
-  int check_caps(RGWUserCaps& caps) override {
+  int check_caps(const RGWUserCaps& caps) override {
     return caps.check_cap("users", RGW_CAP_WRITE);
   }
 

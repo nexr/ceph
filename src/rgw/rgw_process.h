@@ -195,6 +195,7 @@ extern int process_request(rgw::sal::RGWRadosStore* store,
                            int* http_ret = nullptr);
 
 extern int rgw_process_authenticated(RGWHandler_REST* handler,
+                                     rgw::sal::RGWRadosStore* store,
                                      RGWOp*& op,
                                      RGWRequest* req,
                                      req_state* s,

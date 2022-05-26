@@ -349,7 +349,7 @@ int radosgw_Main(int argc, const char **argv)
 
   if (cct->_conf->rgw_use_ranger_authz) {
     prepare_cache_dir(cct.get());
-    init_global_ranger_manager(cct.get());
+    init_global_ranger_manager(cct.get(), store);
   }
 
   rgw_rest_init(g_ceph_context, store->svc()->zone->get_zonegroup());

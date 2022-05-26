@@ -816,13 +816,13 @@ public:
 class RGWUserAdminOp_Endpoint
 {
 public:
-  static int create(RGWRados *store,
+  static int create(rgw::sal::RGWRadosStore *store,
                   RGWUserAdminOpState& op_state, RGWFormatterFlusher& flusher);
 
-  static int modify(RGWRados *store,
+  static int modify(rgw::sal::RGWRadosStore *store,
                   RGWUserAdminOpState& op_state, RGWFormatterFlusher& flusher);
 
-  static int remove(RGWRados *store,
+  static int remove(rgw::sal::RGWRadosStore *store,
                   RGWUserAdminOpState& op_state, RGWFormatterFlusher& flusher);
 };
 

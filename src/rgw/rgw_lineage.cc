@@ -164,7 +164,7 @@ void RGWLineageManager::enqueue(req_state* rs, RGWOp* op)
   lr.server_owner = cct->_conf->cluster;
   lr.server_fsid  = cct->_conf.get_val<uuid_d>("fsid").to_string();
 
-  lr.account = rs->user->user_id.to_str();
+  lr.account = rs->user->get_id().to_str();
 
   lr.zonegroup = (!rs->zonegroup_name.empty()) ? rs->zonegroup_name : "default";
 

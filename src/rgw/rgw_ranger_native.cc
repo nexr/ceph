@@ -315,7 +315,7 @@ bool RGWRangerNativeManager::is_policy_related(req_state * const s, ranger_polic
   trim_path(req_target);
   ldout(cct, 20) << __func__ << "(): req_target = " << req_target << dendl;
 
-  string req_user     = s->user->user_id.to_str();
+  string req_user     = s->user->get_id().to_str();
   string bucket_owner = s->bucket_owner.get_id().to_str();
 
   vector<string>::iterator path_iter = policy.paths.begin();
@@ -350,7 +350,7 @@ bool RGWRangerNativeManager::is_policy_related(req_state * const s, ranger_polic
 bool RGWRangerNativeManager::is_item_related(req_state * const s, ranger_policy::item& policy_item, string tenant_group) {
   bool ret = false;
 
-  string req_user = s->user->user_id.to_str();
+  string req_user = s->user->get_id().to_str();
   string bucket_owner = s->bucket_owner.get_id().to_str();
   ldout(cct, 20) << __func__ << "(): req_user = " << req_user << dendl;
   ldout(cct, 20) << __func__ << "(): bucket_owner = " << bucket_owner << dendl;
@@ -656,7 +656,7 @@ int RGWRangerNativeManager::get_related_policies_from_remote(vector<ranger_polic
     req.set_verify_ssl(endpoint.use_ssl);
 
     // send request
-    ret = req.process();
+    ret = req.process(null_yield);
     if (ret < 0) {
       ldout(cct, 2) << __func__ << "(): Ranger process error:" << bl.c_str() << dendl;
       return ret;

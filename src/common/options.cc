@@ -5953,6 +5953,7 @@ std::vector<Option> get_rgw_options() {
     .set_default(false)
     .set_description("Should OPA be used to authorize client requests."),
 
+    Option("rgw_ranger_url", Option::TYPE_STR, Option::LEVEL_ADVANCED)
     .set_default("")
     .set_description("URL to Ranger server. ex) http[s]://1.2.3.4:6080")
     .add_see_also("rgw_ranger_admin_user")
