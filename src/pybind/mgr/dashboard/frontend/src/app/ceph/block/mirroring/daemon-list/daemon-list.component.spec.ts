@@ -1,6 +1,5 @@
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 
 import { BsDropdownModule } from 'ngx-bootstrap/dropdown';
 import { ProgressbarModule } from 'ngx-bootstrap/progressbar';
@@ -18,7 +17,6 @@ describe('DaemonListComponent', () => {
   configureTestBed({
     declarations: [DaemonListComponent, MirrorHealthColorPipe],
     imports: [
-      BrowserAnimationsModule,
       SharedModule,
       BsDropdownModule.forRoot(),
       TabsModule.forRoot(),

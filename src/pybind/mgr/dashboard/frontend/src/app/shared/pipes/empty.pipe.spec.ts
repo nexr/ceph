@@ -8,7 +8,8 @@ describe('EmptyPipe', () => {
   });
 
   it('transforms with empty value', () => {
-    expect(pipe.transform(undefined)).toBe('-');
+    const value = undefined;
+    expect(pipe.transform(value)).toBe('-');
   });
 
   it('transforms with some value', () => {

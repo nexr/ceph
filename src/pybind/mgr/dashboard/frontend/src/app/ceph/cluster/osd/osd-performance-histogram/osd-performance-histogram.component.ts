@@ -19,12 +19,12 @@ export class OsdPerformanceHistogramComponent implements OnChanges {
     this.render();
   }
 
-  hexdigits(v: number): string {
+  hexdigits(v): string {
     const i = Math.floor(v * 255).toString(16);
     return i.length === 1 ? '0' + i : i;
   }
 
-  hexcolor(r: number, g: number, b: number) {
+  hexcolor(r, g, b) {
     return '#' + this.hexdigits(r) + this.hexdigits(g) + this.hexdigits(b);
   }
 
@@ -46,8 +46,8 @@ export class OsdPerformanceHistogramComponent implements OnChanges {
       });
     });
 
-    this.valuesStyle = this.histogram.values.map((row: any, i: number) => {
-      return row.map((col: any, j: number) => {
+    this.valuesStyle = this.histogram.values.map((row, i) => {
+      return row.map((col, j) => {
         const val = this.last && this.last[i] && this.last[i][j] ? col - this.last[i][j] : col;
         const g = max ? val / max : 0;
         const r = 1 - g;

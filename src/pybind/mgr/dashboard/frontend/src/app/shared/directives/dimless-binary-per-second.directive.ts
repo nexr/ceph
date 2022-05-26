@@ -93,7 +93,7 @@ export class DimlessBinaryPerSecondDirective implements OnInit {
     }
   }
 
-  setValue(value: string) {
+  setValue(value) {
     if (/^[\d.]+$/.test(value)) {
       value += this.defaultUnit || 'm';
     }
@@ -109,7 +109,7 @@ export class DimlessBinaryPerSecondDirective implements OnInit {
     }
   }
 
-  round(size: number) {
+  round(size) {
     if (size !== null && size !== 0) {
       if (!_.isUndefined(this.minBytes) && size < this.minBytes) {
         return this.minBytes;
@@ -126,7 +126,7 @@ export class DimlessBinaryPerSecondDirective implements OnInit {
   }
 
   @HostListener('blur', ['$event.target.value'])
-  onBlur(value: string) {
+  onBlur(value) {
     this.setValue(value);
   }
 }

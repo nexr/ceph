@@ -30,7 +30,7 @@ export class CdFormGroup extends FormGroup {
     return control;
   }
 
-  _get(controlName: string): AbstractControl {
+  _get(controlName): AbstractControl {
     return (
       super.get(controlName) ||
       Object.values(this.controls)

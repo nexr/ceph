@@ -11,24 +11,24 @@ import { RbdMirroringService } from '../../../../shared/api/rbd-mirroring.servic
   styleUrls: ['./image-list.component.scss']
 })
 export class ImageListComponent implements OnInit, OnDestroy {
-  @ViewChild('stateTmpl', { static: true })
+  @ViewChild('stateTmpl')
   stateTmpl: TemplateRef<any>;
-  @ViewChild('syncTmpl', { static: true })
+  @ViewChild('syncTmpl')
   syncTmpl: TemplateRef<any>;
-  @ViewChild('progressTmpl', { static: true })
+  @ViewChild('progressTmpl')
   progressTmpl: TemplateRef<any>;
 
   subs: Subscription;
 
-  image_error: Record<string, any> = {
+  image_error = {
     data: [],
     columns: {}
   };
-  image_syncing: Record<string, any> = {
+  image_syncing = {
     data: [],
     columns: {}
   };
-  image_ready: Record<string, any> = {
+  image_ready = {
     data: [],
     columns: {}
   };
@@ -77,7 +77,10 @@ export class ImageListComponent implements OnInit, OnDestroy {
       }
     ];
 
-    this.subs = this.rbdMirroringService.subscribeSummary((data) => {
+    this.subs = this.rbdMirroringService.subscribeSummary((data: any) => {
+      if (!data) {
+        return;
+      }
       this.image_error.data = data.content_data.image_error;
       this.image_syncing.data = data.content_data.image_syncing;
       this.image_ready.data = data.content_data.image_ready;

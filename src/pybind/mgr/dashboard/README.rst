@@ -13,9 +13,8 @@ Enabling and Starting the Dashboard
 
 If you want to start the dashboard from within a development environment, you
 need to have built Ceph (see the toplevel ``README.md`` file and the `developer
-documentation
-<https://docs.ceph.com/docs/master/dev/developer_guide/#building-from-source>`_
-for details on how to accomplish this.
+documentation <http://docs.ceph.com/docs/master/dev/>`_ for details on how to
+accomplish this.
 
 Finally, you need to build the dashboard frontend code. See the file
 ``HACKING.rst`` in this directory for instructions on setting up the necessary
@@ -26,7 +25,7 @@ will configure and enable the dashboard automatically. The URL and login
 credentials are displayed when the script finishes.
 
 Please see the `Ceph Dashboard documentation
-<https://docs.ceph.com/docs/master/mgr/dashboard/>`_ for details on how to enable
+<http://docs.ceph.com/docs/master/mgr/dashboard/>`_ for details on how to enable
 and configure the dashboard manually and how to configure other settings, e.g.
 access to the Ceph object gateway.
 

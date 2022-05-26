@@ -10,16 +10,21 @@ describe('RelativeDatePipe', () => {
   });
 
   it('transforms without value', () => {
-    expect(pipe.transform(undefined)).toBe('unknown');
+    const value = undefined;
+    expect(pipe.transform(value)).toBe('unknown');
   });
 
   it('transforms "in 7 days"', () => {
-    const value = moment().add(7, 'days').unix();
+    const value = moment()
+      .add(7, 'days')
+      .unix();
     expect(pipe.transform(value)).toBe('in 7 days');
   });
 
   it('transforms "7 days ago"', () => {
-    const value = moment().subtract(7, 'days').unix();
+    const value = moment()
+      .subtract(7, 'days')
+      .unix();
     expect(pipe.transform(value)).toBe('7 days ago');
   });
 });

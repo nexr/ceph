@@ -4,7 +4,9 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { TabDirective, TabsetComponent } from 'ngx-bootstrap/tabs';
 
 import { PrometheusService } from '../../../../shared/api/prometheus.service';
+import { CephReleaseNamePipe } from '../../../../shared/pipes/ceph-release-name.pipe';
 import { PrometheusAlertService } from '../../../../shared/services/prometheus-alert.service';
+import { SummaryService } from '../../../../shared/services/summary.service';
 
 @Component({
   selector: 'cd-monitoring-list',
@@ -16,13 +18,17 @@ export class MonitoringListComponent implements OnInit {
     public prometheusAlertService: PrometheusAlertService,
     private prometheusService: PrometheusService,
     private route: ActivatedRoute,
-    private router: Router
+    private router: Router,
+    private summaryService: SummaryService,
+    private cephReleaseNamePipe: CephReleaseNamePipe
   ) {}
-  @ViewChild('tabs', { static: true })
+  @ViewChild('tabs')
   tabs: TabsetComponent;
 
   isPrometheusConfigured = false;
   isAlertmanagerConfigured = false;
+
+  docsUrl = '';
 
   ngOnInit() {
     this.prometheusService.ifAlertmanagerConfigured(() => {
@@ -30,6 +36,19 @@ export class MonitoringListComponent implements OnInit {
     });
     this.prometheusService.ifPrometheusConfigured(() => {
       this.isPrometheusConfigured = true;
+    });
+
+    const subs = this.summaryService.subscribe((summary: any) => {
+      if (!summary) {
+        return;
+      }
+
+      const releaseName = this.cephReleaseNamePipe.transform(summary.version);
+      this.docsUrl = `https://docs.ceph.com/docs/${releaseName}/mgr/dashboard/#enabling-prometheus-alerting`;
+
+      setTimeout(() => {
+        subs.unsubscribe();
+      }, 0);
     });
 
     // Activate tab according to given fragment

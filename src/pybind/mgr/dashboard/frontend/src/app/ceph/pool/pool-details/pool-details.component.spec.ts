@@ -1,13 +1,11 @@
-import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
-import { RouterTestingModule } from '@angular/router/testing';
 
 import { TabsetComponent, TabsModule } from 'ngx-bootstrap/tabs';
 
 import { configureTestBed, i18nProviders } from '../../../../testing/unit-test-helper';
+import { AppModule } from '../../../app.module';
+import { CdTableSelection } from '../../../shared/models/cd-table-selection';
 import { Permissions } from '../../../shared/models/permissions';
-import { SharedModule } from '../../../shared/shared.module';
 import { RbdConfigurationListComponent } from '../../block/rbd-configuration-list/rbd-configuration-list.component';
 import { PoolDetailsComponent } from './pool-details.component';
 
@@ -16,13 +14,7 @@ describe('PoolDetailsComponent', () => {
   let fixture: ComponentFixture<PoolDetailsComponent>;
 
   configureTestBed({
-    imports: [
-      BrowserAnimationsModule,
-      TabsModule.forRoot(),
-      SharedModule,
-      HttpClientTestingModule,
-      RouterTestingModule
-    ],
+    imports: [TabsModule.forRoot(), AppModule],
     declarations: [PoolDetailsComponent, RbdConfigurationListComponent],
     providers: [i18nProviders]
   });
@@ -30,7 +22,7 @@ describe('PoolDetailsComponent', () => {
   beforeEach(() => {
     fixture = TestBed.createComponent(PoolDetailsComponent);
     poolDetailsComponent = fixture.componentInstance;
-    poolDetailsComponent.selection = undefined;
+    poolDetailsComponent.selection = new CdTableSelection();
     poolDetailsComponent.permissions = new Permissions({
       grafana: ['read']
     });
@@ -43,10 +35,13 @@ describe('PoolDetailsComponent', () => {
 
   describe('Pool details tabset', () => {
     beforeEach(() => {
-      poolDetailsComponent.selection = {
-        tiers: [0],
-        pool: 0
-      };
+      poolDetailsComponent.selection.selected = [
+        {
+          tiers: [0],
+          pool: 0
+        }
+      ];
+      poolDetailsComponent.selection.update();
     });
 
     it('should recognize a tabset child', () => {
@@ -64,9 +59,12 @@ describe('PoolDetailsComponent', () => {
     });
 
     it('should not show "Cache Tiers Details" tab if selected pool has no "tiers"', () => {
-      poolDetailsComponent.selection = {
-        tiers: []
-      };
+      poolDetailsComponent.selection.selected = [
+        {
+          tiers: []
+        }
+      ];
+      poolDetailsComponent.selection.update();
       fixture.detectChanges();
       const tabs = poolDetailsComponent.tabsetChild.tabs;
       expect(tabs.length).toEqual(2);

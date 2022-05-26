@@ -10,7 +10,6 @@ import { FinishedTask } from '../../../shared/models/finished-task';
 import { Permission } from '../../../shared/models/permissions';
 import { AuthStorageService } from '../../../shared/services/auth-storage.service';
 import { TaskWrapperService } from '../../../shared/services/task-wrapper.service';
-import { Pool } from '../../pool/pool';
 
 @Component({
   selector: 'cd-rbd-trash-purge-modal',
@@ -43,8 +42,8 @@ export class RbdTrashPurgeModalComponent implements OnInit {
     if (this.poolPermission.read) {
       this.poolService.list(['pool_name', 'application_metadata']).then((resp) => {
         this.pools = resp
-          .filter((pool: Pool) => pool.application_metadata.includes('rbd'))
-          .map((pool: Pool) => pool.pool_name);
+          .filter((pool) => pool.application_metadata.includes('rbd'))
+          .map((pool) => pool.pool_name);
       });
     }
 

@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
 
-from . import ApiController, RESTController, \
-    allow_empty_body
+from . import ApiController, RESTController
 from .. import mgr
 from ..security import Scope
 from ..services.ceph_service import CephService
@@ -22,7 +21,7 @@ class MgrModules(RESTController):
         """
         result = []
         mgr_map = mgr.get('mgr_map')
-        always_on_modules = mgr_map['always_on_modules'].get(mgr.release_name, [])
+        always_on_modules = mgr_map['always_on_modules'][mgr.release_name]
         for module_config in mgr_map['available_modules']:
             module_name = module_config['name']
             if module_name not in self.ignore_modules:
@@ -70,7 +69,6 @@ class MgrModules(RESTController):
 
     @RESTController.Resource('POST')
     @handle_send_command_error('mgr_modules')
-    @allow_empty_body
     def enable(self, module_name):
         """
         Enable the specified Ceph Mgr module.
@@ -83,7 +81,6 @@ class MgrModules(RESTController):
 
     @RESTController.Resource('POST')
     @handle_send_command_error('mgr_modules')
-    @allow_empty_body
     def disable(self, module_name):
         """
         Disable the specified Ceph Mgr module.
@@ -161,13 +158,12 @@ class MgrModules(RESTController):
                 else:
                     option['default_value'] = str_to_bool(
                         option['default_value'])
-            elif option['type'] in ['float', 'uint', 'int', 'size', 'secs']:
-                cls = {
-                    'float': float
-                }.get(option['type'], int)
+            elif option['type'] == 'float':
                 for name in ['default_value', 'min', 'max']:
-                    if option[name] == 'None':  # This is Python None
-                        option[name] = None
-                    elif option[name]:  # Skip empty entries
-                        option[name] = cls(option[name])
+                    if option[name]:  # Skip empty entries
+                        option[name] = float(option[name])
+            elif option['type'] in ['uint', 'int', 'size', 'secs']:
+                for name in ['default_value', 'min', 'max']:
+                    if option[name]:  # Skip empty entries
+                        option[name] = int(option[name])
         return options

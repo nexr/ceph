@@ -6,12 +6,9 @@ import { forkJoin } from 'rxjs';
 
 import { RoleService } from '../../../shared/api/role.service';
 import { ScopeService } from '../../../shared/api/scope.service';
-import { ListWithDetails } from '../../../shared/classes/list-with-details.class';
 import { CriticalConfirmationModalComponent } from '../../../shared/components/critical-confirmation-modal/critical-confirmation-modal.component';
-import { FormModalComponent } from '../../../shared/components/form-modal/form-modal.component';
 import { ActionLabelsI18n } from '../../../shared/constants/app.constants';
 import { CellTemplate } from '../../../shared/enum/cell-template.enum';
-import { Icons } from '../../../shared/enum/icons.enum';
 import { NotificationType } from '../../../shared/enum/notification-type.enum';
 import { CdTableAction } from '../../../shared/models/cd-table-action';
 import { CdTableColumn } from '../../../shared/models/cd-table-column';
@@ -30,7 +27,7 @@ const BASE_URL = 'user-management/roles';
   styleUrls: ['./role-list.component.scss'],
   providers: [{ provide: URLBuilderService, useValue: new URLBuilderService(BASE_URL) }]
 })
-export class RoleListComponent extends ListWithDetails implements OnInit {
+export class RoleListComponent implements OnInit {
   permission: Permission;
   tableActions: CdTableAction[];
   columns: CdTableColumn[];
@@ -51,24 +48,16 @@ export class RoleListComponent extends ListWithDetails implements OnInit {
     private urlBuilder: URLBuilderService,
     public actionLabels: ActionLabelsI18n
   ) {
-    super();
     this.permission = this.authStorageService.getPermissions().user;
     const addAction: CdTableAction = {
       permission: 'create',
-      icon: Icons.add,
+      icon: 'fa-plus',
       routerLink: () => this.urlBuilder.getCreate(),
       name: this.actionLabels.CREATE
     };
-    const cloneAction: CdTableAction = {
-      permission: 'create',
-      icon: Icons.clone,
-      name: this.actionLabels.CLONE,
-      disable: () => !this.selection.hasSingleSelection,
-      click: () => this.cloneRole()
-    };
     const editAction: CdTableAction = {
       permission: 'update',
-      icon: Icons.edit,
+      icon: 'fa-pencil',
       disable: () => !this.selection.hasSingleSelection || this.selection.first().system,
       routerLink: () =>
         this.selection.first() && this.urlBuilder.getEdit(this.selection.first().name),
@@ -76,12 +65,12 @@ export class RoleListComponent extends ListWithDetails implements OnInit {
     };
     const deleteAction: CdTableAction = {
       permission: 'delete',
-      icon: Icons.destroy,
+      icon: 'fa-times',
       disable: () => !this.selection.hasSingleSelection || this.selection.first().system,
       click: () => this.deleteRoleModal(),
       name: this.actionLabels.DELETE
     };
-    this.tableActions = [addAction, cloneAction, editAction, deleteAction];
+    this.tableActions = [addAction, editAction, deleteAction];
   }
 
   ngOnInit() {
@@ -143,37 +132,6 @@ export class RoleListComponent extends ListWithDetails implements OnInit {
         itemDescription: 'Role',
         itemNames: [name],
         submitAction: () => this.deleteRole(name)
-      }
-    });
-  }
-
-  cloneRole() {
-    const name = this.selection.first().name;
-    this.modalRef = this.modalService.show(FormModalComponent, {
-      initialState: {
-        fields: [
-          {
-            type: 'text',
-            name: 'newName',
-            value: `${name}_clone`,
-            label: this.i18n('New name'),
-            required: true
-          }
-        ],
-        titleText: this.i18n('Clone Role'),
-        submitButtonText: this.i18n('Clone Role'),
-        onSubmit: (values: object) => {
-          this.roleService.clone(name, values['newName']).subscribe(() => {
-            this.getRoles();
-            this.notificationService.show(
-              NotificationType.success,
-              this.i18n(`Cloned role '{{dst_name}}' from '{{src_name}}'`, {
-                src_name: name,
-                dst_name: values['newName']
-              })
-            );
-          });
-        }
       }
     });
   }

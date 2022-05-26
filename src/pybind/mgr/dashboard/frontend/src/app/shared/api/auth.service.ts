@@ -2,9 +2,6 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 
-import { Observable } from 'rxjs';
-import { tap } from 'rxjs/operators';
-
 import { Credentials } from '../models/credentials';
 import { LoginResponse } from '../models/login-response';
 import { AuthStorageService } from '../services/auth-storage.service';
@@ -24,24 +21,19 @@ export class AuthService {
     return this.http.post('api/auth/check', { token: token });
   }
 
-  login(credentials: Credentials): Observable<LoginResponse> {
-    return this.http.post('api/auth', credentials).pipe(
-      tap((resp: LoginResponse) => {
-        this.authStorageService.set(
-          resp.username,
-          resp.permissions,
-          resp.sso,
-          resp.pwdExpirationDate,
-          resp.pwdUpdateRequired
-        );
-      })
-    );
+  login(credentials: Credentials) {
+    return this.http
+      .post('api/auth', credentials)
+      .toPromise()
+      .then((resp: LoginResponse) => {
+        this.authStorageService.set(resp.username, resp.token, resp.permissions);
+      });
   }
 
   logout(callback: Function = null) {
     return this.http.post('api/auth/logout', null).subscribe((resp: any) => {
+      this.router.navigate(['/logout'], { skipLocationChange: true });
       this.authStorageService.remove();
-      this.router.navigate(['/login'], { skipLocationChange: true });
       if (callback) {
         callback();
       }

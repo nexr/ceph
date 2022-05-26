@@ -7,7 +7,6 @@ import { ToastrService } from 'ngx-toastr';
 
 import { configureTestBed, i18nProviders } from '../../../testing/unit-test-helper';
 import { AppModule } from '../../app.module';
-import { NotificationType } from '../enum/notification-type.enum';
 import { CdNotification, CdNotificationConfig } from '../models/cd-notification';
 import { ApiInterceptorService } from './api-interceptor.service';
 import { NotificationService } from './notification.service';
@@ -19,7 +18,7 @@ describe('ApiInterceptorService', () => {
   let router: Router;
   const url = 'api/xyz';
 
-  const httpError = (error: any, errorOpts: object, done = (_resp: any) => {}) => {
+  const httpError = (error, errorOpts, done = (_resp) => {}) => {
     httpClient.get(url).subscribe(
       () => {},
       (resp) => {
@@ -31,30 +30,20 @@ describe('ApiInterceptorService', () => {
     httpTesting.expectOne(url).error(error, errorOpts);
   };
 
-  const runRouterTest = (errorOpts: object, expectedCallParams: any[]) => {
+  const runRouterTest = (errorOpts, expectedCallParams) => {
     httpError(new ErrorEvent('abc'), errorOpts);
     httpTesting.verify();
     expect(router.navigate).toHaveBeenCalledWith(...expectedCallParams);
   };
 
-  const runNotificationTest = (
-    error: any,
-    errorOpts: object,
-    expectedCallParams: CdNotification
-  ) => {
+  const runNotificationTest = (error, errorOpts, expectedCallParams) => {
     httpError(error, errorOpts);
     httpTesting.verify();
     expect(notificationService.show).toHaveBeenCalled();
     expect(notificationService.save).toHaveBeenCalledWith(expectedCallParams);
   };
 
-  const createCdNotification = (
-    type: NotificationType,
-    title?: string,
-    message?: string,
-    options?: any,
-    application?: string
-  ) => {
+  const createCdNotification = (type, title?, message?, options?, application?) => {
     return new CdNotification(new CdNotificationConfig(type, title, message, options, application));
   };
 
@@ -181,7 +170,7 @@ describe('ApiInterceptorService', () => {
   });
 
   describe('interceptor error handling', () => {
-    const expectSaveToHaveBeenCalled = (called: boolean) => {
+    const expectSaveToHaveBeenCalled = (called) => {
       tick(510);
       if (called) {
         expect(notificationService.save).toHaveBeenCalled();

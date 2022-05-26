@@ -1,4 +1,0 @@
-mock; python_version <= '3.3'
-pytest-cov
-pytest-instafail
-pyfakefs==4.5.0

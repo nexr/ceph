@@ -2,7 +2,7 @@ import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { DebugElement } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { TreeModule } from 'angular-tree-component';
+import { TreeModule } from 'ng2-tree';
 import { TabsModule } from 'ngx-bootstrap/tabs';
 import { of } from 'rxjs';
 
@@ -16,7 +16,7 @@ describe('CrushmapComponent', () => {
   let fixture: ComponentFixture<CrushmapComponent>;
   let debugElement: DebugElement;
   configureTestBed({
-    imports: [HttpClientTestingModule, TreeModule.forRoot(), TabsModule.forRoot(), SharedModule],
+    imports: [HttpClientTestingModule, TreeModule, TabsModule.forRoot(), SharedModule],
     declarations: [CrushmapComponent],
     providers: [HealthService]
   });
@@ -33,7 +33,7 @@ describe('CrushmapComponent', () => {
 
   it('should display right title', () => {
     fixture.detectChanges();
-    const span = debugElement.nativeElement.querySelector('.card-header');
+    const span = debugElement.nativeElement.querySelector('span');
     expect(span.textContent).toBe('CRUSH map viewer');
   });
 
@@ -53,7 +53,7 @@ describe('CrushmapComponent', () => {
     it('should display "No nodes!" if ceph tree nodes is empty array', () => {
       prepareGetHealth([]);
       expect(healthService.getFullHealth).toHaveBeenCalled();
-      expect(component.nodes[0].name).toEqual('No nodes!');
+      expect(component.tree.value).toEqual('No nodes!');
     });
 
     describe('nodes not empty', () => {
@@ -71,70 +71,78 @@ describe('CrushmapComponent', () => {
       });
 
       it('should have two root nodes', () => {
-        expect(component.nodes).toEqual([
+        expect(component.tree.children).toEqual([
           {
-            cdId: -3,
             children: [
               {
                 children: [
                   {
-                    id: component.nodes[0].children[0].children[0].id,
-                    cdId: 4,
+                    id: 4,
+                    settings: {
+                      static: true
+                    },
                     status: 'up',
-                    type: 'osd',
-                    name: 'osd.0-2 (osd)'
+                    value: 'osd.0-2 (osd)'
                   }
                 ],
-                id: component.nodes[0].children[0].id,
-                cdId: -4,
+                id: -4,
+                settings: {
+                  static: true
+                },
                 status: undefined,
-                type: 'host',
-                name: 'my-host-2 (host)'
+                value: 'my-host-2 (host)'
               }
             ],
-            id: component.nodes[0].id,
+            id: -3,
+            settings: {
+              static: true
+            },
             status: undefined,
-            type: 'root',
-            name: 'default-2 (root)'
+            value: 'default-2 (root)'
           },
           {
             children: [
               {
                 children: [
                   {
-                    id: component.nodes[1].children[0].children[0].id,
-                    cdId: 0,
+                    id: 0,
+                    settings: {
+                      static: true
+                    },
                     status: 'up',
-                    type: 'osd',
-                    name: 'osd.0 (osd)'
+                    value: 'osd.0 (osd)'
                   },
                   {
-                    id: component.nodes[1].children[0].children[1].id,
-                    cdId: 1,
+                    id: 1,
+                    settings: {
+                      static: true
+                    },
                     status: 'down',
-                    type: 'osd',
-                    name: 'osd.1 (osd)'
+                    value: 'osd.1 (osd)'
                   },
                   {
-                    id: component.nodes[1].children[0].children[2].id,
-                    cdId: 2,
+                    id: 2,
+                    settings: {
+                      static: true
+                    },
                     status: 'up',
-                    type: 'osd',
-                    name: 'osd.2 (osd)'
+                    value: 'osd.2 (osd)'
                   }
                 ],
-                id: component.nodes[1].children[0].id,
-                cdId: -2,
+                id: -2,
+                settings: {
+                  static: true
+                },
                 status: undefined,
-                type: 'host',
-                name: 'my-host (host)'
+                value: 'my-host (host)'
               }
             ],
-            id: component.nodes[1].id,
-            cdId: -1,
+            id: -1,
+            settings: {
+              static: true
+            },
             status: undefined,
-            type: 'root',
-            name: 'default (root)'
+            value: 'default (root)'
           }
         ]);
       });

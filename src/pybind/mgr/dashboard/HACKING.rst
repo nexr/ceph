@@ -62,8 +62,8 @@ Build the Project
 ~~~~~~~~~~~~~~~~~
 
 Run ``npm run build`` to build the project. The build artifacts will be
-stored in the ``dist/`` directory. Use the ``--prod`` flag for a
-production build (``npm run build -- --prod``). Navigate to ``https://localhost:8443``.
+stored in the ``dist/`` directory. Use the ``-prod`` flag for a
+production build. Navigate to ``https://localhost:8443``.
 
 Build the Code Documentation
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -72,7 +72,7 @@ Run ``npm run doc-build`` to generate code docs in the ``documentation/``
 directory. To make them accesible locally for a web browser, run
 ``npm run doc-serve`` and they will become available at ``http://localhost:8444``.
 With ``npm run compodoc -- <opts>`` you may
-`fully configure it <https://compodoc.app/guides/usage.html>`_.
+`fully configure it https://compodoc.app/guides/usage.html`_.
 
 Code linting and formatting
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -121,372 +121,58 @@ to be visible in the rendered template.
 Running Unit Tests
 ~~~~~~~~~~~~~~~~~~
 
+Create ``unit-test-configuration.ts`` file based on
+``unit-test-configuration.ts.sample`` in directory
+``src/pybind/mgr/dashboard/frontend/src``.
+
 Run ``npm run test`` to execute the unit tests via `Jest
 <https://facebook.github.io/jest/>`_.
 
 If you get errors on all tests, it could be because `Jest
-<https://facebook.github.io/jest/>`__ or something else was updated.
+<https://facebook.github.io/jest/>`_ or something else was updated.
 There are a few ways how you can try to resolve this:
 
 - Remove all modules with ``rm -rf dist node_modules`` and run ``npm install``
   again in order to reinstall them
 - Clear the cache of jest by running ``npx jest --clearCache``
 
-Running End-to-End (E2E) Tests
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Running End-to-End Tests
+~~~~~~~~~~~~~~~~~~~~~~~~
 
-We use `Cypress <https://www.cypress.io/>`__ to run our frontend E2E tests.
+We use `Protractor <http://www.protractortest.org/>`__ to run our frontend e2e
+tests.
 
-E2E Prerequisites
-.................
+Our ``run-frontend-e2e-tests.sh`` script will check if Chrome or Docker is
+installed and run the tests if either is found.
 
-You need to previously build the frontend.
-
-In some environments, depending on your user permissions and the CYPRESS_CACHE_FOLDER,
-you might need to run ``npm ci`` with the ``--unsafe-perm`` flag.
-
-You might need to install additional packages to be able to run Cypress.
-Please run ``npx cypress verify`` to verify it.
-
-run-frontend-e2e-tests.sh
-.........................
-
-Our ``run-frontend-e2e-tests.sh`` script is the go to solution when you wish to
-do a full scale e2e run.
-It will verify if everything needed is installed, start a new vstart cluster
-and run the full test suite.
-
-Start all frontend E2E tests by running::
+Start all frontend e2e tests by running::
 
   $ ./run-frontend-e2e-tests.sh
-
-Report:
-  You can follow the e2e report on the terminal and you can find the screenshots
-  of failed test cases by opening the following directory::
-
-    src/pybind/mgr/dashboard/frontend/cypress/screenshots/
 
 Device:
   You can force the script to use a specific device with the ``-d`` flag::
 
-    $ ./run-frontend-e2e-tests.sh -d <chrome|chromium|electron|docker>
+    $ ./run-frontend-e2e-tests.sh -d <chrome|docker>
 
 Remote:
-  By default this script will stop and start a new vstart cluster.
   If you want to run the tests outside the ceph environment, you will need to
-  manually define the dashboard url using ``-r`` and, optionally, credentials
-  (``-u``, ``-p``)::
+  manually define the dashboard url using ``-r``::
 
-    $ ./run-frontend-e2e-tests.sh -r <DASHBOARD_URL> -u <E2E_LOGIN_USER> -p <E2E_LOGIN_PWD>
+    $ ./run-frontend-e2e-tests.sh -r <DASHBOARD_URL>
 
 Note:
   When using docker, as your device, you might need to run the script with sudo
   permissions.
 
-run-cephadm-e2e-tests.sh
-.........................
-
-``run-cephadm-e2e-tests.sh`` runs a subset of E2E tests to verify that the Dashboard and cephadm as
-Orchestrator backend behave correctly.
-
-Prerequisites: you need to install `KCLI
-<https://kcli.readthedocs.io/en/latest/>`_ and Node.js in your local machine.
-
-Configure KCLI plan requirements::
-
-  $ sudo chown -R $(id -un) /var/lib/libvirt/images
-  $ mkdir -p /var/lib/libvirt/images/ceph-dashboard dashboard
-  $ kcli create pool -p /var/lib/libvirt/images/ceph-dashboard dashboard
-  $ kcli create network -c 192.168.100.0/24 dashboard
-
-Note:
-  This script is aimed to be run as jenkins job so the cleanup is triggered only in a jenkins
-  environment. In local, the user will shutdown the cluster when desired (i.e. after debugging).
-
-Start E2E tests by running::
-
-  $ cd <your/ceph/repo/dir>
-  $ sudo chown -R $(id -un) src/pybind/mgr/dashboard/frontend/{dist,node_modules,src/environments}
-  $ ./src/pybind/mgr/dashboard/ci/cephadm/run-cephadm-e2e-tests.sh
-
-You can also start a cluster in development mode (so the frontend build starts in watch mode and you
-only have to reload the page for the changes to be reflected) by running::
-
-  $ ./src/pybind/mgr/dashboard/ci/cephadm/start-cluster.sh --dev-mode
-
-Note:
-  Add ``--expanded`` if you need a cluster ready to deploy services (one with enough monitor
-  daemons spread across different hosts and enough OSDs).
-
-Test your changes by running:
-
-  $ ./src/pybind/mgr/dashboard/ci/cephadm/run-cephadm-e2e-tests.sh
-
-Shutdown the cluster by running:
-
-  $ kcli delete plan -y ceph
-  $ # In development mode, also kill the npm build watch process (e.g., pkill -f "ng build")
-
-Other running options
-.....................
-
-During active development, it is not recommended to run the previous script,
-as it is not prepared for constant file changes.
-Instead you should use one of the following commands:
-
-- ``npm run e2e`` - This will run ``ng serve`` and open the Cypress Test Runner.
-- ``npm run e2e:ci`` - This will run ``ng serve`` and run the Cypress Test Runner once.
-- ``npx cypress run`` - This calls cypress directly and will run the Cypress Test Runner.
-  You need to have a running frontend server.
-- ``npx cypress open`` - This calls cypress directly and will open the Cypress Test Runner.
-  You need to have a running frontend server.
-
-Calling Cypress directly has the advantage that you can use any of the available
-`flags <https://docs.cypress.io/guides/guides/command-line.html#cypress-run>`__
-to customize your test run and you don't need to start a frontend server each time.
-
-Using one of the ``open`` commands, will open a cypress application where you
-can see all the test files you have and run each individually.
-This is going to be run in watch mode, so if you make any changes to test files,
-it will retrigger the test run.
-This cannot be used inside docker, as it requires X11 environment to be able to open.
-
-By default Cypress will look for the web page at ``https://localhost:4200/``.
-If you are serving it in a different URL you will need to configure it by
-exporting the environment variable CYPRESS_BASE_URL with the new value.
-E.g.: ``CYPRESS_BASE_URL=https://localhost:41076/ npx cypress open``
-
-CYPRESS_CACHE_FOLDER
-.....................
-
-When installing cypress via npm, a binary of the cypress app will also be
-downloaded and stored in a cache folder.
-This removes the need to download it every time you run ``npm ci`` or even when
-using cypress in a separate project.
-
-By default Cypress uses ~/.cache to store the binary.
-To prevent changes to the user home directory, we have changed this folder to
-``/ceph/build/src/pybind/mgr/dashboard/cypress``, so when you build ceph or run
-``run-frontend-e2e-tests.sh`` this is the directory Cypress will use.
-
-When using any other command to install or run cypress,
-it will go back to the default directory. It is recommended that you export the
-CYPRESS_CACHE_FOLDER environment variable with a fixed directory, so you always
-use the same directory no matter which command you use.
-
-
 Writing End-to-End Tests
 ~~~~~~~~~~~~~~~~~~~~~~~~
 
-The PagerHelper class
-.....................
-
-The ``PageHelper`` class is supposed to be used for general purpose code that
-can be used on various pages or suites.
-
-Examples are
-
-- ``navigateTo()`` - Navigates to a specific page and waits for it to load
-- ``getFirstTableCell()`` - returns the first table cell. You can also pass a
-  string with the desired content and it will return the first cell that
-  contains it.
-- ``getTabsCount()`` - returns the amount of tabs
-
-Every method that could be useful on several pages belongs there. Also, methods
-which enhance the derived classes of the PageHelper belong there. A good
-example for such a case is the ``restrictTo()`` decorator. It ensures that a
-method implemented in a subclass of PageHelper is called on the correct page.
-It will also show a developer-friendly warning if this is not the case.
-
-Subclasses of PageHelper
-........................
-
-Helper Methods
-""""""""""""""
-
-In order to make code reusable which is specific for a particular suite, make
-sure to put it in a derived class of the ``PageHelper``. For instance, when
-talking about the pool suite, such methods would be ``create()``, ``exist()``
-and ``delete()``. These methods are specific to a pool but are useful for other
-suites.
-
-Methods that return HTML elements which can only be found on a specific page,
-should be either implemented in the helper methods of the subclass of PageHelper
-or as own methods of the subclass of PageHelper.
-
-Using PageHelpers
-"""""""""""""""""
-
-In any suite, an instance of the specific ``Helper`` class should be
-instantiated and called directly.
-
-.. code:: TypeScript
-
-  const pools = new PoolPageHelper();
-
-  it('should create a pool', () => {
-    pools.exist(poolName, false);
-    pools.navigateTo('create');
-    pools.create(poolName, 8);
-    pools.exist(poolName, true);
-  });
-
-Code Style
-..........
-
-Please refer to the official `Cypress Core Concepts
-<https://docs.cypress.io/guides/core-concepts/introduction-to-cypress.html#Cypress-Can-Be-Simple-Sometimes>`__
-for a better insight on how to write and structure tests.
-
-``describe()`` vs ``it()``
-""""""""""""""""""""""""""
-
-Both ``describe()`` and ``it()`` are function blocks, meaning that any
-executable code necessary for the test can be contained in either block.
-However, Typescript scoping rules still apply, therefore any variables declared
-in a ``describe`` are available to the ``it()`` blocks inside of it.
-
-``describe()`` typically are containers for tests, allowing you to break tests
-into multiple parts. Likewise, any setup that must be made before your tests are
-run can be initialized within the ``describe()`` block. Here is an example:
-
-.. code:: TypeScript
-
-  describe('create, edit & delete image test', () => {
-    const poolName = 'e2e_images_pool';
-
-    before(() => {
-      cy.login();
-      pools.navigateTo('create');
-      pools.create(poolName, 8, 'rbd');
-      pools.exist(poolName, true);
-    });
-
-    beforeEach(() => {
-      cy.login();
-      images.navigateTo();
-    });
-
-    //...
-
-  });
-
-As shown, we can initiate the variable ``poolName`` as well as run commands
-before our test suite begins (creating a pool). ``describe()`` block messages
-should include what the test suite is.
-
-``it()`` blocks typically are parts of an overarching test. They contain the
-functionality of the test suite, each performing individual roles.
-Here is an example:
-
-.. code:: TypeScript
-
-  describe('create, edit & delete image test', () => {
-    //...
-
-    it('should create image', () => {
-      images.createImage(imageName, poolName, '1');
-      images.getFirstTableCell(imageName).should('exist');
-    });
-
-    it('should edit image', () => {
-      images.editImage(imageName, poolName, newImageName, '2');
-      images.getFirstTableCell(newImageName).should('exist');
-    });
-
-    //...
-  });
-
-As shown from the previous example, our ``describe()`` test suite is to create,
-edit and delete an image. Therefore, each ``it()`` completes one of these steps,
-one for creating, one for editing, and so on. Likewise, every ``it()`` blocks
-message should be in lowercase and written so long as "it" can be the prefix of
-the message. For example, ``it('edits the test image' () => ...)`` vs.
-``it('image edit test' () => ...)``. As shown, the first example makes
-grammatical sense with ``it()`` as the prefix whereas the second message does
-not. ``it()`` should describe what the individual test is doing and what it
-expects to happen.
-
-Differences between Frontend Unit Tests and End-to-End (E2E) Tests / FAQ
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-General introduction about testing and E2E/unit tests 
-
-
-What are E2E/unit tests designed for?
-.....................................
-
-E2E test:
-
-It requires a fully functional system and tests the interaction of all components
-of the application (Ceph, back-end, front-end).
-E2E tests are designed to mimic the behavior of the user when interacting with the application
-- for example when it comes to workflows like creating/editing/deleting an item.
-Also the tests should verify that certain items are displayed as a user would see them
-when clicking through the UI (for example a menu entry or a pool that has been
-created during a test and the pool and its properties should be displayed in the table).
-
-Angular Unit Tests:
-
-Unit tests, as the name suggests, are tests for smaller units of the code.
-Those tests are designed for testing all kinds of Angulars' components (e.g. services, pipes etc.).
-They do not require a connection to the backend, hence those tests are independent of it.
-The expected data of the backend is mocked in the frontend and by using this data
-the functionality of the frontend can be tested without having to have real data from the backend.
-As previously mentioned, data is either mocked or, in a simple case, contains a static input,
-a function call and an expected static output.
-More complex examples include the state of a component (attributes of the component class),
-that define how the output changes according to the given input.
-
-Which E2E/unit tests are considered to be valid?
-................................................
-
-This is not easy to answer, but new tests that are written in the same way as already existing
-dashboard tests should generally be considered valid.
-Unit tests should focus on the component to be tested.
-This is either an Angular component, directive, service, pipe, etc.
-
-E2E tests should focus on testing the functionality of the whole application.
-Approximately a third of the overall E2E tests should verify the correctness
-of user visible elements.
-
-How should an E2E/unit test look like?
-......................................
-
-Unit tests should focus on the described purpose
-and shouldn't try to test other things in the same `it` block.
-
-E2E tests should contain a description that either verifies
-the correctness of a user visible element or a complete process
-like for example the creation/validation/deletion of a pool.
-
-What should an E2E/unit test cover?
-...................................
-
-E2E tests should mostly, but not exclusively, cover interaction with the backend.
-This way the interaction with the backend is utilized to write integration tests.
-
-A unit test should mostly cover critical or complex functionality
-of a component (Angular Components, Services, Pipes, Directives, etc).
-
-What should an E2E/unit test NOT cover?
-.......................................
-
-Avoid duplicate testing: do not write E2E tests for what's already
-been covered as frontend-unit tests and vice versa.
-It may not be possible to completely avoid an overlap.
-
-Unit tests should not be used to extensively click through components and E2E tests
-shouldn't be used to extensively test a single component of Angular.
-
-Best practices/guideline
-........................
-
-As a general guideline we try to follow the 70/20/10 approach - 70% unit tests,
-20% integration tests and 10% end-to-end tests.
-For further information please refer to `this document
-<https://testing.googleblog.com/2015/04/just-say-no-to-more-end-to-end-tests.html>`__
-and the included "Testing Pyramid".
+When writing e2e tests you don't want to recompile every time from scratch to
+try out if your test has succeeded. As usual you have your development server
+open (``npm start``) which already has compiled all files. To attach
+`Protractor <http://www.protractortest.org/>`__ to this process, instead of
+spinning up it's own server, you can use ``npm run e2e -- --dev-server-target``
+or just ``npm run e2e:dev`` which is equivalent.
 
 Further Help
 ~~~~~~~~~~~~
@@ -541,7 +227,7 @@ This components are declared on the components module:
 `src/pybind/mgr/dashboard/frontend/src/app/shared/components`.
 
 Helper
-~~~~~~
+......
 
 This component should be used to provide additional information to the user.
 
@@ -680,9 +366,9 @@ To do that, check the settings in the i18n config file
 ``src/pybind/mgr/dashboard/frontend/i18n.config.json``:: and make sure that the
 organization is *ceph*, the project is *ceph-dashboard* and the resource is
 the one you want to pull from and push to e.g. *Master:master*. To find a list
-of avaiable resources visit `<https://www.transifex.com/ceph/ceph-dashboard/content/>`_.
+of avaiable resources visit ``https://www.transifex.com/ceph/ceph-dashboard/content/``::
 
-After you checked the config go to the directory ``src/pybind/mgr/dashboard/frontend`` and run::
+After you checked the config go to the directory ``src/pybind/mgr/dashboard/frontend``:: and run
 
   $ npm run i18n
 
@@ -694,7 +380,7 @@ The tool will ask you for an api token, unless you added it by running:
 
   $ npm run i18n:token
 
-To create a transifex api token visit `<https://www.transifex.com/user/settings/api/>`_.
+To create a transifex api token visit ``https://www.transifex.com/user/settings/api/``::
 
 After the command ran successfully, build the UI and check if everything is
 working as expected. You also might want to run the frontend tests.
@@ -704,7 +390,7 @@ Suggestions
 
 Strings need to start and end in the same line as the element:
 
-.. code-block:: html
+.. code-block:: xml
 
   <!-- avoid -->
   <span i18n>
@@ -727,7 +413,7 @@ Strings need to start and end in the same line as the element:
 
 Isolated interpolations should not be translated:
 
-.. code-block:: html
+.. code-block:: xml
 
   <!-- avoid -->
   <span i18n>{{ foo }}</span>
@@ -737,14 +423,14 @@ Isolated interpolations should not be translated:
 
 Interpolations used in a sentence should be kept in the translation:
 
-.. code-block:: html
+.. code-block:: xml
 
   <!-- recommended -->
   <span i18n>There are {{ x }} OSDs.</span>
 
 Remove elements that are outside the context of the translation:
 
-.. code-block:: html
+.. code-block:: xml
 
   <!-- avoid -->
   <label i18n>
@@ -760,7 +446,7 @@ Remove elements that are outside the context of the translation:
 
 Keep elements that affect the sentence:
 
-.. code-block:: html
+.. code-block:: xml
 
   <!-- recommended -->
   <span i18n>Profile <b>foo</b> will be removed.</span>
@@ -802,28 +488,25 @@ Alternatively, you can use Python's native package installation method::
   $ pip install tox
   $ pip install coverage
 
-To run the tests, run ``src/script/run_tox.sh`` in the dashboard directory (where
+To run the tests, run ``run-tox.sh`` in the dashboard directory (where
 ``tox.ini`` is located)::
 
   ## Run Python 2+3 tests+lint commands:
-  $ ../../../script/run_tox.sh --tox-env py27,py3,lint,check
+  $ ./run-tox.sh
 
   ## Run Python 3 tests+lint commands:
-  $ ../../../script/run_tox.sh --tox-env py3,lint,check
+  $ WITH_PYTHON2=OFF ./run-tox.sh
 
   ## Run Python 3 arbitrary command (e.g. 1 single test):
-  $ ../../../script/run_tox.sh --tox-env py3 "" tests/test_rgw_client.py::RgwClientTest::test_ssl_verify
+  $ WITH_PYTHON2=OFF ./run-tox.sh pytest tests/test_rgw_client.py::RgwClientTest::test_ssl_verify
 
-You can also run tox instead of ``run_tox.sh``::
+You can also run tox instead of ``run-tox.sh``::
 
   ## Run Python 3 tests command:
-  $ tox -e py3
+  $ CEPH_BUILD_DIR=.tox tox -e py3-cov
 
   ## Run Python 3 arbitrary command (e.g. 1 single test):
-  $ tox -e py3 tests/test_rgw_client.py::RgwClientTest::test_ssl_verify
-
-Python files can be automatically fixed and formatted according to PEP8
-standards by using ``run_tox.sh --tox-env fix`` or ``tox -e fix``.
+  $ CEPH_BUILD_DIR=.tox tox -e py3-run pytest tests/test_rgw_client.py::RgwClientTest::test_ssl_verify
 
 We also collect coverage information from the backend code when you run tests. You can check the
 coverage information provided by the tox output, or by running the following
@@ -992,7 +675,7 @@ parameter.
 For ``POST`` and ``PUT`` methods, all method parameters are considered
 body parameters by default. To override this default, one can use the
 ``path_params`` and ``query_params`` to specify which method parameters are
-path and query parameters respectively.
+path and query parameters respectivelly.
 Body parameters are decoded from the request body, either from a form format, or
 from a dictionary in JSON format.
 
@@ -1009,17 +692,17 @@ endpoint:
     # URL: /ping/{key}?opt1=...&opt2=...
     @Endpoint(path="/", query_params=['opt1'])
     def index(self, key, opt1, opt2=None):
-      """..."""
+      # ...
 
     # URL: /ping/{key}?opt1=...&opt2=...
     @Endpoint(query_params=['opt1'])
     def __call__(self, key, opt1, opt2=None):
-      """..."""
+      # ...
 
     # URL: /ping/post/{key1}/{key2}
     @Endpoint('POST', path_params=['key1', 'key2'])
     def post(self, key1, key2, data1, data2=None):
-      """..."""
+      # ...
 
 
 In the above example we see how the ``path`` option can be used to override the
@@ -1056,7 +739,7 @@ Consider the following example:
     # URL: /ping/{node}/stats/{date}/latency?unit=...
     @Endpoint(path="/{date}/latency")
     def latency(self, node, date, unit="ms"):
-      """ ..."""
+      # ...
 
 In this example we explicitly declare a path parameter ``{node}`` in the
 controller URL path, and a path parameter ``{date}`` in the ``latency``
@@ -1094,10 +777,9 @@ Example:
 
     @Proxy()
     def proxy(self, path, **params):
-      """
-      if requested URL is "/foo/proxy/access/service?opt=1"
-      then path is "access/service" and params is {'opt': '1'}
-      """
+      # if requested URL is "/foo/proxy/access/service?opt=1"
+      # then path is "access/service" and params is {'opt': '1'}
+      # ...
 
 
 How does the RESTController work?
@@ -1210,54 +892,21 @@ Example:
     def list(self):
       return {"msg": "Hello"}
 
-How to create a dedicated UI endpoint which uses the 'public' API?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Sometimes we want to combine multiple calls into one single call
-to save bandwidth or for other performance reasons.
-In order to achieve that, we first have to create an ``@UiApiController`` which
-is used for endpoints consumed by the UI but that are not part of the
-'public' API. Let the ui class inherit from the REST controller class.
-Now you can use all methods from the api controller.
-
-Example:
-
-.. code-block:: python
-
-  import cherrypy
-  from . import UiApiController, ApiController, RESTController
-
-
-  @ApiController('ping', secure=False)  # /api/ping
-  class Ping(RESTController):
-    def list(self):
-      return self._list()
-
-    def _list(self):  # To not get in conflict with the JSON wrapper
-      return [1,2,3]
-
-
-  @UiApiController('ping', secure=False)  # /ui-api/ping
-  class PingUi(Ping):
-    def list(self):
-      return self._list() + [4, 5, 6]
 
 How to access the manager module instance from a controller?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 We provide the manager module instance as a global variable that can be
-imported in any module.
+imported in any module. We also provide a logger instance in the same way.
 
 Example:
 
 .. code-block:: python
 
-  import logging
   import cherrypy
-  from .. import mgr
+  from .. import logger, mgr
   from ..tools import ApiController, RESTController
 
-  logger = logging.getLogger(__name__)
 
   @ApiController('servers')
   class Servers(RESTController):
@@ -1825,11 +1474,9 @@ API endpoints.However, by default it is not very detailed. There are two
 decorators that can be used to add more information:
 
 * ``@EndpointDoc()`` for documentation of endpoints. It has four optional arguments
-  (explained below): ``description``, ``group``, ``parameters`` and
-  ``responses``.
+  (explained below): ``description``, ``group``, ``parameters`` and``responses``.
 * ``@ControllerDoc()`` for documentation of controller or group associated with
-  the endpoints. It only takes the two first arguments: ``description`` and
-  ``group``.
+  the endpoints. It only takes the two first arguments: ``description`` and``group``.
 
 
 ``description``: A a string with a short (1-2 sentences) description of the object.
@@ -1853,7 +1500,6 @@ type and not as a string. Allowed values are ``str``, ``int``, ``bool``, ``float
 .. code-block:: python
 
  @EndpointDoc(parameters={'my_string': (str, 'Description of my_string')})
- def method(my_string): pass
 
 For body parameters, more complex cases are possible. If the parameter is a
 dictionary, the type should be replaced with a ``dict`` containing its nested
@@ -1872,7 +1518,6 @@ for nested parameters).
       'item2': (str, 'Description of item2', True),  # item2 is optional
       'item3': (str, 'Description of item3', True, 'foo'),  # item3 is optional with 'foo' as default value
   }, 'Description of my_dictionary')})
-  def method(my_dictionary): pass
 
 If the parameter is a ``list`` of primitive types, the type should be
 surrounded with square brackets.
@@ -1880,7 +1525,6 @@ surrounded with square brackets.
 .. code-block:: python
 
   @EndpointDoc(parameters={'my_list': ([int], 'Description of my_list')})
-  def method(my_list): pass
 
 If the parameter is a ``list`` with nested parameters, the nested parameters
 should be placed in a dictionary and surrounded with square brackets.
@@ -1892,7 +1536,6 @@ should be placed in a dictionary and surrounded with square brackets.
       'list_item': (str, 'Description of list_item'),
       'list_item2': (str, 'Description of list_item2')
   }], 'Description of my_list')})
-  def method(my_list): pass
 
 
 ``responses``: A dict used for describing responses. Rules for describing
@@ -1903,8 +1546,7 @@ example below:
 .. code-block:: python
 
   @EndpointDoc(responses={
-    '400':{'my_response': (str, 'Description of my_response')}})
-  def method(): pass
+    '400':{'my_response': (str, 'Description of my_response')}
 
 
 Error Handling in Python
@@ -2013,6 +1655,7 @@ In order to create a new plugin, the following steps are required:
 The available Mixins (helpers) are:
 
 - ``CanMgr``: provides the plug-in with access to the ``mgr`` instance under ``self.mgr``.
+- ``CanLog``: provides the plug-in with access to the Ceph Dashboard logger under ``self.log``.
 
 The available Interfaces are:
 
@@ -2035,7 +1678,7 @@ The available Interfaces are:
 - ``FilterRequest.BeforeHandler``: requires overriding
   ``filter_request_before_handler()`` hook. This method receives a
   ``cherrypy.request`` object for processing. A usual implementation of this
-  method will allow some requests to pass or will raise a ``cherrypy.HTTPError``
+  method will allow some requests to pass or will raise a ``cherrypy.HTTPError`
   based on the ``request`` metadata and other conditions.
 
 New interfaces and hooks should be added as soon as they are required to
@@ -2055,8 +1698,9 @@ A sample plugin implementation would look like this:
   import cherrypy
 
   @PM.add_plugin
-  class Mute(I.CanMgr, I.Setupable, I.HasOptions, I.HasCommands,
-                       I.FilterRequest.BeforeHandler, I.HasControllers):
+  class Mute(I.CanMgr, I.CanLog, I.Setupable, I.HasOptions,
+                       I.HasCommands, I.FilterRequest.BeforeHandler,
+                       I.HasControllers):
     @PM.add_hook
     def get_options(self):
       return [Option('mute', default=False, type='bool')]
@@ -2095,7 +1739,7 @@ facilitates the basic tasks (Options, Commands, and common Mixins). The previous
 plugin could be rewritten like this:
 
 .. code-block:: python
-
+  
   from . import PLUGIN_MANAGER as PM
   from . import interfaces as I
   from .plugin import SimplePlugin as SP

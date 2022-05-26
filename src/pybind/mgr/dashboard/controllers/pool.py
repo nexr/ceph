@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
-from typing import Any, cast, Dict, Iterable, List, Optional, Union
 
 import time
 import cherrypy
 
-from . import ApiController, ControllerDoc, RESTController, Endpoint, ReadPermission, Task, \
-    UiApiController
+from . import ApiController, RESTController, Endpoint, ReadPermission, Task
 from .. import mgr
 from ..security import Scope
 from ..services.ceph_service import CephService
@@ -29,7 +27,7 @@ class Pool(RESTController):
 
         crush_rules = {r['rule_id']: r["rule_name"] for r in mgr.get('osd_map_crush')['rules']}
 
-        res: Dict[Union[int, str], Union[str, List[Any]]] = {}
+        res = {}
         for attr in attrs:
             if attr not in pool:
                 continue
@@ -62,14 +60,16 @@ class Pool(RESTController):
         return self._pool_list(attrs, stats)
 
     @classmethod
-    def _get(cls, pool_name: str, attrs: Optional[str] = None, stats: bool = False) -> dict:
+    def _get(cls, pool_name, attrs=None, stats=False):
+        # type: (str, str, bool) -> dict
         pools = cls._pool_list(attrs, stats)
-        pool = [p for p in pools if p['pool_name'] == pool_name]
+        pool = [pool for pool in pools if pool['pool_name'] == pool_name]
         if not pool:
             raise cherrypy.NotFound('No such pool')
         return pool[0]
 
-    def get(self, pool_name: str, attrs: Optional[str] = None, stats: bool = False) -> dict:
+    def get(self, pool_name, attrs=None, stats=False):
+        # type: (str, str, bool) -> dict
         pool = self._get(pool_name, attrs, stats)
         pool['configuration'] = RbdConfiguration(pool_name).list()
         return pool
@@ -83,8 +83,6 @@ class Pool(RESTController):
     @pool_task('edit', ['{pool_name}'])
     def set(self, pool_name, flags=None, application_metadata=None, configuration=None, **kwargs):
         self._set_pool_values(pool_name, application_metadata, flags, True, kwargs)
-        if kwargs.get('pool'):
-            pool_name = kwargs['pool']
         RbdConfiguration(pool_name).set_configuration(configuration)
         self._wait_for_pgs(pool_name)
 
@@ -114,7 +112,7 @@ class Pool(RESTController):
                                          yes_i_really_mean_it=True)
             if update_existing:
                 original_app_metadata = set(
-                    cast(Iterable[Any], current_pool.get('application_metadata')))
+                    current_pool.get('application_metadata'))
             else:
                 original_app_metadata = set()
 
@@ -126,11 +124,6 @@ class Pool(RESTController):
         def set_key(key, value):
             CephService.send_command('mon', 'osd pool set', pool=pool, var=key, val=str(value))
 
-        quotas = {}
-        quotas['max_objects'] = kwargs.pop('quota_max_objects', None)
-        quotas['max_bytes'] = kwargs.pop('quota_max_bytes', None)
-        self._set_quotas(pool, quotas)
-
         for key, value in kwargs.items():
             if key == 'pool':
                 update_name = True
@@ -141,12 +134,6 @@ class Pool(RESTController):
                     set_key('pgp_num', value)
         if update_name:
             CephService.send_command('mon', 'osd pool rename', srcpool=pool, destpool=destpool)
-
-    def _set_quotas(self, pool, quotas):
-        for field, value in quotas.items():
-            if value is not None:
-                CephService.send_command('mon', 'osd pool set-quota',
-                                         pool=pool, field=field, val=str(value))
 
     def _prepare_compression_removal(self, options, kwargs):
         """
@@ -205,20 +192,15 @@ class Pool(RESTController):
     def configuration(self, pool_name):
         return RbdConfiguration(pool_name).list()
 
-
-@UiApiController('/pool', Scope.POOL)
-@ControllerDoc("Dashboard UI helper function; not part of the public API", "PoolUi")
-class PoolUi(Pool):
     @Endpoint()
     @ReadPermission
-    def info(self):
+    def _info(self, pool_name=''):
+        # type: (str) -> dict
         """Used by the create-pool dialog"""
-        osd_map_crush = mgr.get('osd_map_crush')
-        options = mgr.get('config_options')['options']
 
         def rules(pool_type):
             return [r
-                    for r in osd_map_crush['rules']
+                    for r in mgr.get('osd_map_crush')['rules']
                     if r['type'] == pool_type]
 
         def all_bluestore():
@@ -227,30 +209,12 @@ class PoolUi(Pool):
 
         def get_config_option_enum(conf_name):
             return [[v for v in o['enum_values'] if len(v) > 0]
-                    for o in options
+                    for o in mgr.get('config_options')['options']
                     if o['name'] == conf_name][0]
 
-        profiles = CephService.get_erasure_code_profiles()
-        used_rules: Dict[str, List[str]] = {}
-        used_profiles: Dict[str, List[str]] = {}
-        pool_names = []
-        for p in self._pool_list():
-            name = p['pool_name']
-            pool_names.append(name)
-            rule = p['crush_rule']
-            if rule in used_rules:
-                used_rules[rule].append(name)
-            else:
-                used_rules[rule] = [name]
-            profile = p['erasure_code_profile']
-            if profile in used_profiles:
-                used_profiles[profile].append(name)
-            else:
-                used_profiles[profile] = [name]
-
         mgr_config = mgr.get('config')
-        return {
-            "pool_names": pool_names,
+        result = {
+            "pool_names": [p['pool_name'] for p in self._pool_list()],
             "crush_rules_replicated": rules(1),
             "crush_rules_erasure": rules(3),
             "is_all_bluestore": all_bluestore(),
@@ -260,8 +224,9 @@ class PoolUi(Pool):
             "compression_modes": get_config_option_enum('bluestore_compression_mode'),
             "pg_autoscale_default_mode": mgr_config['osd_pool_default_pg_autoscale_mode'],
             "pg_autoscale_modes": get_config_option_enum('osd_pool_default_pg_autoscale_mode'),
-            "erasure_code_profiles": profiles,
-            "used_rules": used_rules,
-            "used_profiles": used_profiles,
-            'nodes': mgr.get('osd_map_tree')['nodes']
         }
+
+        if pool_name:
+            result['pool_options'] = RbdConfiguration(pool_name).list()
+
+        return result

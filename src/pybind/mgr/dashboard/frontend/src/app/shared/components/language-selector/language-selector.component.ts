@@ -16,7 +16,7 @@ export class LanguageSelectorComponent implements OnInit {
   @Input()
   isDropdown = true;
 
-  supportedLanguages: Record<string, any> = SupportedLanguages;
+  supportedLanguages: Object = SupportedLanguages;
   selectedLanguage: string;
 
   constructor(private localeService: BsLocaleService, private languageService: LanguageService) {}

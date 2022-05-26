@@ -6,7 +6,7 @@ import cherrypy
 from mgr_module import CLICommand, Option
 
 from . import PLUGIN_MANAGER as PM
-from . import interfaces as I  # noqa: E741,N812
+from . import interfaces as I
 from .ttl_cache import ttl_cache
 
 from ..controllers.rbd import Rbd, RbdSnapshot, RbdTrash
@@ -17,12 +17,6 @@ from ..controllers.cephfs import CephFS
 from ..controllers.rgw import Rgw, RgwDaemon, RgwBucket, RgwUser
 from ..controllers.nfsganesha import NFSGanesha, NFSGaneshaService, NFSGaneshaExports
 
-try:
-    from typing import no_type_check, Set
-except ImportError:
-    no_type_check = object()  # Just for type checking
-
-
 class Features(Enum):
     RBD = 'rbd'
     MIRRORING = 'mirroring'
@@ -32,7 +26,7 @@ class Features(Enum):
     NFS = 'nfs'
 
 
-PREDISABLED_FEATURES = set()  # type: Set[str]
+PREDISABLED_FEATURES = set()
 
 
 Feature2Controller = {
@@ -52,9 +46,8 @@ class Actions(Enum):
     STATUS = 'status'
 
 
-# pylint: disable=too-many-ancestors
 @PM.add_plugin
-class FeatureToggles(I.CanMgr, I.Setupable, I.HasOptions,
+class FeatureToggles(I.CanMgr, I.CanLog, I.Setupable, I.HasOptions,
                      I.HasCommands, I.FilterRequest.BeforeHandler,
                      I.HasControllers):
     OPTION_FMT = 'FEATURE_TOGGLE_{}'
@@ -63,11 +56,10 @@ class FeatureToggles(I.CanMgr, I.Setupable, I.HasOptions,
 
     @PM.add_hook
     def setup(self):
-        # pylint: disable=attribute-defined-outside-init
         self.Controller2Feature = {
             controller: feature
             for feature, controllers in Feature2Controller.items()
-            for controller in controllers}  # type: ignore
+            for controller in controllers}
 
     @PM.add_hook
     def get_options(self):
@@ -104,13 +96,12 @@ class FeatureToggles(I.CanMgr, I.Setupable, I.HasOptions,
             else:
                 for feature in features or [f.value for f in Features]:
                     enabled = mgr.get_module_option(self.OPTION_FMT.format(feature))
-                    msg += ["Feature '{}': {}".format(
+                    msg += ["Feature '{}': '{}'".format(
                         feature,
                         'enabled' if enabled else 'disabled')]
             return ret, '\n'.join(msg), ''
         return {'handle_command': cmd}
 
-    @no_type_check  # https://github.com/python/mypy/issues/7806
     def _get_feature_from_request(self, request):
         try:
             return self.Controller2Feature[
@@ -119,7 +110,6 @@ class FeatureToggles(I.CanMgr, I.Setupable, I.HasOptions,
             return None
 
     @ttl_cache(ttl=CACHE_TTL, maxsize=CACHE_MAX_SIZE)
-    @no_type_check  # https://github.com/python/mypy/issues/7806
     def _is_feature_enabled(self, feature):
         return self.mgr.get_module_option(self.OPTION_FMT.format(feature.value))
 
@@ -144,9 +134,8 @@ class FeatureToggles(I.CanMgr, I.Setupable, I.HasOptions,
         @ApiController('/feature_toggles')
         class FeatureTogglesEndpoint(RESTController):
 
-            def list(_):  # pylint: disable=no-self-argument  # noqa: N805
+            def list(_):
                 return {
-                    # pylint: disable=protected-access
                     feature.value: self._is_feature_enabled(feature)
                     for feature in Features
                 }

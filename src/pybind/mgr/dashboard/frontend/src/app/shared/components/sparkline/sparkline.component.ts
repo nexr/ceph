@@ -10,9 +10,9 @@ import { DimlessBinaryPipe } from '../../pipes/dimless-binary.pipe';
   styleUrls: ['./sparkline.component.scss']
 })
 export class SparklineComponent implements OnInit, OnChanges {
-  @ViewChild('sparkCanvas', { static: true })
+  @ViewChild('sparkCanvas')
   chartCanvasRef: ElementRef;
-  @ViewChild('sparkTooltip', { static: true })
+  @ViewChild('sparkTooltip')
   chartTooltipRef: ElementRef;
 
   @Input()
@@ -36,7 +36,7 @@ export class SparklineComponent implements OnInit, OnChanges {
     }
   ];
 
-  options: Record<string, any> = {
+  options = {
     animation: {
       duration: 0
     },
@@ -56,7 +56,7 @@ export class SparklineComponent implements OnInit, OnChanges {
       intersect: false,
       custom: undefined,
       callbacks: {
-        label: (tooltipItem: any) => {
+        label: (tooltipItem) => {
           if (this.isBinary) {
             return this.dimlessBinaryPipe.transform(tooltipItem.yLabel);
           } else {
@@ -91,11 +91,11 @@ export class SparklineComponent implements OnInit, OnChanges {
   constructor(private dimlessBinaryPipe: DimlessBinaryPipe) {}
 
   ngOnInit() {
-    const getStyleTop = (tooltip: any) => {
+    const getStyleTop = (tooltip) => {
       return tooltip.caretY - tooltip.height - tooltip.yPadding - 5 + 'px';
     };
 
-    const getStyleLeft = (tooltip: any, positionX: number) => {
+    const getStyleLeft = (tooltip, positionX) => {
       return positionX + tooltip.caretX + 'px';
     };
 
@@ -111,7 +111,7 @@ export class SparklineComponent implements OnInit, OnChanges {
       borderColor: this.colors[0].pointBorderColor
     };
 
-    this.options.tooltips.custom = (tooltip: any) => {
+    this.options.tooltips.custom = (tooltip) => {
       chartTooltip.customTooltips(tooltip);
     };
   }

@@ -1,15 +1,8 @@
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 
-import {
-  ITreeOptions,
-  TreeComponent,
-  TreeModel,
-  TreeNode,
-  TREE_ACTIONS
-} from 'angular-tree-component';
+import { NodeEvent, TreeModel } from 'ng2-tree';
 
 import { HealthService } from '../../../shared/api/health.service';
-import { Icons } from '../../../shared/enum/icons.enum';
 
 @Component({
   selector: 'cd-crushmap',
@@ -17,48 +10,32 @@ import { Icons } from '../../../shared/enum/icons.enum';
   styleUrls: ['./crushmap.component.scss']
 })
 export class CrushmapComponent implements OnInit {
-  @ViewChild('tree', { static: false }) tree: TreeComponent;
-
-  icons = Icons;
-  loadingIndicator = true;
-  nodes: any[] = [];
-  treeOptions: ITreeOptions = {
-    useVirtualScroll: true,
-    nodeHeight: 22,
-    actionMapping: {
-      mouse: {
-        click: this.onNodeSelected.bind(this)
-      }
-    }
-  };
-
+  tree: TreeModel;
   metadata: any;
   metadataTitle: string;
-  metadataKeyMap: { [key: number]: any } = {};
+  metadataKeyMap: { [key: number]: number } = {};
 
   constructor(private healthService: HealthService) {}
 
   ngOnInit() {
     this.healthService.getFullHealth().subscribe((data: any) => {
-      this.loadingIndicator = false;
-      this.nodes = this.abstractTreeData(data);
+      this.tree = this._abstractTreeData(data);
     });
   }
 
-  private abstractTreeData(data: any): any[] {
+  _abstractTreeData(data: any): TreeModel {
     const nodes = data.osd_map.tree.nodes || [];
     const treeNodeMap: { [key: number]: any } = {};
 
     if (0 === nodes.length) {
-      return [
-        {
-          name: 'No nodes!'
-        }
-      ];
+      return {
+        value: 'No nodes!',
+        settings: { static: true }
+      };
     }
 
-    const roots: any[] = [];
-    nodes.reverse().forEach((node: any) => {
+    const roots = [];
+    nodes.reverse().forEach((node) => {
       if (node.type === 'root') {
         roots.push(node.id);
       }
@@ -69,42 +46,35 @@ export class CrushmapComponent implements OnInit {
       return treeNodeMap[id];
     });
 
-    return children;
+    return {
+      value: 'CRUSH map',
+      children: children
+    };
   }
 
-  private generateTreeLeaf(node: any, treeNodeMap: any) {
-    const cdId = node.id;
-    this.metadataKeyMap[cdId] = node;
+  private generateTreeLeaf(node: any, treeNodeMap) {
+    const id = node.id;
+    this.metadataKeyMap[id] = node;
+    const settings = { static: true };
 
-    const name: string = node.name + ' (' + node.type + ')';
+    const value: string = node.name + ' (' + node.type + ')';
     const status: string = node.status;
 
     const children: any[] = [];
-    const resultNode = { name, status, cdId, type: node.type };
     if (node.children) {
-      node.children.sort().forEach((childId: any) => {
+      node.children.sort().forEach((childId) => {
         children.push(treeNodeMap[childId]);
       });
 
-      resultNode['children'] = children;
+      return { value, status, settings, id, children };
     }
 
-    return resultNode;
+    return { value, status, settings, id };
   }
 
-  onNodeSelected(tree: TreeModel, node: TreeNode) {
-    TREE_ACTIONS.ACTIVATE(tree, node, true);
-    if (node.data.cdId !== undefined) {
-      const { name, type, status, ...remain } = this.metadataKeyMap[node.data.cdId];
-      this.metadata = remain;
-      this.metadataTitle = name + ' (' + type + ')';
-    } else {
-      delete this.metadata;
-      delete this.metadataTitle;
-    }
-  }
-
-  onUpdateData() {
-    this.tree.treeModel.expandAll();
+  onNodeSelected(e: NodeEvent) {
+    const { name, type, status, ...remain } = this.metadataKeyMap[e.node.id];
+    this.metadata = remain;
+    this.metadataTitle = name + ' (' + type + ')';
   }
 }

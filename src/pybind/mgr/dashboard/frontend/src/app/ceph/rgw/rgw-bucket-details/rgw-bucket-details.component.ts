@@ -1,6 +1,6 @@
 import { Component, Input, OnChanges } from '@angular/core';
 
-import { RgwBucketService } from '../../../shared/api/rgw-bucket.service';
+import { CdTableSelection } from '../../../shared/models/cd-table-selection';
 
 @Component({
   selector: 'cd-rgw-bucket-details',
@@ -8,16 +8,16 @@ import { RgwBucketService } from '../../../shared/api/rgw-bucket.service';
   styleUrls: ['./rgw-bucket-details.component.scss']
 })
 export class RgwBucketDetailsComponent implements OnChanges {
-  @Input()
-  selection: any;
+  bucket: any;
 
-  constructor(private rgwBucketService: RgwBucketService) {}
+  @Input()
+  selection: CdTableSelection;
+
+  constructor() {}
 
   ngOnChanges() {
-    if (this.selection) {
-      this.rgwBucketService.get(this.selection.bid).subscribe((bucket: object) => {
-        this.selection = bucket;
-      });
+    if (this.selection.hasSelection) {
+      this.bucket = this.selection.first();
     }
   }
 }

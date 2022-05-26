@@ -90,7 +90,7 @@ class S3Auth(AuthBase):
             key = self.secret_key.encode('utf-8')
             msg = canonical_string.encode('utf-8')
         else:
-            key = self.secret_key  # type: ignore
+            key = self.secret_key
             msg = canonical_string
         h = hmac.new(key, msg, digestmod=sha)
         return encodestring(h.digest()).strip()

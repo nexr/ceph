@@ -1,16 +1,14 @@
-import { Component, NgZone, ViewChild } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
 
 import { I18n } from '@ngx-translate/i18n-polyfill';
 import { BsModalService } from 'ngx-bootstrap/modal';
 import { forkJoin as observableForkJoin, Observable, Subscriber } from 'rxjs';
 
 import { RgwUserService } from '../../../shared/api/rgw-user.service';
-import { ListWithDetails } from '../../../shared/classes/list-with-details.class';
 import { CriticalConfirmationModalComponent } from '../../../shared/components/critical-confirmation-modal/critical-confirmation-modal.component';
 import { ActionLabelsI18n } from '../../../shared/constants/app.constants';
 import { TableComponent } from '../../../shared/datatable/table/table.component';
 import { CellTemplate } from '../../../shared/enum/cell-template.enum';
-import { Icons } from '../../../shared/enum/icons.enum';
 import { CdTableAction } from '../../../shared/models/cd-table-action';
 import { CdTableColumn } from '../../../shared/models/cd-table-column';
 import { CdTableFetchDataContext } from '../../../shared/models/cd-table-fetch-data-context';
@@ -27,16 +25,15 @@ const BASE_URL = 'rgw/user';
   styleUrls: ['./rgw-user-list.component.scss'],
   providers: [{ provide: URLBuilderService, useValue: new URLBuilderService(BASE_URL) }]
 })
-export class RgwUserListComponent extends ListWithDetails {
-  @ViewChild(TableComponent, { static: true })
+export class RgwUserListComponent {
+  @ViewChild(TableComponent)
   table: TableComponent;
+
   permission: Permission;
   tableActions: CdTableAction[];
   columns: CdTableColumn[] = [];
   users: object[] = [];
   selection: CdTableSelection = new CdTableSelection();
-  isStale = false;
-  staleTimeout: number;
 
   constructor(
     private authStorageService: AuthStorageService,
@@ -44,20 +41,13 @@ export class RgwUserListComponent extends ListWithDetails {
     private bsModalService: BsModalService,
     private i18n: I18n,
     private urlBuilder: URLBuilderService,
-    public actionLabels: ActionLabelsI18n,
-    private ngZone: NgZone
+    public actionLabels: ActionLabelsI18n
   ) {
-    super();
     this.permission = this.authStorageService.getPermissions().rgw;
     this.columns = [
       {
         name: this.i18n('Username'),
         prop: 'uid',
-        flexGrow: 1
-      },
-      {
-        name: this.i18n('Tenant'),
-        prop: 'tenant',
         flexGrow: 1
       },
       {
@@ -92,43 +82,26 @@ export class RgwUserListComponent extends ListWithDetails {
       this.selection.first() && `${encodeURIComponent(this.selection.first().uid)}`;
     const addAction: CdTableAction = {
       permission: 'create',
-      icon: Icons.add,
+      icon: 'fa-plus',
       routerLink: () => this.urlBuilder.getCreate(),
-      name: this.actionLabels.CREATE,
-      canBePrimary: (selection: CdTableSelection) => !selection.hasSelection
+      name: this.actionLabels.CREATE
     };
     const editAction: CdTableAction = {
       permission: 'update',
-      icon: Icons.edit,
+      icon: 'fa-pencil',
       routerLink: () => this.urlBuilder.getEdit(getUserUri()),
       name: this.actionLabels.EDIT
     };
     const deleteAction: CdTableAction = {
       permission: 'delete',
-      icon: Icons.destroy,
+      icon: 'fa-times',
       click: () => this.deleteAction(),
-      disable: () => !this.selection.hasSelection,
-      name: this.actionLabels.DELETE,
-      canBePrimary: (selection: CdTableSelection) => selection.hasMultiSelection
+      name: this.actionLabels.DELETE
     };
     this.tableActions = [addAction, editAction, deleteAction];
-    this.timeConditionReached();
-  }
-
-  timeConditionReached() {
-    clearTimeout(this.staleTimeout);
-    this.ngZone.runOutsideAngular(() => {
-      this.staleTimeout = window.setTimeout(() => {
-        this.ngZone.run(() => {
-          this.isStale = true;
-        });
-      }, 10000);
-    });
   }
 
   getUserList(context: CdTableFetchDataContext) {
-    this.isStale = false;
-    this.timeConditionReached();
     this.rgwUserService.list().subscribe(
       (resp: object[]) => {
         this.users = resp;

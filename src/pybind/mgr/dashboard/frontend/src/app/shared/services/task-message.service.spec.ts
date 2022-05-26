@@ -2,9 +2,7 @@ import { TestBed } from '@angular/core/testing';
 
 import * as _ from 'lodash';
 
-import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { configureTestBed, i18nProviders } from '../../../testing/unit-test-helper';
-import { RbdService } from '../api/rbd.service';
 import { FinishedTask } from '../models/finished-task';
 import { TaskException } from '../models/task-exception';
 import { TaskMessageOperation, TaskMessageService } from './task-message.service';
@@ -14,14 +12,12 @@ describe('TaskManagerMessageService', () => {
   let finishedTask: FinishedTask;
 
   configureTestBed({
-    providers: [TaskMessageService, i18nProviders, RbdService],
-    imports: [HttpClientTestingModule]
+    providers: [TaskMessageService, i18nProviders]
   });
 
   beforeEach(() => {
     service = TestBed.get(TaskMessageService);
     finishedTask = new FinishedTask();
-    finishedTask.duration = 30;
   });
 
   it('should be created', () => {
@@ -52,7 +48,7 @@ describe('TaskManagerMessageService', () => {
       expect(service.getErrorTitle(finishedTask)).toBe(
         'Failed to ' + operation.failure + ' ' + involves
       );
-      expect(service.getSuccessTitle(finishedTask)).toBe(`${operation.success} ${involves}`);
+      expect(service.getSuccessTitle(finishedTask)).toBe(operation.success + ' ' + involves);
     };
 
     const testCreate = (involves: string) => {
@@ -65,10 +61,6 @@ describe('TaskManagerMessageService', () => {
 
     const testDelete = (involves: string) => {
       testMessages(new TaskMessageOperation('Deleting', 'delete', 'Deleted'), involves);
-    };
-
-    const testImport = (involves: string) => {
-      testMessages(new TaskMessageOperation('Importing', 'import', 'Imported'), involves);
     };
 
     const testErrorCode = (code: number, msg: string) => {
@@ -126,29 +118,8 @@ describe('TaskManagerMessageService', () => {
       });
     });
 
-    describe('crush rule tasks', () => {
-      beforeEach(() => {
-        const metadata = {
-          name: 'someRuleName'
-        };
-        defaultMsg = `crush rule '${metadata.name}'`;
-        finishedTask.metadata = metadata;
-      });
-
-      it('tests crushRule/create messages', () => {
-        finishedTask.name = 'crushRule/create';
-        testCreate(defaultMsg);
-        testErrorCode(17, `Name is already used by ${defaultMsg}.`);
-      });
-
-      it('tests crushRule/delete messages', () => {
-        finishedTask.name = 'crushRule/delete';
-        testDelete(defaultMsg);
-      });
-    });
-
     describe('rbd tasks', () => {
-      let metadata: Record<string, any>;
+      let metadata;
       let childMsg: string;
       let destinationMsg: string;
       let snapMsg: string;
@@ -157,20 +128,20 @@ describe('TaskManagerMessageService', () => {
         metadata = {
           pool_name: 'somePool',
           image_name: 'someImage',
-          image_id: '12345',
-          image_spec: 'somePool/someImage',
-          image_id_spec: 'somePool/12345',
           snapshot_name: 'someSnapShot',
           dest_pool_name: 'someDestinationPool',
           dest_image_name: 'someDestinationImage',
           child_pool_name: 'someChildPool',
           child_image_name: 'someChildImage',
-          new_image_name: 'someImage2'
+          new_image_name: 'newImage',
+          image_id: '12345'
         };
         defaultMsg = `RBD '${metadata.pool_name}/${metadata.image_name}'`;
         childMsg = `RBD '${metadata.child_pool_name}/${metadata.child_image_name}'`;
         destinationMsg = `RBD '${metadata.dest_pool_name}/${metadata.dest_image_name}'`;
-        snapMsg = `RBD snapshot '${metadata.pool_name}/${metadata.image_name}@${metadata.snapshot_name}'`;
+        snapMsg = `RBD snapshot '${metadata.pool_name}/${metadata.image_name}@${
+          metadata.snapshot_name
+        }'`;
         finishedTask.metadata = metadata;
       });
 
@@ -189,7 +160,6 @@ describe('TaskManagerMessageService', () => {
       it('tests rbd/delete messages', () => {
         finishedTask.name = 'rbd/delete';
         testDelete(defaultMsg);
-        testErrorCode(16, `${defaultMsg} is busy.`);
         testErrorCode(39, `${defaultMsg} contains snapshots.`);
       });
 
@@ -238,7 +208,7 @@ describe('TaskManagerMessageService', () => {
         finishedTask.name = 'rbd/trash/move';
         testMessages(
           new TaskMessageOperation('Moving', 'move', 'Moved'),
-          `image '${metadata.image_spec}' to trash`
+          `image '${metadata.pool_name}/${metadata.image_name}' to trash`
         );
         testErrorCode(2, `Could not find image.`);
       });
@@ -247,14 +217,18 @@ describe('TaskManagerMessageService', () => {
         finishedTask.name = 'rbd/trash/restore';
         testMessages(
           new TaskMessageOperation('Restoring', 'restore', 'Restored'),
-          `image '${metadata.image_id_spec}' ` + `into '${metadata.new_image_name}'`
+          `image '${metadata.pool_name}@${metadata.image_id}' ` +
+            `into '${metadata.pool_name}/${metadata.new_image_name}'`
         );
-        testErrorCode(17, `Image name '${metadata.new_image_name}' is already in use.`);
+        testErrorCode(
+          17,
+          `Image name '${metadata.pool_name}/${metadata.new_image_name}' is already in use.`
+        );
       });
 
       it('tests rbd/trash/remove messages', () => {
         finishedTask.name = 'rbd/trash/remove';
-        testDelete(`image '${metadata.image_id_spec}'`);
+        testDelete(`image '${metadata.pool_name}/${metadata.image_name}@${metadata.image_id}'`);
       });
 
       it('tests rbd/trash/purge messages', () => {
@@ -277,18 +251,6 @@ describe('TaskManagerMessageService', () => {
         modeMsg = `mirror mode for pool '${metadata.pool_name}'`;
         peerMsg = `mirror peer for pool '${metadata.pool_name}'`;
         finishedTask.metadata = metadata;
-      });
-      it('tests rbd/mirroring/site_name/edit messages', () => {
-        finishedTask.name = 'rbd/mirroring/site_name/edit';
-        testUpdate('mirroring site name');
-      });
-      it('tests rbd/mirroring/bootstrap/create messages', () => {
-        finishedTask.name = 'rbd/mirroring/bootstrap/create';
-        testCreate('bootstrap token');
-      });
-      it('tests rbd/mirroring/bootstrap/import messages', () => {
-        finishedTask.name = 'rbd/mirroring/bootstrap/import';
-        testImport('bootstrap token');
       });
       it('tests rbd/mirroring/pool/edit messages', () => {
         finishedTask.name = 'rbd/mirroring/pool/edit';

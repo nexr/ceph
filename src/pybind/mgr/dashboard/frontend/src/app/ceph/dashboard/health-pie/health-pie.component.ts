@@ -11,11 +11,11 @@ import {
 
 import * as Chart from 'chart.js';
 import * as _ from 'lodash';
-import { PluginServiceGlobalRegistrationAndOptions } from 'ng2-charts';
 
 import { ChartTooltip } from '../../../shared/models/chart-tooltip';
 import { DimlessBinaryPipe } from '../../../shared/pipes/dimless-binary.pipe';
 import { DimlessPipe } from '../../../shared/pipes/dimless.pipe';
+import { HealthPieColor } from './health-pie-color.enum';
 
 @Component({
   selector: 'cd-health-pie',
@@ -23,9 +23,9 @@ import { DimlessPipe } from '../../../shared/pipes/dimless.pipe';
   styleUrls: ['./health-pie.component.scss']
 })
 export class HealthPieComponent implements OnChanges, OnInit {
-  @ViewChild('chartCanvas', { static: true })
+  @ViewChild('chartCanvas')
   chartCanvasRef: ElementRef;
-  @ViewChild('chartTooltip', { static: true })
+  @ViewChild('chartTooltip')
   chartTooltipRef: ElementRef;
 
   @Input()
@@ -42,107 +42,67 @@ export class HealthPieComponent implements OnChanges, OnInit {
   prepareFn = new EventEmitter();
 
   chartConfig: any = {
-    chartType: 'doughnut',
+    chartType: 'pie',
     dataset: [
       {
         label: null,
         borderWidth: 0
       }
     ],
-    colors: [
-      {
-        backgroundColor: [
-          '--color-green',
-          '--color-yellow',
-          '--color-orange',
-          '--color-red',
-          '--color-blue'
-        ]
-      }
-    ],
     options: {
-      cutoutPercentage: 90,
-      events: ['click', 'mouseout', 'touchstart'],
       legend: {
         display: true,
         position: 'right',
-        labels: {
-          boxWidth: 10,
-          usePointStyle: false
+        labels: { usePointStyle: true },
+        onClick: (event, legendItem) => {
+          this.onLegendClick(event, legendItem);
         }
       },
-      plugins: {
-        center_text: true
-      },
+      animation: { duration: 0 },
       tooltips: {
-        enabled: true,
-        displayColors: false,
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        cornerRadius: 0,
-        bodyFontSize: 14,
-        bodyFontStyle: '600',
-        position: 'nearest',
-        xPadding: 12,
-        yPadding: 12,
-        callbacks: {
-          label: (item: Record<string, any>, data: Record<string, any>) => {
-            let text = data.labels[item.index];
-            if (!text.includes('%')) {
-              text = `${text} (${data.datasets[item.datasetIndex].data[item.index]}%)`;
-            }
-            return text;
-          }
-        }
+        enabled: false
       },
       title: {
         display: false
       }
     }
   };
-
-  public doughnutChartPlugins: PluginServiceGlobalRegistrationAndOptions[] = [
-    {
-      id: 'center_text',
-      beforeDraw(chart: Chart) {
-        const defaultFontColorA = '#151515';
-        const defaultFontColorB = '#72767B';
-        const defaultFontFamily = 'Helvetica Neue, Helvetica, Arial, sans-serif';
-        Chart.defaults.global.defaultFontFamily = defaultFontFamily;
-        const ctx = chart.ctx;
-        if (!chart.options.plugins.center_text || !chart.data.datasets[0].label) {
-          return;
-        }
-
-        ctx.save();
-        const label = chart.data.datasets[0].label.split('\n');
-
-        const centerX = (chart.chartArea.left + chart.chartArea.right) / 2;
-        const centerY = (chart.chartArea.top + chart.chartArea.bottom) / 2;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        ctx.font = `24px ${defaultFontFamily}`;
-        ctx.fillStyle = defaultFontColorA;
-        ctx.fillText(label[0], centerX, centerY - 10);
-
-        if (label.length > 1) {
-          ctx.font = `14px ${defaultFontFamily}`;
-          ctx.fillStyle = defaultFontColorB;
-          ctx.fillText(label[1], centerX, centerY + 10);
-        }
-        ctx.restore();
-      }
-    }
-  ];
+  private hiddenSlices = [];
 
   constructor(private dimlessBinary: DimlessBinaryPipe, private dimless: DimlessPipe) {}
 
   ngOnInit() {
-    const getStyleTop = (tooltip: any, positionY: number) => {
+    // An extension to Chart.js to enable rendering some
+    // text in the middle of a doughnut
+    Chart.pluginService.register({
+      beforeDraw: function(chart) {
+        if (!chart.options.center_text) {
+          return;
+        }
+
+        const width = chart.chart.width,
+          height = chart.chart.height,
+          ctx = chart.chart.ctx;
+
+        ctx.restore();
+        const fontSize = (height / 114).toFixed(2);
+        ctx.font = fontSize + 'em sans-serif';
+        ctx.textBaseline = 'middle';
+
+        const text = chart.options.center_text,
+          textX = Math.round((width - ctx.measureText(text).width) / 2),
+          textY = height / 2;
+
+        ctx.fillText(text, textX, textY);
+        ctx.save();
+      }
+    });
+
+    const getStyleTop = (tooltip, positionY) => {
       return positionY + tooltip.caretY - tooltip.height - 10 + 'px';
     };
 
-    const getStyleLeft = (tooltip: any, positionX: number) => {
+    const getStyleLeft = (tooltip, positionX) => {
       return positionX + tooltip.caretX + 'px';
     };
 
@@ -153,41 +113,40 @@ export class HealthPieComponent implements OnChanges, OnInit {
       getStyleTop
     );
 
-    chartTooltip.getBody = (body: any) => {
+    const getBody = (body) => {
       return this.getChartTooltipBody(body);
     };
 
-    _.merge(this.chartConfig, this.config);
+    chartTooltip.getBody = getBody;
 
-    this.setColorsFromCssVars();
+    this.chartConfig.options.tooltips.custom = (tooltip) => {
+      chartTooltip.customTooltips(tooltip);
+    };
+
+    this.chartConfig.colors = [
+      {
+        backgroundColor: [
+          HealthPieColor.DEFAULT_RED,
+          HealthPieColor.DEFAULT_BLUE,
+          HealthPieColor.DEFAULT_ORANGE,
+          HealthPieColor.DEFAULT_GREEN,
+          HealthPieColor.DEFAULT_MAGENTA
+        ]
+      }
+    ];
+
+    _.merge(this.chartConfig, this.config);
 
     this.prepareFn.emit([this.chartConfig, this.data]);
   }
 
   ngOnChanges() {
     this.prepareFn.emit([this.chartConfig, this.data]);
+    this.hideSlices();
     this.setChartSliceBorderWidth();
   }
 
-  private setColorsFromCssVars() {
-    this.chartConfig.colors.forEach(
-      (colorEl: { backgroundColor: string[] }, colorIndex: number) => {
-        colorEl.backgroundColor.forEach((bgColor: string, bgColorIndex: number) => {
-          if (bgColor.startsWith('--')) {
-            this.chartConfig.colors[colorIndex].backgroundColor[bgColorIndex] = this.getCssVar(
-              bgColor
-            );
-          }
-        });
-      }
-    );
-  }
-
-  private getCssVar(name: string): string {
-    return getComputedStyle(document.querySelector('.chart-container')).getPropertyValue(name);
-  }
-
-  private getChartTooltipBody(body: string[]) {
+  private getChartTooltipBody(body) {
     const bodySplit = body[0].split(': ');
 
     if (this.showLabelAsTooltip) {
@@ -203,12 +162,26 @@ export class HealthPieComponent implements OnChanges, OnInit {
 
   private setChartSliceBorderWidth() {
     let nonZeroValueSlices = 0;
-    _.forEach(this.chartConfig.dataset[0].data, function (slice) {
+    _.forEach(this.chartConfig.dataset[0].data, function(slice) {
       if (slice > 0) {
         nonZeroValueSlices += 1;
       }
     });
 
     this.chartConfig.dataset[0].borderWidth = nonZeroValueSlices > 1 ? 1 : 0;
+  }
+
+  private onLegendClick(event, legendItem) {
+    event.stopPropagation();
+    this.hiddenSlices[legendItem.index] = !legendItem.hidden;
+    this.ngOnChanges();
+  }
+
+  private hideSlices() {
+    _.forEach(this.chartConfig.dataset[0].data, (_slice, sliceIndex) => {
+      if (this.hiddenSlices[sliceIndex]) {
+        this.chartConfig.dataset[0].data[sliceIndex] = undefined;
+      }
+    });
   }
 }

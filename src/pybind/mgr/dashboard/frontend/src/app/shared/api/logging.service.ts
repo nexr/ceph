@@ -9,7 +9,7 @@ import { ApiModule } from './api.module';
 export class LoggingService {
   constructor(private http: HttpClient) {}
 
-  jsError(url: string, message: string, stack: any) {
+  jsError(url, message, stack) {
     const request = {
       url: url,
       message: message,

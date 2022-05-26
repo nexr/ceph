@@ -78,7 +78,7 @@ describe('SilenceMatcherModalComponent', () => {
   });
 
   describe('test rule matching', () => {
-    const expectMatch = (name: string, value: string, helpText: string) => {
+    const expectMatch = (name, value, helpText) => {
       component.preFillControls({
         name: name,
         value: value,
@@ -154,7 +154,7 @@ describe('SilenceMatcherModalComponent', () => {
       isRegex: false
     };
     component.preFillControls(controlValues);
-    component.submitAction.subscribe((resp: object) => {
+    component.submitAction.subscribe((resp) => {
       expect(resp).toEqual(controlValues);
       done();
     });

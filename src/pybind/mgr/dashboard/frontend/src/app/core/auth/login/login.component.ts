@@ -1,7 +1,6 @@
 import { Component, OnInit } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
+import { Router } from '@angular/router';
 
-import * as _ from 'lodash';
 import { BsModalService } from 'ngx-bootstrap/modal';
 
 import { AuthService } from '../../../shared/api/auth.service';
@@ -16,13 +15,11 @@ import { AuthStorageService } from '../../../shared/services/auth-storage.servic
 export class LoginComponent implements OnInit {
   model = new Credentials();
   isLoginActive = false;
-  returnUrl: string;
 
   constructor(
     private authService: AuthService,
     private authStorageService: AuthStorageService,
     private bsModalService: BsModalService,
-    private route: ActivatedRoute,
     private router: Router
   ) {}
 
@@ -37,8 +34,7 @@ export class LoginComponent implements OnInit {
       for (let i = 1; i <= modalsCount; i++) {
         this.bsModalService.hide(i);
       }
-
-      let token: string = null;
+      let token = null;
       if (window.location.hash.indexOf('access_token=') !== -1) {
         token = window.location.hash.split('access_token=')[1];
         const uri = window.location.toString();
@@ -52,12 +48,7 @@ export class LoginComponent implements OnInit {
             window.location.replace(login.login_url);
           }
         } else {
-          this.authStorageService.set(
-            login.username,
-            login.permissions,
-            login.sso,
-            login.pwdExpirationDate
-          );
+          this.authStorageService.set(login.username, token, login.permissions);
           this.router.navigate(['']);
         }
       });
@@ -65,9 +56,8 @@ export class LoginComponent implements OnInit {
   }
 
   login() {
-    this.authService.login(this.model).subscribe(() => {
-      const url = _.get(this.route.snapshot.queryParams, 'returnUrl', '/');
-      this.router.navigate([url]);
+    this.authService.login(this.model).then(() => {
+      this.router.navigate(['']);
     });
   }
 }

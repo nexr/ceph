@@ -1,11 +1,10 @@
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ComponentFixture, fakeAsync, TestBed, tick } from '@angular/core/testing';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { By } from '@angular/platform-browser';
 import { RouterTestingModule } from '@angular/router/testing';
 
 import { I18n } from '@ngx-translate/i18n-polyfill';
 import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
-import { TabsModule } from 'ngx-bootstrap/tabs';
 import { ToastrModule } from 'ngx-toastr';
 import { Subject, throwError as observableThrowError } from 'rxjs';
 
@@ -28,8 +27,7 @@ import { AuthStorageService } from '../../../shared/services/auth-storage.servic
 import { NotificationService } from '../../../shared/services/notification.service';
 import { SummaryService } from '../../../shared/services/summary.service';
 import { TaskListService } from '../../../shared/services/task-list.service';
-import { RbdSnapshotFormModalComponent } from '../rbd-snapshot-form/rbd-snapshot-form-modal.component';
-import { RbdTabsComponent } from '../rbd-tabs/rbd-tabs.component';
+import { RbdSnapshotFormComponent } from '../rbd-snapshot-form/rbd-snapshot-form.component';
 import { RbdSnapshotListComponent } from './rbd-snapshot-list.component';
 import { RbdSnapshotModel } from './rbd-snapshot.model';
 
@@ -48,17 +46,15 @@ describe('RbdSnapshotListComponent', () => {
   };
 
   configureTestBed({
-    declarations: [RbdSnapshotListComponent, RbdTabsComponent],
+    declarations: [RbdSnapshotListComponent],
     imports: [
-      ApiModule,
-      BrowserAnimationsModule,
-      ComponentsModule,
       DataTableModule,
+      ComponentsModule,
+      ToastrModule.forRoot(),
+      ApiModule,
       HttpClientTestingModule,
-      PipesModule,
       RouterTestingModule,
-      TabsModule.forRoot(),
-      ToastrModule.forRoot()
+      PipesModule
     ],
     providers: [
       { provide: AuthStorageService, useValue: fakeAuthStorageService },
@@ -70,7 +66,6 @@ describe('RbdSnapshotListComponent', () => {
   beforeEach(() => {
     fixture = TestBed.createComponent(RbdSnapshotListComponent);
     component = fixture.componentInstance;
-    component.ngOnChanges();
     summaryService = TestBed.get(SummaryService);
   });
 
@@ -80,7 +75,7 @@ describe('RbdSnapshotListComponent', () => {
   });
 
   describe('api delete request', () => {
-    let called: boolean;
+    let called;
     let rbdService: RbdService;
     let notificationService: NotificationService;
     let authStorageService: AuthStorageService;
@@ -93,7 +88,7 @@ describe('RbdSnapshotListComponent', () => {
       rbdService = new RbdService(null, null);
       notificationService = new NotificationService(null, null, null);
       authStorageService = new AuthStorageService();
-      authStorageService.set('user', { 'rbd-image': ['create', 'read', 'update', 'delete'] });
+      authStorageService.set('user', '', { 'rbd-image': ['create', 'read', 'update', 'delete'] });
       component = new RbdSnapshotListComponent(
         authStorageService,
         null,
@@ -115,7 +110,7 @@ describe('RbdSnapshotListComponent', () => {
       };
     });
 
-    it('should call stopLoadingSpinner if the request fails', fakeAsync(() => {
+    it('should call stopLoadingSpinner if the request fails', <any>fakeAsync(() => {
       expect(called).toBe(false);
       component._asyncTask('deleteSnapshot', 'rbd/snap/delete', 'someName');
       tick(500);
@@ -126,7 +121,7 @@ describe('RbdSnapshotListComponent', () => {
   describe('handling of executing tasks', () => {
     let snapshots: RbdSnapshotModel[];
 
-    const addSnapshot = (name: string) => {
+    const addSnapshot = (name) => {
       const model = new RbdSnapshotModel();
       model.id = 1;
       model.name = name;
@@ -137,13 +132,14 @@ describe('RbdSnapshotListComponent', () => {
       const task = new ExecutingTask();
       task.name = task_name;
       task.metadata = {
-        image_spec: 'rbd/foo',
+        pool_name: 'rbd',
+        image_name: 'foo',
         snapshot_name: snapshot_name
       };
       summaryService.addRunningTask(task);
     };
 
-    const refresh = (data: any) => {
+    const refresh = (data) => {
       summaryService['summaryDataSource'].next(data);
     };
 
@@ -192,7 +188,7 @@ describe('RbdSnapshotListComponent', () => {
       component.rbdName = 'image01';
       spyOn(TestBed.get(BsModalService), 'show').and.callFake(() => {
         const ref = new BsModalRef();
-        ref.content = new RbdSnapshotFormModalComponent(
+        ref.content = new RbdSnapshotFormComponent(
           null,
           null,
           null,
@@ -207,6 +203,7 @@ describe('RbdSnapshotListComponent', () => {
 
     it('should display old snapshot name', () => {
       component.selection.selected = [{ name: 'oldname' }];
+      component.selection.update();
       component.openEditSnapshotModal();
       expect(component.modalRef.content.snapName).toBe('oldname');
       expect(component.modalRef.content.editing).toBeTruthy();
@@ -220,54 +217,209 @@ describe('RbdSnapshotListComponent', () => {
     });
   });
 
-  it('should test all TableActions combinations', () => {
-    const permissionHelper: PermissionHelper = new PermissionHelper(component.permission);
-    const tableActions: TableActionsComponent = permissionHelper.setPermissionsAndGetActions(
-      component.tableActions
-    );
+  describe('show action buttons and drop down actions depending on permissions', () => {
+    let tableActions: TableActionsComponent;
+    let scenario: { fn; empty; single };
+    let permissionHelper: PermissionHelper;
 
-    expect(tableActions).toEqual({
-      'create,update,delete': {
-        actions: [
-          'Create',
-          'Rename',
-          'Protect',
-          'Unprotect',
-          'Clone',
-          'Copy',
-          'Rollback',
-          'Delete'
-        ],
-        primary: { multiple: 'Create', executing: 'Rename', single: 'Rename', no: 'Create' }
-      },
-      'create,update': {
-        actions: ['Create', 'Rename', 'Protect', 'Unprotect', 'Clone', 'Copy', 'Rollback'],
-        primary: { multiple: 'Create', executing: 'Rename', single: 'Rename', no: 'Create' }
-      },
-      'create,delete': {
-        actions: ['Create', 'Clone', 'Copy', 'Delete'],
-        primary: { multiple: 'Create', executing: 'Clone', single: 'Clone', no: 'Create' }
-      },
-      create: {
-        actions: ['Create', 'Clone', 'Copy'],
-        primary: { multiple: 'Create', executing: 'Clone', single: 'Clone', no: 'Create' }
-      },
-      'update,delete': {
-        actions: ['Rename', 'Protect', 'Unprotect', 'Rollback', 'Delete'],
-        primary: { multiple: 'Rename', executing: 'Rename', single: 'Rename', no: 'Rename' }
-      },
-      update: {
-        actions: ['Rename', 'Protect', 'Unprotect', 'Rollback'],
-        primary: { multiple: 'Rename', executing: 'Rename', single: 'Rename', no: 'Rename' }
-      },
-      delete: {
-        actions: ['Delete'],
-        primary: { multiple: 'Delete', executing: 'Delete', single: 'Delete', no: 'Delete' }
-      },
-      'no-permissions': {
-        actions: [],
-        primary: { multiple: '', executing: '', single: '', no: '' }
-      }
+    const getTableActionComponent = (): TableActionsComponent => {
+      fixture.detectChanges();
+      return fixture.debugElement.query(By.directive(TableActionsComponent)).componentInstance;
+    };
+
+    beforeEach(() => {
+      permissionHelper = new PermissionHelper(component.permission, () =>
+        getTableActionComponent()
+      );
+      scenario = {
+        fn: () => tableActions.getCurrentButton().name,
+        single: 'Rename',
+        empty: 'Create'
+      };
+    });
+
+    describe('with all', () => {
+      beforeEach(() => {
+        tableActions = permissionHelper.setPermissionsAndGetActions(1, 1, 1);
+      });
+
+      it(`shows 'Rename' for single selection else 'Create' as main action`, () =>
+        permissionHelper.testScenarios(scenario));
+
+      it('shows all actions', () => {
+        expect(tableActions.tableActions.length).toBe(8);
+        expect(tableActions.tableActions).toEqual(component.tableActions);
+      });
+    });
+
+    describe('with read, create and update', () => {
+      beforeEach(() => {
+        tableActions = permissionHelper.setPermissionsAndGetActions(1, 1, 0);
+      });
+
+      it(`shows 'Rename' for single selection else 'Create' as main action`, () =>
+        permissionHelper.testScenarios(scenario));
+
+      it(`shows all actions except for 'Delete'`, () => {
+        expect(tableActions.tableActions.length).toBe(7);
+        component.tableActions.pop();
+        expect(tableActions.tableActions).toEqual(component.tableActions);
+      });
+    });
+
+    describe('with read, create and delete', () => {
+      beforeEach(() => {
+        tableActions = permissionHelper.setPermissionsAndGetActions(1, 0, 1);
+      });
+
+      it(`shows 'Clone' for single selection else 'Create' as main action`, () => {
+        scenario.single = 'Clone';
+        permissionHelper.testScenarios(scenario);
+      });
+
+      it(`shows 'Create', 'Clone', 'Copy' and 'Delete' action`, () => {
+        expect(tableActions.tableActions.length).toBe(4);
+        expect(tableActions.tableActions).toEqual([
+          component.tableActions[0],
+          component.tableActions[4],
+          component.tableActions[5],
+          component.tableActions[7]
+        ]);
+      });
+    });
+
+    describe('with read, edit and delete', () => {
+      beforeEach(() => {
+        tableActions = permissionHelper.setPermissionsAndGetActions(0, 1, 1);
+      });
+
+      it(`shows always 'Rename' as main action`, () => {
+        scenario.empty = 'Rename';
+        permissionHelper.testScenarios(scenario);
+      });
+
+      it(`shows 'Rename', 'Protect', 'Unprotect', 'Rollback' and 'Delete' action`, () => {
+        expect(tableActions.tableActions.length).toBe(5);
+        expect(tableActions.tableActions).toEqual([
+          component.tableActions[1],
+          component.tableActions[2],
+          component.tableActions[3],
+          component.tableActions[6],
+          component.tableActions[7]
+        ]);
+      });
+    });
+
+    describe('with read and create', () => {
+      beforeEach(() => {
+        tableActions = permissionHelper.setPermissionsAndGetActions(1, 0, 0);
+      });
+
+      it(`shows 'Clone' for single selection else 'Create' as main action`, () => {
+        scenario.single = 'Clone';
+        permissionHelper.testScenarios(scenario);
+      });
+
+      it(`shows 'Create', 'Clone' and 'Copy' actions`, () => {
+        expect(tableActions.tableActions.length).toBe(3);
+        expect(tableActions.tableActions).toEqual([
+          component.tableActions[0],
+          component.tableActions[4],
+          component.tableActions[5]
+        ]);
+      });
+    });
+
+    describe('with read and edit', () => {
+      beforeEach(() => {
+        tableActions = permissionHelper.setPermissionsAndGetActions(0, 1, 0);
+      });
+
+      it(`shows always 'Rename' as main action`, () => {
+        scenario.empty = 'Rename';
+        permissionHelper.testScenarios(scenario);
+      });
+
+      it(`shows 'Rename', 'Protect', 'Unprotect' and 'Rollback' actions`, () => {
+        expect(tableActions.tableActions.length).toBe(4);
+        expect(tableActions.tableActions).toEqual([
+          component.tableActions[1],
+          component.tableActions[2],
+          component.tableActions[3],
+          component.tableActions[6]
+        ]);
+      });
+    });
+
+    describe('with read and delete', () => {
+      beforeEach(() => {
+        tableActions = permissionHelper.setPermissionsAndGetActions(0, 0, 1);
+      });
+
+      it(`shows always 'Delete' as main action`, () => {
+        scenario.single = 'Delete';
+        scenario.empty = 'Delete';
+        permissionHelper.testScenarios(scenario);
+      });
+
+      it(`shows only 'Delete' action`, () => {
+        expect(tableActions.tableActions.length).toBe(1);
+        expect(tableActions.tableActions).toEqual([component.tableActions[7]]);
+      });
+    });
+
+    describe('with only read', () => {
+      beforeEach(() => {
+        tableActions = permissionHelper.setPermissionsAndGetActions(0, 0, 0);
+      });
+
+      it('shows no main action', () => {
+        permissionHelper.testScenarios({
+          fn: () => tableActions.getCurrentButton(),
+          single: undefined,
+          empty: undefined
+        });
+      });
+
+      it('shows no actions', () => {
+        expect(tableActions.tableActions.length).toBe(0);
+        expect(tableActions.tableActions).toEqual([]);
+      });
+    });
+
+    describe('test unprotected and protected action cases', () => {
+      beforeEach(() => {
+        tableActions = permissionHelper.setPermissionsAndGetActions(0, 1, 0);
+      });
+
+      it(`shows none of them if nothing is selected`, () => {
+        permissionHelper.setSelection([]);
+        fixture.detectChanges();
+        expect(tableActions.dropDownActions).toEqual([
+          component.tableActions[1],
+          component.tableActions[6]
+        ]);
+      });
+
+      it(`shows 'Protect' of them if nothing is selected`, () => {
+        permissionHelper.setSelection([{ is_protected: false }]);
+        fixture.detectChanges();
+        expect(tableActions.dropDownActions).toEqual([
+          component.tableActions[1],
+          component.tableActions[2],
+          component.tableActions[6]
+        ]);
+      });
+
+      it(`shows 'Unprotect' of them if nothing is selected`, () => {
+        permissionHelper.setSelection([{ is_protected: true }]);
+        fixture.detectChanges();
+        expect(tableActions.dropDownActions).toEqual([
+          component.tableActions[1],
+          component.tableActions[3],
+          component.tableActions[6]
+        ]);
+      });
     });
   });
 });

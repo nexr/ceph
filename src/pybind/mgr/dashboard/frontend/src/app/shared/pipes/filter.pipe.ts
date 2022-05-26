@@ -5,12 +5,12 @@ import { Pipe, PipeTransform } from '@angular/core';
 })
 export class FilterPipe implements PipeTransform {
   transform(value: any, args?: any): any {
-    return value.filter((row: any) => {
+    return value.filter((row) => {
       let result = true;
 
-      args.forEach((filter: any): boolean | void => {
+      args.forEach((filter) => {
         if (!filter.value) {
-          return undefined;
+          return;
         }
 
         result = result && filter.applyFilter(row, filter.value);

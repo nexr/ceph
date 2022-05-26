@@ -1,11 +1,10 @@
 import { Component, Input } from '@angular/core';
-import { FormArray, FormControl, NgForm, Validators } from '@angular/forms';
+import { FormArray, FormControl, Validators } from '@angular/forms';
 
 import { I18n } from '@ngx-translate/i18n-polyfill';
 import * as _ from 'lodash';
 
 import { NfsService } from '../../../shared/api/nfs.service';
-import { Icons } from '../../../shared/enum/icons.enum';
 import { CdFormGroup } from '../../../shared/forms/cd-form-group';
 
 @Component({
@@ -19,7 +18,6 @@ export class NfsFormClientComponent {
 
   nfsSquash: any[] = this.nfsService.nfsSquash;
   nfsAccessType: any[] = this.nfsService.nfsAccessType;
-  icons = Icons;
 
   constructor(private nfsService: NfsService, private i18n: I18n) {}
 
@@ -30,7 +28,7 @@ export class NfsFormClientComponent {
     return this.i18n('-- Select the access type --');
   }
 
-  getAccessTypeHelp(index: number) {
+  getAccessTypeHelp(index) {
     const accessTypeItem = this.nfsAccessType.find((currentAccessTypeItem) => {
       return this.getValue(index, 'access_type') === currentAccessTypeItem.value;
     });
@@ -62,16 +60,16 @@ export class NfsFormClientComponent {
     return fg;
   }
 
-  removeClient(index: number) {
+  removeClient(index) {
     const clients = this.form.get('clients') as FormArray;
     clients.removeAt(index);
   }
 
-  showError(index: number, control: string, formDir: NgForm, x: string) {
+  showError(index, control, formDir, x) {
     return (<any>this.form.controls.clients).controls[index].showError(control, formDir, x);
   }
 
-  getValue(index: number, control: string) {
+  getValue(index, control) {
     const clients = this.form.get('clients') as FormArray;
     const client = clients.at(index) as CdFormGroup;
     return client.getValue(control);
@@ -84,7 +82,7 @@ export class NfsFormClientComponent {
     });
   }
 
-  trackByFn(index: number) {
+  trackByFn(index) {
     return index;
   }
 }

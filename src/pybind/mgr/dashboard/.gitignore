@@ -5,6 +5,7 @@ coverage.xml
 junit*xml
 .cache
 ceph.conf
+wheelhouse*
 
 # IDE
 .vscode

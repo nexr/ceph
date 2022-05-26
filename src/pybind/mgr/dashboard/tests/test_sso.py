@@ -5,8 +5,7 @@ from __future__ import absolute_import
 import errno
 import unittest
 
-from . import CmdException, exec_dashboard_cmd, \
-    KVStoreMockMixin  # pylint: disable=no-name-in-module
+from . import CmdException, exec_dashboard_cmd, KVStoreMockMixin
 from ..services.sso import handle_sso_command, load_sso_db
 
 

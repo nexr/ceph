@@ -39,11 +39,14 @@ describe('ModuleStatusGuardService', () => {
     expect(router.url).toBe(urlResult);
   };
 
-  configureTestBed({
-    imports: [RouterTestingModule.withRoutes(routes)],
-    providers: [ModuleStatusGuardService, { provide: HttpClient, useValue: fakeService }],
-    declarations: [FooComponent]
-  });
+  configureTestBed(
+    {
+      imports: [RouterTestingModule.withRoutes(routes)],
+      providers: [ModuleStatusGuardService, { provide: HttpClient, useValue: fakeService }],
+      declarations: [FooComponent]
+    },
+    true
+  );
 
   beforeEach(() => {
     service = TestBed.get(ModuleStatusGuardService);

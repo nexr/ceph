@@ -1,15 +1,6 @@
 #!/usr/bin/env bash
 
-# cross shell: Are we sourced?
-# Source: https://stackoverflow.com/a/28776166/3185053
-([[ -n $ZSH_EVAL_CONTEXT && $ZSH_EVAL_CONTEXT =~ :file$ ]] ||
- [[ -n $KSH_VERSION && $(cd "$(dirname -- "$0")" &&
-    printf '%s' "${PWD%/}/")$(basename -- "$0") != "${.sh.file}" ]] ||
- [[ -n $BASH_VERSION ]] && (return 0 2>/dev/null)) && sourced=1 || sourced=0
-
-if [ "$sourced" -eq 0 ] ; then
-    set -eo pipefail
-fi
+set -eo pipefail
 
 if [[ "$1" = "-h" || "$1" = "--help" ]]; then
 	echo "Usage (run from ./):"
@@ -33,14 +24,26 @@ get_cmake_variable() {
     grep "$variable" CMakeCache.txt | cut -d "=" -f 2
 }
 
-[ -z "$BUILD_DIR" ] && BUILD_DIR=build
-CURR_DIR=`pwd`
-LOCAL_BUILD_DIR="$CURR_DIR/../../../../$BUILD_DIR"
+get_build_py_version() {
+    CURR_DIR=`pwd`
+    BUILD_DIR="$CURR_DIR/../../../../build"
+    cd $BUILD_DIR
+
+    CEPH_MGR_PY_VERSION_MAJOR=$(get_cmake_variable MGR_PYTHON_VERSION | cut -d '.' -f1)
+    if [ -n "$CEPH_MGR_PY_VERSION_MAJOR" ]; then
+        CEPH_PY_VERSION_MAJOR=${CEPH_MGR_PY_VERSION_MAJOR}
+    else
+        if [ $(get_cmake_variable WITH_PYTHON2) = ON ]; then
+            CEPH_PY_VERSION_MAJOR=2
+        else
+            CEPH_PY_VERSION_MAJOR=3
+        fi
+    fi
+}
 
 setup_teuthology() {
     TEMP_DIR=`mktemp -d`
     cd $TEMP_DIR
-
     virtualenv --python=${TEUTHOLOGY_PYTHON_BIN:-/usr/bin/python3} venv
     source venv/bin/activate
     pip install 'setuptools >= 12'
@@ -56,7 +59,7 @@ setup_coverage() {
     # In CI environment we cannot install coverage in system, so we install it in a dedicated venv
     # so only coverage is available when adding this path.
     cd $TEMP_DIR
-    virtualenv --python=/usr/bin/python3 coverage-venv
+    virtualenv --python=${TEUTHOLOGY_PYTHON_BIN:-/usr/bin/python} coverage-venv
     source coverage-venv/bin/activate
     cd $CURR_DIR
     pip install coverage==4.5.2
@@ -66,9 +69,9 @@ setup_coverage() {
 
 on_tests_error() {
     if [[ -n "$JENKINS_HOME" ]]; then
-        CEPH_OUT_DIR=${CEPH_OUT_DIR:-"$LOCAL_BUILD_DIR"/out}
+        CEPH_OUT_DIR=${CEPH_OUT_DIR:-"$BUILD_DIR"/out}
         MGR_LOG_FILES=$(find "$CEPH_OUT_DIR" -iname "mgr.*.log" | tr '\n' ' ')
-        MGR_LOG_FILE_LAST_LINES=1000
+        MGR_LOG_FILE_LAST_LINES=60000
         for mgr_log_file in ${MGR_LOG_FILES[@]}; do
             printf "\n\nDisplaying last ${MGR_LOG_FILE_LAST_LINES} lines of: $mgr_log_file\n\n"
             tail -n ${MGR_LOG_FILE_LAST_LINES} $mgr_log_file
@@ -81,13 +84,13 @@ on_tests_error() {
 run_teuthology_tests() {
     trap on_tests_error ERR
 
-    cd "$LOCAL_BUILD_DIR"
+    cd "$BUILD_DIR"
     find ../src/pybind/mgr/dashboard/ -name '*.pyc' -exec rm -f {} \;
 
     OPTIONS=''
     TEST_CASES=''
     if [[ "$@" == '' || "$@" == '--create-cluster-only' ]]; then
-      TEST_CASES=`for i in \`ls $LOCAL_BUILD_DIR/../qa/tasks/mgr/dashboard/test_*\`; do F=$(basename $i); M="${F%.*}"; echo -n " tasks.mgr.dashboard.$M"; done`
+      TEST_CASES=`for i in \`ls $BUILD_DIR/../qa/tasks/mgr/dashboard/test_*\`; do F=$(basename $i); M="${F%.*}"; echo -n " tasks.mgr.dashboard.$M"; done`
       # Mgr selftest module tests have to be run at the end as they stress the mgr daemon.
       TEST_CASES="tasks.mgr.test_dashboard $TEST_CASES tasks.mgr.test_module_selftest"
       if [[ "$@" == '--create-cluster-only' ]]; then
@@ -99,32 +102,32 @@ run_teuthology_tests() {
       done
     fi
 
-    export PATH=$LOCAL_BUILD_DIR/bin:$PATH
+    export PATH=$BUILD_DIR/bin:$PATH
     source $TEMP_DIR/venv/bin/activate # Run after setting PATH as it does the last PATH export.
-    export LD_LIBRARY_PATH=$LOCAL_BUILD_DIR/lib/cython_modules/lib.3/:$LOCAL_BUILD_DIR/lib
-    local source_dir=$(dirname "$LOCAL_BUILD_DIR")
+    export LD_LIBRARY_PATH=$BUILD_DIR/lib/cython_modules/lib.${CEPH_PY_VERSION_MAJOR}/:$BUILD_DIR/lib
+    local source_dir=$(dirname "$BUILD_DIR")
     local pybind_dir=$source_dir/src/pybind
     local python_common_dir=$source_dir/src/python-common
     # In CI environment we set python paths inside build (where you find the required frontend build: "dist" dir).
     if [[ -n "$JENKINS_HOME" ]]; then
-        export PYBIND=$LOCAL_BUILD_DIR/src/pybind
+        export PYBIND=$BUILD_DIR/src/pybind
         pybind_dir=$PYBIND
     fi
-    export PYTHONPATH=$source_dir/qa:$LOCAL_BUILD_DIR/lib/cython_modules/lib.3/:$pybind_dir:$python_common_dir:${COVERAGE_PATH}
+    export PYTHONPATH=$source_dir/qa:$BUILD_DIR/lib/cython_modules/lib.${CEPH_PY_VERSION_MAJOR}/:$pybind_dir:$python_common_dir:${COVERAGE_PATH}
     export RGW=${RGW:-1}
 
     export COVERAGE_ENABLED=true
     export COVERAGE_FILE=.coverage.mgr.dashboard
     find . -iname "*${COVERAGE_FILE}*" -type f -delete
 
-    python ../qa/tasks/vstart_runner.py --ignore-missing-binaries --no-verbose $OPTIONS $(echo $TEST_CASES)
+    python ../qa/tasks/vstart_runner.py --ignore-missing-binaries $OPTIONS $TEST_CASES
 
     deactivate
     cd $CURR_DIR
 }
 
 cleanup_teuthology() {
-    cd "$LOCAL_BUILD_DIR"
+    cd "$BUILD_DIR"
     killall ceph-mgr
     sleep 10
     if [[ "$COVERAGE_ENABLED" == 'true' ]]; then
@@ -140,8 +143,9 @@ cleanup_teuthology() {
 
     unset TEMP_DIR
     unset CURR_DIR
-    unset LOCAL_BUILD_DIR
+    unset BUILD_DIR
     unset COVERAGE_PATH
+    unset get_build_py_version
     unset setup_teuthology
     unset setup_coverage
     unset on_tests_error
@@ -149,16 +153,14 @@ cleanup_teuthology() {
     unset cleanup_teuthology
 }
 
-export LC_ALL=en_US.UTF-8
-
+get_build_py_version
 setup_teuthology
 setup_coverage
 run_teuthology_tests --create-cluster-only
 
 # End sourced section. Do not exit shell when the script has been sourced.
-if [ "$sourced" -eq 1 ] ; then
-    return
-fi
+set +e
+return 2>/dev/null || set -eo pipefail
 
 run_teuthology_tests "$@"
 cleanup_teuthology

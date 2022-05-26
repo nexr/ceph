@@ -2,7 +2,6 @@ import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { BsDropdownModule } from 'ngx-bootstrap/dropdown';
 import { ProgressbarModule } from 'ngx-bootstrap/progressbar';
 import { TabsModule } from 'ngx-bootstrap/tabs';
@@ -20,7 +19,6 @@ describe('PoolListComponent', () => {
   configureTestBed({
     declarations: [PoolListComponent, MirrorHealthColorPipe],
     imports: [
-      BrowserAnimationsModule,
       SharedModule,
       BsDropdownModule.forRoot(),
       TabsModule.forRoot(),

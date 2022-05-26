@@ -59,10 +59,14 @@ export class PoolEditModeModalComponent implements OnInit, OnDestroy {
       this.setResponse(resp);
     });
 
-    this.subs = this.rbdMirroringService.subscribeSummary((data) => {
+    this.subs = this.rbdMirroringService.subscribeSummary((data: any) => {
       this.peerExists = false;
+      if (!data) {
+        return;
+      }
+
       const poolData = data.content_data.pools;
-      const pool = poolData.find((o: any) => this.poolName === o['name']);
+      const pool = poolData.find((o) => this.poolName === o['name']);
       this.peerExists = pool && pool['peer_uuids'].length;
     });
   }

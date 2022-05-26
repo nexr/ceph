@@ -1,27 +1,27 @@
-import { Component, Input, ViewChild } from '@angular/core';
+import { Component, Input, OnChanges } from '@angular/core';
 
-import { TabsetComponent } from 'ngx-bootstrap/tabs';
-
-import { Permissions } from '../../../../shared/models/permissions';
+import { CdTableSelection } from '../../../../shared/models/cd-table-selection';
+import { Permission } from '../../../../shared/models/permissions';
+import { AuthStorageService } from '../../../../shared/services/auth-storage.service';
 
 @Component({
   selector: 'cd-host-details',
   templateUrl: './host-details.component.html',
   styleUrls: ['./host-details.component.scss']
 })
-export class HostDetailsComponent {
+export class HostDetailsComponent implements OnChanges {
+  grafanaPermission: Permission;
   @Input()
-  permissions: Permissions;
+  selection: CdTableSelection;
+  host: any;
 
-  @Input()
-  selection: any;
-
-  @ViewChild(TabsetComponent, { static: false })
-  tabsetChild: TabsetComponent;
-
-  get selectedHostname(): string {
-    return this.selection !== undefined ? this.selection['hostname'] : null;
+  constructor(private authStorageService: AuthStorageService) {
+    this.grafanaPermission = this.authStorageService.getPermissions().grafana;
   }
 
-  constructor() {}
+  ngOnChanges() {
+    if (this.selection.hasSelection) {
+      this.host = this.selection.first();
+    }
+  }
 }

@@ -17,7 +17,7 @@
         </p>
 
         <div class="form-group">
-          <label class="col-form-label mx-auto"
+          <label class="center-block"
                  i18n>Pool:</label>
           <input class="form-control"
                  type="text"
@@ -25,9 +25,7 @@
                  i18n-placeholder
                  formControlName="poolName"
                  *ngIf="!poolPermission.read">
-          <select id="poolName"
-                  name="poolName"
-                  class="form-control custom-select"
+          <select class="form-control"
                   formControlName="poolName"
                   *ngIf="poolPermission.read">
             <option value=""
@@ -40,8 +38,7 @@
 
       <div class="modal-footer">
         <div class="button-group text-right">
-          <cd-submit-button id="purgeFormButton"
-                            [form]="purgeForm"
+          <cd-submit-button [form]="purgeForm"
                             (submitAction)="purge()"
                             i18n>Purge Trash</cd-submit-button>
           <cd-back-button [back]="modalRef.hide"

@@ -1,11 +1,12 @@
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, NgZone, OnDestroy, OnInit } from '@angular/core';
 
-import { Subscription } from 'rxjs';
+import * as _ from 'lodash';
 
-import { Icons } from '../../../shared/enum/icons.enum';
 import { CdNotification } from '../../../shared/models/cd-notification';
+import { AuthStorageService } from '../../../shared/services/auth-storage.service';
 import { NotificationService } from '../../../shared/services/notification.service';
-import { SummaryService } from '../../../shared/services/summary.service';
+import { PrometheusAlertService } from '../../../shared/services/prometheus-alert.service';
+import { PrometheusNotificationService } from '../../../shared/services/prometheus-notification.service';
 
 @Component({
   selector: 'cd-notifications',
@@ -13,35 +14,45 @@ import { SummaryService } from '../../../shared/services/summary.service';
   styleUrls: ['./notifications.component.scss']
 })
 export class NotificationsComponent implements OnInit, OnDestroy {
-  icons = Icons;
-  hasRunningTasks = false;
-  hasNotifications = false;
-  private subs = new Subscription();
+  notifications: CdNotification[];
+  private interval: number;
 
   constructor(
     public notificationService: NotificationService,
-    private summaryService: SummaryService
-  ) {}
+    private prometheusNotificationService: PrometheusNotificationService,
+    private authStorageService: AuthStorageService,
+    private prometheusAlertService: PrometheusAlertService,
+    private ngZone: NgZone
+  ) {
+    this.notifications = [];
+  }
+
+  ngOnDestroy() {
+    window.clearInterval(this.interval);
+  }
 
   ngOnInit() {
-    this.subs.add(
-      this.summaryService.subscribe((summary) => {
-        this.hasRunningTasks = summary.executing_tasks.length > 0;
-      })
-    );
-
-    this.subs.add(
-      this.notificationService.data$.subscribe((notifications: CdNotification[]) => {
-        this.hasNotifications = notifications.length > 0;
-      })
-    );
+    if (this.authStorageService.getPermissions().prometheus.read) {
+      this.triggerPrometheusAlerts();
+      this.ngZone.runOutsideAngular(() => {
+        this.interval = window.setInterval(() => {
+          this.ngZone.run(() => {
+            this.triggerPrometheusAlerts();
+          });
+        }, 5000);
+      });
+    }
+    this.notificationService.data$.subscribe((notifications: CdNotification[]) => {
+      this.notifications = _.orderBy(notifications, ['timestamp'], ['desc']);
+    });
   }
 
-  ngOnDestroy(): void {
-    this.subs.unsubscribe();
+  private triggerPrometheusAlerts() {
+    this.prometheusAlertService.refresh();
+    this.prometheusNotificationService.refresh();
   }
 
-  toggleSidebar() {
-    this.notificationService.toggleSidebar();
+  removeAll() {
+    this.notificationService.removeAll();
   }
 }

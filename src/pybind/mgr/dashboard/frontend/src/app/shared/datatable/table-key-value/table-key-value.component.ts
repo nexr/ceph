@@ -34,7 +34,7 @@ interface KeyValueItem {
   styleUrls: ['./table-key-value.component.scss']
 })
 export class TableKeyValueComponent implements OnInit, OnChanges {
-  @ViewChild(TableComponent, { static: true })
+  @ViewChild(TableComponent)
   table: TableComponent;
 
   @Input()
@@ -49,11 +49,11 @@ export class TableKeyValueComponent implements OnInit, OnChanges {
   @Input()
   hideEmpty = false;
   @Input()
-  hideKeys: string[] = []; // Keys of pairs not to be displayed
+  hideKeys = []; // Keys of pairs not to be displayed
 
   // If set, the classAddingTpl is used to enable different css for different values
   @Input()
-  customCss?: { [css: string]: number | string | ((any: any) => boolean) };
+  customCss?: { [css: string]: number | string | ((any) => boolean) };
 
   columns: Array<CdTableColumn> = [];
   tableData: KeyValueItem[];
@@ -112,7 +112,7 @@ export class TableKeyValueComponent implements OnInit, OnChanges {
   private makePairs(data: any): KeyValueItem[] {
     let result: KeyValueItem[] = [];
     if (!data) {
-      return undefined; // Wait for data
+      return; // Wait for data
     } else if (_.isArray(data)) {
       result = this.makePairsFromArray(data);
     } else if (_.isObject(data)) {
@@ -130,7 +130,7 @@ export class TableKeyValueComponent implements OnInit, OnChanges {
   }
 
   private makePairsFromArray(data: any[]): KeyValueItem[] {
-    let temp: any[] = [];
+    let temp = [];
     const first = data[0];
     if (_.isArray(first)) {
       if (first.length === 2) {
@@ -157,7 +157,7 @@ export class TableKeyValueComponent implements OnInit, OnChanges {
     return temp;
   }
 
-  private makePairsFromObject(data: any): KeyValueItem[] {
+  private makePairsFromObject(data: object): KeyValueItem[] {
     return Object.keys(data).map((k) => ({
       key: k,
       value: data[k]
@@ -215,7 +215,7 @@ export class TableKeyValueComponent implements OnInit, OnChanges {
     return value;
   }
 
-  private isDate(s: string) {
+  private isDate(s) {
     const sep = '[ -:.TZ]';
     const n = '\\d{2}' + sep;
     //                            year     -    m - d - h : m : s . someRest  Z (if UTC)

@@ -25,18 +25,16 @@
           <ng-template #noNames>
             <p i18n>Are you sure that you want to {{ actionDescription | lowercase }} the selected {{ itemDescription }}?</p>
           </ng-template>
-          <ng-container *ngTemplateOutlet="childFormGroupTemplate; context:{form:deletionForm}"></ng-container>
-          <div class="form-group">
-            <div class="custom-control custom-checkbox">
+          <div class="form-group"
+               [ngClass]="{'has-error': deletionForm.showError('confirmation', formDir)}">
+            <div class="checkbox checkbox-primary">
               <input type="checkbox"
-                     class="custom-control-input"
                      name="confirmation"
                      id="confirmation"
                      formControlName="confirmation"
                      autofocus>
-              <label class="custom-control-label"
-                     for="confirmation"
-                     i18n>Yes, I am sure.</label>
+              <label i18n
+                     for="confirmation">Yes, I am sure.</label>
             </div>
           </div>
         </div>

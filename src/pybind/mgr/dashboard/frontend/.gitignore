@@ -31,10 +31,11 @@
 npm-debug.log
 testem.log
 /typings
+/src/unit-test-configuration.ts
 
 # e2e
-/cypress/screenshots
-/cypress/videos
+/e2e/*.js
+/e2e/*.map
 
 # System Files
 .DS_Store

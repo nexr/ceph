@@ -1,6 +1,5 @@
 import { Component, OnInit, TemplateRef, ViewChild } from '@angular/core';
 import { I18n } from '@ngx-translate/i18n-polyfill';
-import { ListWithDetails } from '../../../../shared/classes/list-with-details.class';
 import { CellTemplate } from '../../../../shared/enum/cell-template.enum';
 import { Icons } from '../../../../shared/enum/icons.enum';
 import { CdTableAction } from '../../../../shared/models/cd-table-action';
@@ -20,8 +19,8 @@ const BASE_URL = 'silence'; // as only silence actions can be used
   templateUrl: './active-alert-list.component.html',
   styleUrls: ['./active-alert-list.component.scss']
 })
-export class ActiveAlertListComponent extends ListWithDetails implements OnInit {
-  @ViewChild('externalLinkTpl', { static: true })
+export class ActiveAlertListComponent implements OnInit {
+  @ViewChild('externalLinkTpl')
   externalLinkTpl: TemplateRef<any>;
   columns: CdTableColumn[];
   tableActions: CdTableAction[];
@@ -29,9 +28,9 @@ export class ActiveAlertListComponent extends ListWithDetails implements OnInit 
   selection = new CdTableSelection();
   icons = Icons;
   customCss = {
-    'badge badge-danger': 'active',
-    'badge badge-warning': 'unprocessed',
-    'badge badge-info': 'suppressed'
+    'label label-danger': 'active',
+    'label label-warning': 'unprocessed',
+    'label label-info': 'suppressed'
   };
 
   constructor(
@@ -42,7 +41,6 @@ export class ActiveAlertListComponent extends ListWithDetails implements OnInit 
     private i18n: I18n,
     private cdDatePipe: CdDatePipe
   ) {
-    super();
     this.permission = this.authStorageService.getPermissions().prometheus;
     this.tableActions = [
       {

@@ -7,7 +7,7 @@ import { RouterTestingModule } from '@angular/router/testing';
 import { BsModalService } from 'ngx-bootstrap/modal';
 import { TooltipModule } from 'ngx-bootstrap/tooltip';
 import { ToastrModule } from 'ngx-toastr';
-import { of as observableOf, throwError } from 'rxjs';
+import { of as observableOf } from 'rxjs';
 
 import { configureTestBed, FormHelper, i18nProviders } from '../../../../testing/unit-test-helper';
 import { RgwUserService } from '../../../shared/api/rgw-user.service';
@@ -155,22 +155,24 @@ describe('RgwUserFormComponent', () => {
   });
 
   describe('username validation', () => {
+    beforeEach(() => {
+      spyOn(rgwUserService, 'enumerate').and.returnValue(observableOf(['abc', 'xyz']));
+    });
+
     it('should validate that username is required', () => {
-      formHelper.expectErrorChange('user_id', '', 'required', true);
+      formHelper.expectErrorChange('uid', '', 'required', true);
     });
 
     it('should validate that username is valid', fakeAsync(() => {
-      spyOn(rgwUserService, 'get').and.returnValue(throwError('foo'));
-      formHelper.setValue('user_id', 'ab', true);
-      tick();
-      formHelper.expectValid('user_id');
+      formHelper.setValue('uid', 'ab', true);
+      tick(500);
+      formHelper.expectValid('uid');
     }));
 
     it('should validate that username is invalid', fakeAsync(() => {
-      spyOn(rgwUserService, 'get').and.returnValue(observableOf({}));
-      formHelper.setValue('user_id', 'abc', true);
-      tick();
-      formHelper.expectError('user_id', 'notUnique');
+      formHelper.setValue('uid', 'abc', true);
+      tick(500);
+      formHelper.expectError('uid', 'notUnique');
     }));
   });
 

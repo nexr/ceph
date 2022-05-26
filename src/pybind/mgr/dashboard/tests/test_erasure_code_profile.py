@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from .. import mgr
-from . import ControllerTestCase  # pylint: disable=no-name-in-module
+from . import ControllerTestCase
 from ..controllers.erasure_code_profile import ErasureCodeProfile
 
 
@@ -29,3 +29,8 @@ class ErasureCodeProfileTest(ControllerTestCase):
         self._get('/api/erasure_code_profile')
         self.assertStatus(200)
         self.assertJsonBody([{'k': 2, 'm': 1, 'name': 'test'}])
+
+    def test_get(self):
+        self._get('/api/erasure_code_profile/test')
+        self.assertStatus(200)
+        self.assertJsonBody({'k': 2, 'm': 1, 'name': 'test'})

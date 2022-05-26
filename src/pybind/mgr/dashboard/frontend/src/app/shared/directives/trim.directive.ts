@@ -10,7 +10,7 @@ export class TrimDirective {
   constructor(private ngControl: NgControl) {}
 
   @HostListener('input', ['$event.target.value'])
-  onInput(value: string) {
+  onInput(value) {
     this.setValue(value);
   }
 

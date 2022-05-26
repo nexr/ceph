@@ -9,7 +9,6 @@ import { CdFormGroup } from '../../../shared/forms/cd-form-group';
 import { CdValidators } from '../../../shared/forms/cd-validators';
 import { ExecutingTask } from '../../../shared/models/executing-task';
 import { FinishedTask } from '../../../shared/models/finished-task';
-import { ImageSpec } from '../../../shared/models/image-spec';
 import { TaskWrapperService } from '../../../shared/services/task-wrapper.service';
 
 @Component({
@@ -18,14 +17,9 @@ import { TaskWrapperService } from '../../../shared/services/task-wrapper.servic
   styleUrls: ['./rbd-trash-move-modal.component.scss']
 })
 export class RbdTrashMoveModalComponent implements OnInit {
-  // initial state
+  metaType: string;
   poolName: string;
-  namespace: string;
   imageName: string;
-  hasSnapshots: boolean;
-
-  imageSpec: ImageSpec;
-  imageSpecStr: string;
   executingTasks: ExecutingTask[];
 
   moveForm: CdFormGroup;
@@ -50,11 +44,11 @@ export class RbdTrashMoveModalComponent implements OnInit {
       expiresAt: [
         '',
         [
-          CdValidators.custom('format', (expiresAt: string) => {
+          CdValidators.custom('format', (expiresAt) => {
             const result = expiresAt === '' || moment(expiresAt, 'YYYY-MM-DD HH:mm:ss').isValid();
             return !result;
           }),
-          CdValidators.custom('expired', (expiresAt: string) => {
+          CdValidators.custom('expired', (expiresAt) => {
             const result = moment().isAfter(expiresAt);
             return result;
           })
@@ -64,8 +58,6 @@ export class RbdTrashMoveModalComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.imageSpec = new ImageSpec(this.poolName, this.namespace, this.imageName);
-    this.imageSpecStr = this.imageSpec.toString();
     this.pattern = `${this.poolName}/${this.imageName}`;
   }
 
@@ -84,9 +76,10 @@ export class RbdTrashMoveModalComponent implements OnInit {
     this.taskWrapper
       .wrapTaskAroundCall({
         task: new FinishedTask('rbd/trash/move', {
-          image_spec: this.imageSpecStr
+          pool_name: this.poolName,
+          image_name: this.imageName
         }),
-        call: this.rbdService.moveTrash(this.imageSpec, delay)
+        call: this.rbdService.moveTrash(this.poolName, this.imageName, delay)
       })
       .subscribe(undefined, undefined, () => {
         this.modalRef.hide();

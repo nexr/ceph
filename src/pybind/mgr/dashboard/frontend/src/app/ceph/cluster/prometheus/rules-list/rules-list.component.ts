@@ -2,8 +2,8 @@ import { Component, Input, OnInit } from '@angular/core';
 
 import { I18n } from '@ngx-translate/i18n-polyfill';
 
-import { ListWithDetails } from '../../../../shared/classes/list-with-details.class';
 import { CdTableColumn } from '../../../../shared/models/cd-table-column';
+import { CdTableSelection } from '../../../../shared/models/cd-table-selection';
 import { PrometheusRule } from '../../../../shared/models/prometheus-alerts';
 import { DurationPipe } from '../../../../shared/pipes/duration.pipe';
 
@@ -12,11 +12,11 @@ import { DurationPipe } from '../../../../shared/pipes/duration.pipe';
   templateUrl: './rules-list.component.html',
   styleUrls: ['./rules-list.component.scss']
 })
-export class RulesListComponent extends ListWithDetails implements OnInit {
+export class RulesListComponent implements OnInit {
   @Input()
   data: any;
   columns: CdTableColumn[];
-  expandedRow: PrometheusRule;
+  selectedRule: PrometheusRule;
 
   /**
    * Hide active alerts in details of alerting rules as they are already shown
@@ -25,9 +25,7 @@ export class RulesListComponent extends ListWithDetails implements OnInit {
    */
   hideKeys = ['alerts', 'type'];
 
-  constructor(private i18n: I18n) {
-    super();
-  }
+  constructor(private i18n: I18n) {}
 
   ngOnInit() {
     this.columns = [
@@ -38,5 +36,9 @@ export class RulesListComponent extends ListWithDetails implements OnInit {
       { prop: 'query', name: this.i18n('Query'), isHidden: true },
       { prop: 'annotations.description', name: this.i18n('Description') }
     ];
+  }
+
+  selectionUpdated(selection: CdTableSelection) {
+    this.selectedRule = selection.first();
   }
 }

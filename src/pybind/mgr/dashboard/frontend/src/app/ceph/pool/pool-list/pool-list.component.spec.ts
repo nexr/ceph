@@ -1,6 +1,5 @@
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterTestingModule } from '@angular/router/testing';
 
 import * as _ from 'lodash';
@@ -33,7 +32,7 @@ describe('PoolListComponent', () => {
   let fixture: ComponentFixture<PoolListComponent>;
   let poolService: PoolService;
 
-  const createPool = (name: string, id: number): Pool => {
+  const createPool = (name, id): Pool => {
     return _.merge(new Pool(name), {
       pool: id,
       pg_num: 256,
@@ -50,7 +49,6 @@ describe('PoolListComponent', () => {
   configureTestBed({
     declarations: [PoolListComponent, PoolDetailsComponent, RbdConfigurationListComponent],
     imports: [
-      BrowserAnimationsModule,
       SharedModule,
       ToastrModule.forRoot(),
       RouterTestingModule,
@@ -74,11 +72,7 @@ describe('PoolListComponent', () => {
   });
 
   it('should have columns that are sortable', () => {
-    expect(
-      component.columns
-        .filter((column) => !(column.prop === undefined))
-        .every((column) => Boolean(column.prop))
-    ).toBeTruthy();
+    expect(component.columns.every((column) => Boolean(column.prop))).toBeTruthy();
   });
 
   describe('monAllowPoolDelete', () => {
@@ -146,8 +140,10 @@ describe('PoolListComponent', () => {
   describe('pool deletion', () => {
     let taskWrapper: TaskWrapperService;
 
-    const setSelectedPool = (poolName: string) =>
-      (component.selection.selected = [{ pool_name: poolName }]);
+    const setSelectedPool = (poolName: string) => {
+      component.selection.selected = [{ pool_name: poolName }];
+      component.selection.update();
+    };
 
     const callDeletion = () => {
       component.deletePoolModal();
@@ -155,7 +151,7 @@ describe('PoolListComponent', () => {
       deletion.submitActionObservable();
     };
 
-    const testPoolDeletion = (poolName: string) => {
+    const testPoolDeletion = (poolName) => {
       setSelectedPool(poolName);
       callDeletion();
       expect(poolService.delete).toHaveBeenCalledWith(poolName);
@@ -199,10 +195,7 @@ describe('PoolListComponent', () => {
 
     beforeEach(() => {
       summaryService = TestBed.get(SummaryService);
-      summaryService['summaryDataSource'].next({
-        executing_tasks: [],
-        finished_tasks: []
-      });
+      summaryService['summaryDataSource'].next({ executing_tasks: [], finished_tasks: [] });
     });
 
     it('gets all pools without executing pools', () => {
@@ -252,7 +245,7 @@ describe('PoolListComponent', () => {
   });
 
   describe('getPgStatusCellClass', () => {
-    const testMethod = (value: string, expected: string) =>
+    const testMethod = (value, expected) =>
       expect(component.getPgStatusCellClass('', '', value)).toEqual({
         'text-right': true,
         [expected]: true
@@ -280,7 +273,7 @@ describe('PoolListComponent', () => {
 
   describe('custom row comparators', () => {
     const expectCorrectComparator = (statsAttribute: string) => {
-      const mockPool = (v: number) => ({ stats: { [statsAttribute]: { latest: v } } });
+      const mockPool = (v) => ({ stats: { [statsAttribute]: { latest: v } } });
       const columnDefinition = _.find(
         component.columns,
         (column) => column.prop === `stats.${statsAttribute}.rates`
@@ -301,7 +294,7 @@ describe('PoolListComponent', () => {
   describe('transformPoolsData', () => {
     let pool: Pool;
 
-    const getPoolData = (o: object) => [
+    const getPoolData = (o) => [
       _.merge(
         _.merge(createPool('a', 0), {
           cdIsBinary: true,
@@ -309,8 +302,6 @@ describe('PoolListComponent', () => {
           stats: {
             bytes_used: { latest: 0, rate: 0, rates: [] },
             max_avail: { latest: 0, rate: 0, rates: [] },
-            avail_raw: { latest: 0, rate: 0, rates: [] },
-            percent_used: { latest: 0, rate: 0, rates: [] },
             rd: { latest: 0, rate: 0, rates: [] },
             rd_bytes: { latest: 0, rate: 0, rates: [] },
             wr: { latest: 0, rate: 0, rates: [] },
@@ -330,16 +321,8 @@ describe('PoolListComponent', () => {
       pool = _.merge(pool, {
         stats: {
           bytes_used: { latest: 5, rate: 0, rates: [] },
-          avail_raw: { latest: 15, rate: 0, rates: [] },
-          percent_used: { latest: 0.25, rate: 0, rates: [] },
-          rd_bytes: {
-            latest: 6,
-            rate: 4,
-            rates: [
-              [0, 2],
-              [1, 6]
-            ]
-          }
+          max_avail: { latest: 15, rate: 0, rates: [] },
+          rd_bytes: { latest: 6, rate: 4, rates: [[0, 2], [1, 6]] }
         },
         pg_status: { 'active+clean': 8, down: 2 }
       });
@@ -348,8 +331,7 @@ describe('PoolListComponent', () => {
           pg_status: '8 active+clean, 2 down',
           stats: {
             bytes_used: { latest: 5, rate: 0, rates: [] },
-            avail_raw: { latest: 15, rate: 0, rates: [] },
-            percent_used: { latest: 0.25, rate: 0, rates: [] },
+            max_avail: { latest: 15, rate: 0, rates: [] },
             rd_bytes: { latest: 6, rate: 4, rates: [2, 6] }
           },
           usage: 0.25
@@ -431,7 +413,7 @@ describe('PoolListComponent', () => {
     });
 
     it('returns empty string', () => {
-      const pgStatus: any = undefined;
+      const pgStatus = undefined;
       const expected = '';
 
       expect(component.transformPgStatus(pgStatus)).toEqual(expected);
@@ -440,7 +422,12 @@ describe('PoolListComponent', () => {
 
   describe('getSelectionTiers', () => {
     const setSelectionTiers = (tiers: number[]) => {
-      component.expandedRow = { tiers };
+      component.selection.selected = [
+        {
+          tiers
+        }
+      ];
+      component.selection.update();
       component.getSelectionTiers();
     };
 
@@ -450,39 +437,35 @@ describe('PoolListComponent', () => {
 
     it('should select multiple existing cache tiers', () => {
       setSelectionTiers([0, 1, 2]);
-      expect(component.cacheTiers).toEqual(getPoolList());
+      expect(component.selectionCacheTiers).toEqual(getPoolList());
     });
 
     it('should select correct existing cache tier', () => {
       setSelectionTiers([0]);
-      expect(component.cacheTiers).toEqual([createPool('a', 0)]);
+      expect(component.selectionCacheTiers).toEqual([createPool('a', 0)]);
     });
 
     it('should not select cache tier if id is invalid', () => {
       setSelectionTiers([-1]);
-      expect(component.cacheTiers).toEqual([]);
+      expect(component.selectionCacheTiers).toEqual([]);
     });
 
     it('should not select cache tier if empty', () => {
       setSelectionTiers([]);
-      expect(component.cacheTiers).toEqual([]);
+      expect(component.selectionCacheTiers).toEqual([]);
     });
 
     it('should be able to selected one pool with multiple tiers, than with a single tier, than with no tiers', () => {
       setSelectionTiers([0, 1, 2]);
-      expect(component.cacheTiers).toEqual(getPoolList());
+      expect(component.selectionCacheTiers).toEqual(getPoolList());
       setSelectionTiers([0]);
-      expect(component.cacheTiers).toEqual([createPool('a', 0)]);
+      expect(component.selectionCacheTiers).toEqual([createPool('a', 0)]);
       setSelectionTiers([]);
-      expect(component.cacheTiers).toEqual([]);
+      expect(component.selectionCacheTiers).toEqual([]);
     });
   });
 
   describe('getDisableDesc', () => {
-    beforeEach(() => {
-      component.selection.selected = [{ pool_name: 'foo' }];
-    });
-
     it('should return message if mon_allow_pool_delete flag is set to false', () => {
       component.monAllowPoolDelete = false;
       expect(component.getDisableDesc()).toBe(
@@ -490,9 +473,9 @@ describe('PoolListComponent', () => {
       );
     });
 
-    it('should return false if mon_allow_pool_delete flag is set to true', () => {
+    it('should return undefined if mon_allow_pool_delete flag is set to true', () => {
       component.monAllowPoolDelete = true;
-      expect(component.getDisableDesc()).toBeFalsy();
+      expect(component.getDisableDesc()).toBeUndefined();
     });
   });
 });

@@ -13,7 +13,7 @@ export class LogsService {
     return this.http.get('api/logs/all');
   }
 
-  validateDashboardUrl(uid: string) {
+  validateDashboardUrl(uid) {
     return this.http.get(`api/grafana/validation/${uid}`);
   }
 }

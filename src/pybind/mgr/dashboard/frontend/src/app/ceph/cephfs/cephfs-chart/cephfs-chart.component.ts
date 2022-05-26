@@ -12,9 +12,9 @@ import { ChartTooltip } from '../../../shared/models/chart-tooltip';
   styleUrls: ['./cephfs-chart.component.scss']
 })
 export class CephfsChartComponent implements OnChanges, OnInit {
-  @ViewChild('chartCanvas', { static: true })
+  @ViewChild('chartCanvas')
   chartCanvas: ElementRef;
-  @ViewChild('chartTooltip', { static: true })
+  @ViewChild('chartTooltip')
   chartTooltip: ElementRef;
 
   @Input()
@@ -123,8 +123,8 @@ export class CephfsChartComponent implements OnChanges, OnInit {
     const chartTooltip = new ChartTooltip(
       this.chartCanvas,
       this.chartTooltip,
-      (tooltip: any) => tooltip.caretX + 'px',
-      (tooltip: any) => tooltip.caretY - tooltip.height - 23 + 'px'
+      (tooltip) => tooltip.caretX + 'px',
+      (tooltip) => tooltip.caretY - tooltip.height - 23 + 'px'
     );
     chartTooltip.getTitle = (ts) => moment(ts, 'x').format('LTS');
     chartTooltip.checkOffset = true;
@@ -160,8 +160,8 @@ export class CephfsChartComponent implements OnChanges, OnInit {
    * can handle (list of objects with millisecs-since-epoch
    * timestamps)
    */
-  private convertTimeSeries(sourceSeries: any) {
-    const data: any[] = [];
+  private convertTimeSeries(sourceSeries) {
+    const data = [];
     _.each(sourceSeries, (dp) => {
       data.push({
         x: dp[0] * 1000,
@@ -179,7 +179,7 @@ export class CephfsChartComponent implements OnChanges, OnInit {
     return data;
   }
 
-  private deltaTimeSeries(sourceSeries: any) {
+  private deltaTimeSeries(sourceSeries) {
     let i;
     let prev = sourceSeries[0];
     const result = [];

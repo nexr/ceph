@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 
 import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
 
-import { Icons } from '../../../shared/enum/icons.enum';
-import { DocService } from '../../../shared/services/doc.service';
+import { CephReleaseNamePipe } from '../../../shared/pipes/ceph-release-name.pipe';
+import { AuthStorageService } from '../../../shared/services/auth-storage.service';
+import { SummaryService } from '../../../shared/services/summary.service';
 import { AboutComponent } from '../about/about.component';
 
 @Component({
@@ -12,20 +13,40 @@ import { AboutComponent } from '../about/about.component';
   styleUrls: ['./dashboard-help.component.scss']
 })
 export class DashboardHelpComponent implements OnInit {
+  @ViewChild('docsForm')
+  docsFormElement;
   docsUrl: string;
   modalRef: BsModalRef;
-  icons = Icons;
 
-  constructor(private modalService: BsModalService, private docService: DocService) {}
+  constructor(
+    private summaryService: SummaryService,
+    private cephReleaseNamePipe: CephReleaseNamePipe,
+    private modalService: BsModalService,
+    private authStorageService: AuthStorageService
+  ) {}
 
   ngOnInit() {
-    this.docService.subscribeOnce('dashboard', (url: string) => {
-      this.docsUrl = url;
+    const subs = this.summaryService.subscribe((summary: any) => {
+      if (!summary) {
+        return;
+      }
+
+      const releaseName = this.cephReleaseNamePipe.transform(summary.version);
+      this.docsUrl = `http://docs.ceph.com/docs/${releaseName}/mgr/dashboard/`;
+
+      setTimeout(() => {
+        subs.unsubscribe();
+      }, 0);
     });
   }
 
   openAboutModal() {
     this.modalRef = this.modalService.show(AboutComponent);
-    this.modalRef.setClass('modal-lg');
+  }
+
+  goToApiDocs() {
+    const tokenInput = this.docsFormElement.nativeElement.children[0];
+    tokenInput.value = this.authStorageService.getToken();
+    this.docsFormElement.nativeElement.submit();
   }
 }

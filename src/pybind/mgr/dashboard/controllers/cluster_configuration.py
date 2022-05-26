@@ -20,9 +20,6 @@ class ClusterConfiguration(RESTController):
         :return: list of config options extended by their current values
         """
         config_dump = CephService.send_command('mon', 'config dump')
-        mgr_config = mgr.get('config')
-        config_dump.append({'name': 'fsid', 'section': 'mgr', 'value': mgr_config['fsid']})
-
         for config_dump_entry in config_dump:
             for i, elem in enumerate(options):
                 if config_dump_entry['name'] == elem['name']:
@@ -62,9 +59,9 @@ class ClusterConfiguration(RESTController):
         self._updateable_at_runtime([name])
 
         # Update config option
-        avail_sections = ['global', 'mon', 'mgr', 'osd', 'mds', 'client']
+        availSections = ['global', 'mon', 'mgr', 'osd', 'mds', 'client']
 
-        for section in avail_sections:
+        for section in availSections:
             for entry in value:
                 if entry['value'] is None:
                     break

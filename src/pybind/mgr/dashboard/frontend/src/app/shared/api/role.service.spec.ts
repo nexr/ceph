@@ -44,13 +44,6 @@ describe('RoleService', () => {
     expect(req.request.method).toBe('GET');
   });
 
-  it('should call clone', () => {
-    service.clone('foo', 'bar').subscribe();
-    const req = httpTesting.expectOne('api/role/foo/clone');
-    expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ new_name: 'bar' });
-  });
-
   it('should check if role name exists', () => {
     let exists: boolean;
     service.exists('role1').subscribe((res: boolean) => {

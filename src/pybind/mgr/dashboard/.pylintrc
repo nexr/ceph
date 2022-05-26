@@ -15,7 +15,7 @@ ignore-patterns=
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
-init-hook='import sys; sys.path.append("./")'
+#init-hook=
 
 # Use multiple processes to speed up Pylint.
 jobs=1
@@ -118,11 +118,7 @@ disable=import-star-module-level,
         too-many-arguments,
         too-many-locals,
         too-many-statements,
-        useless-object-inheritance,
-        relative-beyond-top-level,
-        raise-missing-from,
-        super-with-arguments,
-        import-outside-toplevel
+        useless-object-inheritance
 
 
 # Enable the message, report, category or checker with the given id(s). You can
@@ -396,7 +392,7 @@ ignored-classes=optparse.Values,thread._local,_thread._local
 # (useful for modules/projects where namespaces are manipulated during runtime
 # and thus existing member attributes cannot be deduced by static analysis. It
 # supports qualified module names, as well as Unix pattern matching.
-ignored-modules=cherrypy,distutils,rados,rbd,cephfs
+ignored-modules=cherrypy,distutils
 
 # Show a hint with possible names when a member name was not found. The aspect
 # of finding the hint is based on edit distance.
@@ -435,7 +431,7 @@ ignore-comments=yes
 ignore-docstrings=yes
 
 # Ignore imports when computing similarities.
-ignore-imports=yes
+ignore-imports=no
 
 # Minimum lines number of a similarity.
 min-similarity-lines=4
@@ -505,7 +501,7 @@ valid-metaclass-classmethod-first-arg=mcs
 max-args=5
 
 # Maximum number of attributes for a class (see R0902).
-max-attributes=10
+max-attributes=7
 
 # Maximum number of boolean expressions in a if statement
 max-bool-expr=5

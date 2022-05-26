@@ -20,9 +20,11 @@
           <!-- LUN -->
           <div class="form-group row">
             <div class="col-sm-12">
-              <label class="col-form-label required"
-                     for="lun"
-                     i18n>lun</label>
+              <label class="col-form-label"
+                     for="lun">
+                <ng-container i18n>lun</ng-container>
+                <span class="required"></span>
+              </label>
               <input type="number"
                      class="form-control"
                      id="lun"
@@ -54,11 +56,11 @@
         <!-- BACKSTORE -->
         <div class="form-group row">
           <div class="col-sm-12">
-            <label class="col-form-label"
+            <label class="control-label"
                    i18n>Backstore</label>
             <select id="backstore"
                     name="backstore"
-                    class="form-control custom-select"
+                    class="form-control"
                     formControlName="backstore">
               <option *ngFor="let bs of backstores"
                       [value]="bs">{{ bs | iscsiBackstore }}</option>
@@ -70,7 +72,8 @@
         <ng-container *ngFor="let bs of backstores">
           <ng-container *ngIf="settingsForm.value['backstore'] === bs">
             <div class="form-group row"
-                 *ngFor="let setting of disk_default_controls[bs] | keyvalue">
+                 *ngFor="let setting of disk_default_controls[bs] | keyvalue"
+                 [ngClass]="{'has-error': settingsForm.showError(setting.key, formDir)}">
               <div class="col-sm-12">
                 <cd-iscsi-setting [settingsForm]="settingsForm"
                                   [formDir]="formDir"
@@ -93,6 +96,7 @@
           </cd-back-button>
         </div>
       </div>
+
     </form>
   </ng-container>
 </cd-modal>

@@ -12,7 +12,7 @@ describe('FilterPipe', () => {
     const filters = [
       {
         value: 'foo',
-        applyFilter: (row: any[], val: any) => {
+        applyFilter: (row, val) => {
           return row.indexOf(val) !== -1;
         }
       }
@@ -25,13 +25,13 @@ describe('FilterPipe', () => {
     const filters = [
       {
         value: 'foo',
-        applyFilter: (row: any[], val: any) => {
+        applyFilter: (row, val) => {
           return row.indexOf(val) !== -1;
         }
       },
       {
         value: 'bar',
-        applyFilter: (row: any[], val: any) => {
+        applyFilter: (row, val) => {
           return row.indexOf(val) !== -1;
         }
       }

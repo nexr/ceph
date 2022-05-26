@@ -7,7 +7,7 @@ import { configureTestBed } from '../../../testing/unit-test-helper';
 import { SummaryService } from './summary.service';
 import { TaskManagerService } from './task-manager.service';
 
-const summary: Record<string, any> = {
+const summary = {
   executing_tasks: [],
   health_status: 'HEALTH_OK',
   mgr_id: 'x',
@@ -25,7 +25,7 @@ export class SummaryServiceMock {
   refresh() {
     this.summaryDataSource.next(summary);
   }
-  subscribe(call: any) {
+  subscribe(call) {
     return this.summaryData$.subscribe(call);
   }
 }
@@ -35,9 +35,12 @@ describe('TaskManagerService', () => {
   let summaryService: any;
   let called: boolean;
 
-  configureTestBed({
-    providers: [TaskManagerService, { provide: SummaryService, useClass: SummaryServiceMock }]
-  });
+  configureTestBed(
+    {
+      providers: [TaskManagerService, { provide: SummaryService, useClass: SummaryServiceMock }]
+    },
+    true
+  );
 
   beforeEach(() => {
     taskManagerService = TestBed.get(TaskManagerService);
@@ -54,7 +57,6 @@ describe('TaskManagerService', () => {
     expect(taskManagerService.subscriptions.length).toBe(1);
     summaryService.refresh();
     tick();
-    taskManagerService.init(summaryService);
     expect(called).toEqual(true);
     expect(taskManagerService.subscriptions).toEqual([]);
   }));

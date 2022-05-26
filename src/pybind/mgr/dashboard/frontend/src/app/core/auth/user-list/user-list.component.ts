@@ -6,14 +6,11 @@ import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
 import { UserService } from '../../../shared/api/user.service';
 import { CriticalConfirmationModalComponent } from '../../../shared/components/critical-confirmation-modal/critical-confirmation-modal.component';
 import { ActionLabelsI18n } from '../../../shared/constants/app.constants';
-import { CellTemplate } from '../../../shared/enum/cell-template.enum';
-import { Icons } from '../../../shared/enum/icons.enum';
 import { NotificationType } from '../../../shared/enum/notification-type.enum';
 import { CdTableAction } from '../../../shared/models/cd-table-action';
 import { CdTableColumn } from '../../../shared/models/cd-table-column';
 import { CdTableSelection } from '../../../shared/models/cd-table-selection';
 import { Permission } from '../../../shared/models/permissions';
-import { CdDatePipe } from '../../../shared/pipes/cd-date.pipe';
 import { EmptyPipe } from '../../../shared/pipes/empty.pipe';
 import { AuthStorageService } from '../../../shared/services/auth-storage.service';
 import { NotificationService } from '../../../shared/services/notification.service';
@@ -28,7 +25,7 @@ const BASE_URL = 'user-management/users';
   providers: [{ provide: URLBuilderService, useValue: new URLBuilderService(BASE_URL) }]
 })
 export class UserListComponent implements OnInit {
-  @ViewChild('userRolesTpl', { static: true })
+  @ViewChild('userRolesTpl')
   userRolesTpl: TemplateRef<any>;
 
   permission: Permission;
@@ -47,26 +44,25 @@ export class UserListComponent implements OnInit {
     private authStorageService: AuthStorageService,
     private i18n: I18n,
     private urlBuilder: URLBuilderService,
-    private cdDatePipe: CdDatePipe,
     public actionLabels: ActionLabelsI18n
   ) {
     this.permission = this.authStorageService.getPermissions().user;
     const addAction: CdTableAction = {
       permission: 'create',
-      icon: Icons.add,
+      icon: 'fa-plus',
       routerLink: () => this.urlBuilder.getCreate(),
       name: this.actionLabels.CREATE
     };
     const editAction: CdTableAction = {
       permission: 'update',
-      icon: Icons.edit,
+      icon: 'fa-pencil',
       routerLink: () =>
         this.selection.first() && this.urlBuilder.getEdit(this.selection.first().username),
       name: this.actionLabels.EDIT
     };
     const deleteAction: CdTableAction = {
       permission: 'delete',
-      icon: Icons.destroy,
+      icon: 'fa-times',
       click: () => this.deleteUserModal(),
       name: this.actionLabels.DELETE
     };
@@ -97,29 +93,12 @@ export class UserListComponent implements OnInit {
         prop: 'roles',
         flexGrow: 1,
         cellTemplate: this.userRolesTpl
-      },
-      {
-        name: this.i18n('Enabled'),
-        prop: 'enabled',
-        flexGrow: 1,
-        cellTransformation: CellTemplate.checkIcon
-      },
-      {
-        name: this.i18n('Password expiration date'),
-        prop: 'pwdExpirationDate',
-        flexGrow: 1,
-        pipe: this.cdDatePipe
       }
     ];
   }
 
   getUsers() {
     this.userService.list().subscribe((users: Array<any>) => {
-      users.forEach((user) => {
-        if (user['pwdExpirationDate'] && user['pwdExpirationDate'] > 0) {
-          user['pwdExpirationDate'] = user['pwdExpirationDate'] * 1000;
-        }
-      });
       this.users = users;
     });
   }

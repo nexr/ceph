@@ -7,7 +7,6 @@ import { CdFormBuilder } from '../../../shared/forms/cd-form-builder';
 import { CdFormGroup } from '../../../shared/forms/cd-form-group';
 import { ExecutingTask } from '../../../shared/models/executing-task';
 import { FinishedTask } from '../../../shared/models/finished-task';
-import { ImageSpec } from '../../../shared/models/image-spec';
 import { TaskWrapperService } from '../../../shared/services/task-wrapper.service';
 
 @Component({
@@ -16,10 +15,9 @@ import { TaskWrapperService } from '../../../shared/services/task-wrapper.servic
   styleUrls: ['./rbd-trash-restore-modal.component.scss']
 })
 export class RbdTrashRestoreModalComponent implements OnInit {
+  metaType: string;
   poolName: string;
-  namespace: string;
   imageName: string;
-  imageSpec: string;
   imageId: string;
   executingTasks: ExecutingTask[];
 
@@ -33,7 +31,6 @@ export class RbdTrashRestoreModalComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    this.imageSpec = new ImageSpec(this.poolName, this.namespace, this.imageName).toString();
     this.restoreForm = this.fb.group({
       name: this.imageName
     });
@@ -41,15 +38,15 @@ export class RbdTrashRestoreModalComponent implements OnInit {
 
   restore() {
     const name = this.restoreForm.getValue('name');
-    const imageSpec = new ImageSpec(this.poolName, this.namespace, this.imageId);
 
     this.taskWrapper
       .wrapTaskAroundCall({
         task: new FinishedTask('rbd/trash/restore', {
-          image_id_spec: imageSpec.toString(),
+          pool_name: this.poolName,
+          image_id: this.imageId,
           new_image_name: name
         }),
-        call: this.rbdService.restoreTrash(imageSpec, name)
+        call: this.rbdService.restoreTrash(this.poolName, this.imageId, name)
       })
       .subscribe(
         undefined,

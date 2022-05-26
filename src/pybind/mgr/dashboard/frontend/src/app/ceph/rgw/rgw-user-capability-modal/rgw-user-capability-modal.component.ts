@@ -74,7 +74,7 @@ export class RgwUserCapabilityModalComponent {
   setCapabilities(capabilities: RgwUserCapability[]) {
     // Parse the configured capabilities to get a list of types that
     // should be displayed.
-    const usedTypes: string[] = [];
+    const usedTypes = [];
     capabilities.forEach((capability) => {
       usedTypes.push(capability.type);
     });

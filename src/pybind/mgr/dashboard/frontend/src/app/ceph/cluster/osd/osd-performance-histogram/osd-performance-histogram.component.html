@@ -1,6 +1,8 @@
 <table>
-  <tr *ngFor="let row of valuesStyle">
-    <td *ngFor="let col of row"
+  <tr style="height: 10px;"
+      *ngFor="let row of valuesStyle">
+    <td style="width: 10px; height: 10px;"
+        *ngFor="let col of row"
         [ngStyle]="col">
     </td>
   </tr>

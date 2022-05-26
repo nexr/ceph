@@ -15,23 +15,18 @@ export class MgrSummaryPipe implements PipeTransform {
     }
 
     let activeCount = this.i18n('n/a');
-    const activeTitleText = _.isUndefined(value.active_name)
+    const titleText = _.isUndefined(value.active_name)
       ? ''
       : `${this.i18n('active daemon')}: ${value.active_name}`;
-    // There is always one standbyreplay to replace active daemon, if active one is down
-    if (activeTitleText.length > 0) {
+    if (titleText.length > 0) {
       activeCount = '1';
     }
-    const standbyHoverText = value.standbys.map((s: any): string => s.name).join(', ');
-    const standbyTitleText = !standbyHoverText
-      ? ''
-      : `${this.i18n('standby daemons')}: ${standbyHoverText}`;
     const standbyCount = value.standbys.length;
     const mgrSummary = [
       {
         content: `${activeCount} ${this.i18n('active')}`,
-        class: 'popover-info',
-        titleText: activeTitleText
+        class: 'mgr-active-name',
+        titleText: titleText
       }
     ];
 
@@ -42,8 +37,8 @@ export class MgrSummaryPipe implements PipeTransform {
     });
     mgrSummary.push({
       content: `${standbyCount} ${this.i18n('standby')}`,
-      class: 'popover-info',
-      titleText: standbyTitleText
+      class: '',
+      titleText: ''
     });
 
     return mgrSummary;

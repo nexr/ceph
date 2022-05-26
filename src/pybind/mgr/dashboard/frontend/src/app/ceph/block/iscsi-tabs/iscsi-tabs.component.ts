@@ -16,7 +16,7 @@ export class IscsiTabsComponent implements OnInit {
     this.url = this.router.url;
   }
 
-  navigateTo(url: string) {
+  navigateTo(url) {
     this.router.navigate([url]);
   }
 }

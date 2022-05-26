@@ -5,7 +5,6 @@ import sys
 import inspect
 import json
 import functools
-import logging
 
 import collections
 from datetime import datetime, timedelta
@@ -13,6 +12,8 @@ from distutils.util import strtobool
 import fnmatch
 import time
 import threading
+import socket
+import six
 from six.moves import urllib
 import cherrypy
 
@@ -21,25 +22,27 @@ try:
 except ImportError:
     from urllib.parse import urljoin
 
-from ceph.deployment.utils import wrap_ipv6
-
-from . import mgr
+from . import logger, mgr
 from .exceptions import ViewCacheNoDataException
 from .settings import Settings
 from .services.auth import JwtManager
 
-try:
-    from typing import Any, AnyStr, Callable, DefaultDict, Deque,\
-        Dict, List, Set, Tuple, Union  # noqa
-except ImportError:
-    pass  # For typing only
+
+def ensure_str(s, encoding='utf-8', errors='strict'):
+    """Ported from six."""
+    if not isinstance(s, (six.text_type, six.binary_type)):
+        raise TypeError("not expecting type '%s'" % type(s))
+    if six.PY2 and isinstance(s, six.text_type):
+        s = s.encode(encoding, errors)
+    elif six.PY3 and isinstance(s, six.binary_type):
+        s = s.decode(encoding, errors)
+    return s
 
 
 class RequestLoggingTool(cherrypy.Tool):
     def __init__(self):
         cherrypy.Tool.__init__(self, 'before_handler', self.request_begin,
                                priority=10)
-        self.logger = logging.getLogger('request')
 
     def _setup(self):
         cherrypy.Tool._setup(self)
@@ -51,9 +54,12 @@ class RequestLoggingTool(cherrypy.Tool):
     def request_begin(self):
         req = cherrypy.request
         user = JwtManager.get_username()
+        if user is not None:
+            # PY2: Encode user to str to prevent further implicit decoding
+            user = ensure_str(user)
         # Log the request.
-        self.logger.debug('[%s:%s] [%s] [%s] %s', req.remote.ip, req.remote.port,
-                          req.method, user, req.path_info)
+        logger.debug('[%s:%s] [%s] [%s] %s', req.remote.ip, req.remote.port,
+                     req.method, user, req.path_info)
         # Audit the request.
         if Settings.AUDIT_API_ENABLED and req.method not in ['GET']:
             url = build_url(req.remote.ip, scheme=req.scheme,
@@ -77,16 +83,16 @@ class RequestLoggingTool(cherrypy.Tool):
             mgr.cluster_log('audit', mgr.CLUSTER_LOG_PRIO_INFO, msg)
 
     def request_error(self):
-        self._request_log(self.logger.error)
-        self.logger.error(cherrypy.response.body)
+        self._request_log(logger.error)
+        logger.error(cherrypy.response.body)
 
     def request_end(self):
         status = cherrypy.response.status[:3]
-        if status in ["401", "403"]:
+        if status in ["401"]:
             # log unauthorized accesses
-            self._request_log(self.logger.warning)
+            self._request_log(logger.warning)
         else:
-            self._request_log(self.logger.info)
+            self._request_log(logger.info)
 
     def _format_bytes(self, num):
         units = ['B', 'K', 'M', 'G']
@@ -124,11 +130,11 @@ class RequestLoggingTool(cherrypy.Tool):
         if user:
             logger_fn("[%s:%s] [%s] [%s] [%s] [%s] [%s] %s", req.remote.ip,
                       req.remote.port, req.method, status,
-                      "{0:.3f}s".format(lat), user, length, req.path_info)
+                      "{0:.3f}s".format(lat), ensure_str(user), length, req.path_info)
         else:
-            logger_fn("[%s:%s] [%s] [%s] [%s] [%s] [%s] %s", req.remote.ip,
+            logger_fn("[%s:%s] [%s] [%s] [%s] [%s] %s", req.remote.ip,
                       req.remote.port, req.method, status,
-                      "{0:.3f}s".format(lat), length, getattr(req, 'unique_id', '-'), req.path_info)
+                      "{0:.3f}s".format(lat), length, req.path_info)
 
 
 # pylint: disable=too-many-instance-attributes
@@ -152,13 +158,13 @@ class ViewCache(object):
             t1 = 0.0
             try:
                 t0 = time.time()
-                self._view.logger.debug("starting execution of %s", self.fn)
+                logger.debug("VC: starting execution of %s", self.fn)
                 val = self.fn(*self.args, **self.kwargs)
                 t1 = time.time()
             except Exception as ex:
                 with self._view.lock:
-                    self._view.logger.exception("Error while calling fn=%s ex=%s", self.fn,
-                                                str(ex))
+                    logger.exception("Error while calling fn=%s ex=%s", self.fn,
+                                     str(ex))
                     self._view.value = None
                     self._view.value_when = None
                     self._view.getter_thread = None
@@ -171,8 +177,8 @@ class ViewCache(object):
                     self._view.getter_thread = None
                     self._view.exception = None
 
-            self._view.logger.debug("execution of %s finished in: %s", self.fn,
-                                    t1 - t0)
+            logger.debug("VC: execution of %s finished in: %s", self.fn,
+                         t1 - t0)
             self.event.set()
 
     class RemoteViewCache(object):
@@ -189,7 +195,6 @@ class ViewCache(object):
             self.latency = 0
             self.exception = None
             self.lock = threading.Lock()
-            self.logger = logging.getLogger('viewcache')
 
         def reset(self):
             with self.lock:
@@ -221,7 +226,7 @@ class ViewCache(object):
                                                                 kwargs)
                     self.getter_thread.start()
                 else:
-                    self.logger.debug("getter_thread still alive for: %s", fn)
+                    logger.debug("VC: getter_thread still alive for: %s", fn)
 
                 ev = self.getter_thread.event
 
@@ -252,7 +257,7 @@ class ViewCache(object):
                 rvc = ViewCache.RemoteViewCache(self.timeout)
                 self.cache_by_args[args] = rvc
             return rvc.run(fn, args, kwargs)
-        wrapper.reset = self.reset  # type: ignore
+        wrapper.reset = self.reset
         return wrapper
 
     def reset(self):
@@ -262,10 +267,10 @@ class ViewCache(object):
 
 class NotificationQueue(threading.Thread):
     _ALL_TYPES_ = '__ALL__'
-    _listeners = collections.defaultdict(set)  # type: DefaultDict[str, Set[Tuple[int, Callable]]]
+    _listeners = collections.defaultdict(set)
     _lock = threading.Lock()
     _cond = threading.Condition()
-    _queue = collections.deque()  # type: Deque[Tuple[str, Any]]
+    _queue = collections.deque()
     _running = False
     _instance = None
 
@@ -280,8 +285,7 @@ class NotificationQueue(threading.Thread):
                 return
             cls._running = True
             cls._instance = NotificationQueue()
-        cls.logger = logging.getLogger('notification_queue')  # type: ignore
-        cls.logger.debug("starting notification queue")  # type: ignore
+        logger.debug("starting notification queue")
         cls._instance.start()
 
     @classmethod
@@ -295,9 +299,9 @@ class NotificationQueue(threading.Thread):
             cls._running = False
         with cls._cond:
             cls._cond.notify()
-        cls.logger.debug("waiting for notification queue to finish")  # type: ignore
+        logger.debug("waiting for notification queue to finish")
         instance.join()
-        cls.logger.debug("notification queue stopped")  # type: ignore
+        logger.debug("notification queue stopped")
 
     @classmethod
     def _registered_handler(cls, func, n_types):
@@ -328,14 +332,11 @@ class NotificationQueue(threading.Thread):
             for ev_type in n_types:
                 if not cls._registered_handler(func, ev_type):
                     cls._listeners[ev_type].add((priority, func))
-                    cls.logger.debug(  # type: ignore
-                        "function %s was registered for events of type %s",
-                        func, ev_type
-                    )
+                    logger.debug("NQ: function %s was registered for events of"
+                                 " type %s", func, ev_type)
 
     @classmethod
     def deregister(cls, func, n_types=None):
-        # type: (Callable, Union[str, list, None]) -> None
         """Removes the listener function from this notification queue
 
         If the second parameter `n_types` is omitted, the function is removed
@@ -355,21 +356,18 @@ class NotificationQueue(threading.Thread):
                 raise Exception("n_types param is neither a string nor a list")
             for ev_type in n_types:
                 listeners = cls._listeners[ev_type]
-                to_remove = None
+                toRemove = None
                 for pr, fn in listeners:
                     if fn == func:
-                        to_remove = (pr, fn)
+                        toRemove = (pr, fn)
                         break
-                if to_remove:
-                    listeners.discard(to_remove)
-                    cls.logger.debug(  # type: ignore
-                        "function %s was deregistered for events of type %s",
-                        func, ev_type
-                    )
+                if toRemove:
+                    listeners.discard(toRemove)
+                    logger.debug("NQ: function %s was deregistered for events "
+                                 "of type %s", func, ev_type)
 
     @classmethod
     def new_notification(cls, notify_type, notify_value):
-        # type: (str, Any) -> None
         with cls._cond:
             cls._queue.append((notify_type, notify_value))
             cls._cond.notify()
@@ -386,10 +384,10 @@ class NotificationQueue(threading.Thread):
                 listener[1](notify_value)
 
     def run(self):
-        self.logger.debug("notification queue started")  # type: ignore
+        logger.debug("notification queue started")
         while self._running:
             private_buffer = []
-            self.logger.debug("processing queue: %s", len(self._queue))  # type: ignore
+            logger.debug("NQ: processing queue: %s", len(self._queue))
             try:
                 while True:
                     private_buffer.append(self._queue.popleft())
@@ -400,10 +398,10 @@ class NotificationQueue(threading.Thread):
                 while self._running and not self._queue:
                     self._cond.wait()
         # flush remaining events
-        self.logger.debug("flush remaining events: %s", len(self._queue))  # type: ignore
+        logger.debug("NQ: flush remaining events: %s", len(self._queue))
         self._notify_listeners(self._queue)
         self._queue.clear()
-        self.logger.debug("notification queue finished")  # type: ignore
+        logger.debug("notification queue finished")
 
 
 # pylint: disable=too-many-arguments, protected-access
@@ -414,20 +412,19 @@ class TaskManager(object):
     VALUE_DONE = "done"
     VALUE_EXECUTING = "executing"
 
-    _executing_tasks = set()  # type: Set[Task]
-    _finished_tasks = []  # type: List[Task]
+    _executing_tasks = set()
+    _finished_tasks = []
     _lock = threading.Lock()
 
     _task_local_data = threading.local()
 
     @classmethod
     def init(cls):
-        cls.logger = logging.getLogger('taskmgr')  # type: ignore
         NotificationQueue.register(cls._handle_finished_task, 'cd_task_finished')
 
     @classmethod
     def _handle_finished_task(cls, task):
-        cls.logger.info("finished %s", task)  # type: ignore
+        logger.info("TM: finished %s", task)
         with cls._lock:
             cls._executing_tasks.remove(task)
             cls._finished_tasks.append(task)
@@ -445,13 +442,13 @@ class TaskManager(object):
                     exception_handler)
         with cls._lock:
             if task in cls._executing_tasks:
-                cls.logger.debug("task already executing: %s", task)  # type: ignore
+                logger.debug("TM: task already executing: %s", task)
                 for t in cls._executing_tasks:
                     if t == task:
                         return t
-            cls.logger.debug("created %s", task)  # type: ignore
+            logger.debug("TM: created %s", task)
             cls._executing_tasks.add(task)
-        cls.logger.info("running %s", task)  # type: ignore
+        logger.info("TM: running %s", task)
         task._run()
         return task
 
@@ -519,7 +516,6 @@ class TaskManager(object):
 # pylint: disable=protected-access
 class TaskExecutor(object):
     def __init__(self):
-        self.logger = logging.getLogger('taskexec')
         self.task = None
 
     def init(self, task):
@@ -527,19 +523,19 @@ class TaskExecutor(object):
 
     # pylint: disable=broad-except
     def start(self):
-        self.logger.debug("executing task %s", self.task)
+        logger.debug("EX: executing task %s", self.task)
         try:
-            self.task.fn(*self.task.fn_args, **self.task.fn_kwargs)  # type: ignore
+            self.task.fn(*self.task.fn_args, **self.task.fn_kwargs)
         except Exception as ex:
-            self.logger.exception("Error while calling %s", self.task)
+            logger.exception("Error while calling %s", self.task)
             self.finish(None, ex)
 
     def finish(self, ret_value, exception):
         if not exception:
-            self.logger.debug("successfully finished task: %s", self.task)
+            logger.debug("EX: successfully finished task: %s", self.task)
         else:
-            self.logger.debug("task finished with exception: %s", self.task)
-        self.task._complete(ret_value, exception)  # type: ignore
+            logger.debug("EX: task finished with exception: %s", self.task)
+        self.task._complete(ret_value, exception)
 
 
 # pylint: disable=protected-access
@@ -555,10 +551,10 @@ class ThreadedExecutor(TaskExecutor):
     def _run(self):
         TaskManager._task_local_data.task = self.task
         try:
-            self.logger.debug("executing task %s", self.task)
-            val = self.task.fn(*self.task.fn_args, **self.task.fn_kwargs)  # type: ignore
+            logger.debug("TEX: executing task %s", self.task)
+            val = self.task.fn(*self.task.fn_args, **self.task.fn_kwargs)
         except Exception as ex:
-            self.logger.exception("Error while calling %s", self.task)
+            logger.exception("Error while calling %s", self.task)
             self.finish(None, ex)
         else:
             self.finish(val, None)
@@ -582,7 +578,6 @@ class Task(object):
         self.end_time = None
         self.duration = 0
         self.exception = None
-        self.logger = logging.getLogger('task')
         self.lock = threading.Lock()
 
     def __hash__(self):
@@ -621,12 +616,12 @@ class Task(object):
             self.end_time = now
             self.ret_value = ret_value
             self.exception = exception
-            self.duration = now - self.begin_time  # type: ignore
+            self.duration = now - self.begin_time
             if not self.exception:
                 self.set_progress(100, True)
         NotificationQueue.new_notification('cd_task_finished', self)
-        self.logger.debug("execution of %s finished in: %s s", self,
-                          self.duration)
+        logger.debug("TK: execution of %s finished in: %s s", self,
+                     self.duration)
 
     def _handle_task_finished(self, task):
         if self == task:
@@ -655,7 +650,7 @@ class Task(object):
             raise Exception("Progress delta value must be a positive integer")
         if not in_lock:
             self.lock.acquire()
-        prog = self.progress + delta  # type: ignore
+        prog = self.progress + delta
         self.progress = prog if prog <= 100 else 100
         if not in_lock:
             self.lock.release()
@@ -669,6 +664,110 @@ class Task(object):
         self.progress = percentage
         if not in_lock:
             self.lock.release()
+
+
+def is_valid_ip_address(addr):
+    """
+    Validate the given IPv4 or IPv6 address.
+
+    >>> is_valid_ip_address('2001:0db8::1234')
+    True
+
+    >>> is_valid_ip_address('192.168.121.1')
+    True
+
+    >>> is_valid_ip_address('1:::1')
+    False
+
+    >>> is_valid_ip_address('8.1.0')
+    False
+
+    >>> is_valid_ip_address('260.1.0.1')
+    False
+
+    :param addr:
+    :type addr: str
+    :return: Returns ``True`` if the IP address is valid,
+        otherwise ``False``.
+    :rtype: bool
+    """
+    return is_valid_ipv4_address(addr) or is_valid_ipv6_address(addr)
+
+
+def is_valid_ipv4_address(addr):
+    """
+    Validate the given IPv4 address.
+
+    >>> is_valid_ipv4_address('0.0.0.0')
+    True
+
+    >>> is_valid_ipv4_address('192.168.121.1')
+    True
+
+    >>> is_valid_ipv4_address('a.b.c.d')
+    False
+
+    >>> is_valid_ipv4_address('172.1.0.a')
+    False
+
+    >>> is_valid_ipv4_address('2001:0db8::1234')
+    False
+
+    >>> is_valid_ipv4_address(None)
+    False
+
+    >>> is_valid_ipv4_address(123456)
+    False
+
+    :param addr:
+    :type addr: str
+    :return: Returns ``True`` if the IPv4 address is valid,
+        otherwise ``False``.
+    :rtype: bool
+    """
+    try:
+        socket.inet_pton(socket.AF_INET, addr)
+        return True
+    except (socket.error, TypeError):
+        return False
+
+
+def is_valid_ipv6_address(addr):
+    """
+    Validate the given IPv6 address.
+
+    >>> is_valid_ipv6_address('2001:0db8::1234')
+    True
+
+    >>> is_valid_ipv6_address('fe80::bc6c:66b0:5af8:f44')
+    True
+
+    >>> is_valid_ipv6_address('192.168.121.1')
+    False
+
+    >>> is_valid_ipv6_address('a:x::1')
+    False
+
+    >>> is_valid_ipv6_address('1200:0000:AB00:1234:O000:2552:7777:1313')
+    False
+
+    >>> is_valid_ipv6_address(None)
+    False
+
+    >>> is_valid_ipv6_address(123456)
+    False
+
+    :param addr:
+    :type addr: str
+    :return: Returns ``True`` if the IPv6 address is valid,
+        otherwise ``False``.
+    :rtype: bool
+    """
+    try:
+        socket.inet_pton(socket.AF_INET6, addr)
+        return True
+    except (socket.error, TypeError):
+        return False
 
 
 def build_url(host, scheme=None, port=None):
@@ -693,7 +792,7 @@ def build_url(host, scheme=None, port=None):
     :type port: int
     :rtype: str
     """
-    netloc = wrap_ipv6(host)
+    netloc = host if not is_valid_ipv6_address(host) else '[{}]'.format(host)
     if port:
         netloc += ':{}'.format(port)
     pr = urllib.parse.ParseResult(
@@ -731,21 +830,6 @@ def dict_contains_path(dct, keys):
             return dict_contains_path(dct, keys)
         return False
     return True
-
-
-def dict_get(obj, path, default=None):
-    """
-    Get the value at any depth of a nested object based on the path
-    described by `path`. If path doesn't exist, `default` is returned.
-    """
-    current = obj
-    for part in path.split('.'):
-        if not isinstance(current, dict):
-            return default
-        if part not in current.keys():
-            return default
-        current = current.get(part, {})
-    return current
 
 
 if sys.version_info > (3, 0):
@@ -796,36 +880,6 @@ def str_to_bool(val):
     return bool(strtobool(val))
 
 
-def json_str_to_object(value):  # type: (AnyStr) -> Any
-    """
-    It converts a JSON valid string representation to object.
-
-    >>> result = json_str_to_object('{"a": 1}')
-    >>> result == {'a': 1}
-    True
-    """
-    if value == '':
-        return value
-
-    try:
-        # json.loads accepts binary input from version >=3.6
-        value = value.decode('utf-8')  # type: ignore
-    except AttributeError:
-        pass
-
-    return json.loads(value)
-
-
-def partial_dict(orig, keys):  # type: (Dict, List[str]) -> Dict
-    """
-    It returns Dict containing only the selected keys of original Dict.
-
-    >>> partial_dict({'a': 1, 'b': 2}, ['b'])
-    {'b': 2}
-    """
-    return {k: orig[k] for k in keys}
-
-
 def get_request_body_params(request):
     """
     Helper function to get parameters from the request body.
@@ -834,7 +888,7 @@ def get_request_body_params(request):
     :return: A dictionary containing the parameters.
     :rtype: dict
     """
-    params = {}  # type: dict
+    params = {}
     if request.method not in request.methods_with_bodies:
         return params
 

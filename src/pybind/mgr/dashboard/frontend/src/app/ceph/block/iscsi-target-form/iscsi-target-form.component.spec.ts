@@ -52,7 +52,7 @@ describe('IscsiTargetFormComponent', () => {
     api_version: 1
   };
 
-  const LIST_TARGET: any[] = [
+  const LIST_TARGET = [
     {
       target_iqn: 'iqn.2003-01.com.redhat.iscsi-gw:iscsi-igw',
       portals: [{ host: 'node1', ip: '192.168.100.201' }],
@@ -91,7 +91,7 @@ describe('IscsiTargetFormComponent', () => {
     ceph_iscsi_config_version: 11
   };
 
-  const RBD_LIST: any[] = [
+  const RBD_LIST = [
     { status: 0, value: [], pool_name: 'ganesha' },
     {
       status: 0,
@@ -141,23 +141,26 @@ describe('IscsiTargetFormComponent', () => {
     }
   ];
 
-  configureTestBed({
-    declarations: [IscsiTargetFormComponent],
-    imports: [
-      SharedModule,
-      ReactiveFormsModule,
-      HttpClientTestingModule,
-      RouterTestingModule,
-      ToastrModule.forRoot()
-    ],
-    providers: [
-      i18nProviders,
-      {
-        provide: ActivatedRoute,
-        useValue: new ActivatedRouteStub({ target_iqn: undefined })
-      }
-    ]
-  });
+  configureTestBed(
+    {
+      declarations: [IscsiTargetFormComponent],
+      imports: [
+        SharedModule,
+        ReactiveFormsModule,
+        HttpClientTestingModule,
+        RouterTestingModule,
+        ToastrModule.forRoot()
+      ],
+      providers: [
+        i18nProviders,
+        {
+          provide: ActivatedRoute,
+          useValue: new ActivatedRouteStub({ target_iqn: undefined })
+        }
+      ]
+    },
+    true
+  );
 
   beforeEach(() => {
     fixture = TestBed.createComponent(IscsiTargetFormComponent);
@@ -169,6 +172,7 @@ describe('IscsiTargetFormComponent', () => {
     httpTesting.expectOne('ui-api/iscsi/settings').flush(SETTINGS);
     httpTesting.expectOne('ui-api/iscsi/portals').flush(PORTALS);
     httpTesting.expectOne('ui-api/iscsi/version').flush(VERSION);
+    httpTesting.expectOne('api/summary').flush({});
     httpTesting.expectOne('api/block/image').flush(RBD_LIST);
     httpTesting.expectOne('api/iscsi/target').flush(LIST_TARGET);
     httpTesting.verify();

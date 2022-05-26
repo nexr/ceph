@@ -6,7 +6,6 @@ import { Observable, Subscriber, Subscription } from 'rxjs';
 
 import { RbdMirroringService } from '../../../../shared/api/rbd-mirroring.service';
 import { CriticalConfirmationModalComponent } from '../../../../shared/components/critical-confirmation-modal/critical-confirmation-modal.component';
-import { Icons } from '../../../../shared/enum/icons.enum';
 import { CdTableAction } from '../../../../shared/models/cd-table-action';
 import { CdTableSelection } from '../../../../shared/models/cd-table-selection';
 import { FinishedTask } from '../../../../shared/models/finished-task';
@@ -22,7 +21,7 @@ import { PoolEditPeerModalComponent } from '../pool-edit-peer-modal/pool-edit-pe
   styleUrls: ['./pool-list.component.scss']
 })
 export class PoolListComponent implements OnInit, OnDestroy {
-  @ViewChild('healthTmpl', { static: true })
+  @ViewChild('healthTmpl')
   healthTmpl: TemplateRef<any>;
 
   subs: Subscription;
@@ -48,14 +47,14 @@ export class PoolListComponent implements OnInit, OnDestroy {
 
     const editModeAction: CdTableAction = {
       permission: 'update',
-      icon: Icons.edit,
+      icon: 'fa-edit',
       click: () => this.editModeModal(),
       name: this.i18n('Edit Mode'),
       canBePrimary: () => true
     };
     const addPeerAction: CdTableAction = {
       permission: 'create',
-      icon: Icons.add,
+      icon: 'fa-plus',
       name: this.i18n('Add Peer'),
       click: () => this.editPeersModal('add'),
       disable: () => !this.selection.first() || this.selection.first().mirror_mode === 'disabled',
@@ -64,14 +63,14 @@ export class PoolListComponent implements OnInit, OnDestroy {
     };
     const editPeerAction: CdTableAction = {
       permission: 'update',
-      icon: Icons.exchange,
+      icon: 'fa-exchange',
       name: this.i18n('Edit Peer'),
       click: () => this.editPeersModal('edit'),
       visible: () => !!this.getPeerUUID()
     };
     const deletePeerAction: CdTableAction = {
       permission: 'delete',
-      icon: Icons.destroy,
+      icon: 'fa-times',
       name: this.i18n('Delete Peer'),
       click: () => this.deletePeersModal(),
       visible: () => !!this.getPeerUUID()
@@ -94,7 +93,10 @@ export class PoolListComponent implements OnInit, OnDestroy {
       }
     ];
 
-    this.subs = this.rbdMirroringService.subscribeSummary((data) => {
+    this.subs = this.rbdMirroringService.subscribeSummary((data: any) => {
+      if (!data) {
+        return;
+      }
       this.data = data.content_data.pools;
     });
   }
@@ -114,7 +116,7 @@ export class PoolListComponent implements OnInit, OnDestroy {
     this.modalRef = this.modalService.show(PoolEditModeModalComponent, { initialState });
   }
 
-  editPeersModal(mode: string) {
+  editPeersModal(mode) {
     const initialState = {
       poolName: this.selection.first().name,
       mode: mode
@@ -155,14 +157,12 @@ export class PoolListComponent implements OnInit, OnDestroy {
     });
   }
 
-  getPeerUUID(): any {
+  getPeerUUID() {
     const selection = this.selection.first();
     const pool = this.data.find((o) => selection && selection.name === o['name']);
     if (pool && pool['peer_uuids']) {
       return pool['peer_uuids'][0];
     }
-
-    return undefined;
   }
 
   updateSelection(selection: CdTableSelection) {

@@ -4,7 +4,6 @@ import { FormControl, ValidatorFn } from '@angular/forms';
 import { I18n } from '@ngx-translate/i18n-polyfill';
 import * as _ from 'lodash';
 
-import { Icons } from '../../../shared/enum/icons.enum';
 import { CdFormGroup } from '../../forms/cd-form-group';
 import { SelectMessages } from './select-messages.model';
 import { SelectOption } from './select-option.model';
@@ -37,7 +36,6 @@ export class SelectComponent implements OnInit, OnChanges {
   filter: FormControl;
   Object = Object;
   filteredOptions: Array<SelectOption> = [];
-  icons = Icons;
 
   constructor(private i18n: I18n) {}
 

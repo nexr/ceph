@@ -1,30 +1,22 @@
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { async, ComponentFixture, TestBed } from '@angular/core/testing';
-import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterTestingModule } from '@angular/router/testing';
 
-import * as _ from 'lodash';
 import { BsDropdownModule } from 'ngx-bootstrap/dropdown';
 import { TabsModule } from 'ngx-bootstrap/tabs';
-import { ToastrModule } from 'ngx-toastr';
-import { of } from 'rxjs';
 
 import { configureTestBed, i18nProviders } from '../../../../testing/unit-test-helper';
-import { CoreModule } from '../../../core/core.module';
 import { HostService } from '../../../shared/api/host.service';
-import { ActionLabels } from '../../../shared/constants/app.constants';
-import { CdTableAction } from '../../../shared/models/cd-table-action';
 import { Permissions } from '../../../shared/models/permissions';
 import { AuthStorageService } from '../../../shared/services/auth-storage.service';
 import { SharedModule } from '../../../shared/shared.module';
-import { CephModule } from '../../ceph.module';
-import { CephSharedModule } from '../../shared/ceph-shared.module';
+import { HostDetailsComponent } from './host-details/host-details.component';
 import { HostsComponent } from './hosts.component';
 
 describe('HostsComponent', () => {
   let component: HostsComponent;
   let fixture: ComponentFixture<HostsComponent>;
-  let hostListSpy: jasmine.Spy;
+  let hostListSpy;
 
   const fakeAuthStorageService = {
     getPermissions: () => {
@@ -34,19 +26,14 @@ describe('HostsComponent', () => {
 
   configureTestBed({
     imports: [
-      BrowserAnimationsModule,
-      CephSharedModule,
       SharedModule,
       HttpClientTestingModule,
       TabsModule.forRoot(),
       BsDropdownModule.forRoot(),
-      RouterTestingModule,
-      ToastrModule.forRoot(),
-      CephModule,
-      CoreModule
+      RouterTestingModule
     ],
     providers: [{ provide: AuthStorageService, useValue: fakeAuthStorageService }, i18nProviders],
-    declarations: []
+    declarations: [HostsComponent, HostDetailsComponent]
   });
 
   beforeEach(() => {
@@ -79,12 +66,11 @@ describe('HostsComponent', () => {
           }
         ],
         hostname: hostname,
-        ceph_version: 'ceph version Development',
-        labels: ['foo', 'bar']
+        ceph_version: 'ceph version Development'
       }
     ];
 
-    hostListSpy.and.callFake(() => of(payload));
+    hostListSpy.and.returnValue(Promise.resolve(payload));
 
     fixture.whenStable().then(() => {
       fixture.detectChanges();
@@ -95,81 +81,4 @@ describe('HostsComponent', () => {
       expect(spans[0].textContent).toBe(hostname);
     });
   }));
-
-  describe('test edit button', () => {
-    let tableAction: CdTableAction;
-
-    beforeEach(() => {
-      tableAction = _.find(component.tableActions, { name: ActionLabels.EDIT });
-    });
-
-    it('should disable button and return message (not managed by Orchestrator)', () => {
-      component.selection.add({
-        sources: {
-          ceph: true,
-          orchestrator: false
-        }
-      });
-      expect(tableAction.disable(component.selection)).toBeTruthy();
-      expect(component.getEditDisableDesc(component.selection)).toBe(
-        'Host editing is disabled because the selected host is not managed by Orchestrator.'
-      );
-    });
-
-    it('should disable button and return true (no selection)', () => {
-      expect(tableAction.disable(component.selection)).toBeTruthy();
-      expect(component.getEditDisableDesc(component.selection)).toBeTruthy();
-    });
-
-    it('should enable button and return false (managed by Orchestrator)', () => {
-      component.selection.add({
-        sources: {
-          ceph: false,
-          orchestrator: true
-        }
-      });
-      expect(tableAction.disable(component.selection)).toBeFalsy();
-      expect(component.getEditDisableDesc(component.selection)).toBeFalsy();
-    });
-  });
-
-  describe('getDeleteDisableDesc', () => {
-    it('should return message (not managed by Orchestrator)', () => {
-      component.selection.add({
-        sources: {
-          ceph: false,
-          orchestrator: true
-        }
-      });
-      component.selection.add({
-        sources: {
-          ceph: true,
-          orchestrator: false
-        }
-      });
-      expect(component.getDeleteDisableDesc(component.selection)).toBe(
-        'Host deletion is disabled because a selected host is not managed by Orchestrator.'
-      );
-    });
-
-    it('should return true (no selection)', () => {
-      expect(component.getDeleteDisableDesc(component.selection)).toBeTruthy();
-    });
-
-    it('should return false (managed by Orchestrator)', () => {
-      component.selection.add({
-        sources: {
-          ceph: false,
-          orchestrator: true
-        }
-      });
-      component.selection.add({
-        sources: {
-          ceph: false,
-          orchestrator: true
-        }
-      });
-      expect(component.getDeleteDisableDesc(component.selection)).toBeFalsy();
-    });
-  });
 });

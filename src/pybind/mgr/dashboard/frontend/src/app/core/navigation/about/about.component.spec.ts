@@ -18,7 +18,7 @@ export class SummaryServiceMock {
   });
   summaryData$ = this.summaryDataSource.asObservable();
 
-  subscribe(call: any) {
+  subscribe(call) {
     return this.summaryData$.subscribe(call);
   }
 }

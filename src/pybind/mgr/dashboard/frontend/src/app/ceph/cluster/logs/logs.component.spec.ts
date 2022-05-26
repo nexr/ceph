@@ -57,7 +57,7 @@ describe('LogsComponent', () => {
   });
 
   describe('filterLogs', () => {
-    const contentData: Record<string, any> = {
+    const contentData = {
       clog: [
         {
           name: 'priority',

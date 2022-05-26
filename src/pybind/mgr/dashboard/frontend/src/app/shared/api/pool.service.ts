@@ -18,11 +18,11 @@ export class PoolService {
 
   constructor(private http: HttpClient, private rbdConfigurationService: RbdConfigurationService) {}
 
-  create(pool: any) {
+  create(pool) {
     return this.http.post(this.apiPath, pool, { observe: 'response' });
   }
 
-  update(pool: any) {
+  update(pool) {
     let name: string;
     if (pool.hasOwnProperty('srcpool')) {
       name = pool.srcpool;
@@ -36,11 +36,11 @@ export class PoolService {
     });
   }
 
-  delete(name: string) {
+  delete(name) {
     return this.http.delete(`${this.apiPath}/${name}`, { observe: 'response' });
   }
 
-  get(poolName: string) {
+  get(poolName) {
     return this.http.get(`${this.apiPath}/${poolName}`);
   }
 
@@ -59,11 +59,11 @@ export class PoolService {
     );
   }
 
-  getInfo() {
-    return this.http.get(`ui-${this.apiPath}/info`);
+  getInfo(pool_name?: string) {
+    return this.http.get(`${this.apiPath}/_info` + (pool_name ? `?pool_name=${pool_name}` : ''));
   }
 
-  list(attrs: string[] = []) {
+  list(attrs = []) {
     const attrsStr = attrs.join(',');
     return this.http
       .get(`${this.apiPath}?attrs=${attrsStr}`)

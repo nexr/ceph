@@ -2,30 +2,24 @@
 from __future__ import absolute_import
 
 import json
+import sys
 from contextlib import contextmanager
-import logging
-import six
 
 import cherrypy
 
-from orchestrator import OrchestratorError
 import rbd
 import rados
 
+from .. import logger
 from ..services.ceph_service import SendCommandError
 from ..exceptions import ViewCacheNoDataException, DashboardException
 from ..tools import wraps
 
-
-logger = logging.getLogger('exception')
-
-
-if six.PY2:
+if sys.version_info < (3, 0):
     # Monkey-patch a __call__ method into @contextmanager to make
     # it compatible to Python 3
 
-    # pylint: disable=no-name-in-module,ungrouped-imports
-    from contextlib import GeneratorContextManager
+    from contextlib import GeneratorContextManager  # pylint: disable=no-name-in-module
 
     def init(self, *args):
         if len(args) == 1:
@@ -56,7 +50,7 @@ if six.PY2:
     GeneratorContextManager.__call__ = call
 
     # pylint: disable=function-redefined
-    def contextmanager(func):  # noqa: F811
+    def contextmanager(func):
 
         @wraps(func)
         def helper(*args, **kwds):
@@ -84,7 +78,7 @@ def serialize_dashboard_exception(e, include_http_status=False, task=None):
     if include_http_status:
         out['status'] = getattr(e, 'status', 500)
     if task:
-        out['task'] = dict(name=task.name, metadata=task.metadata)  # type: ignore
+        out['task'] = dict(name=task.name, metadata=task.metadata)
     return out
 
 
@@ -94,7 +88,7 @@ def dashboard_exception_handler(handler, *args, **kwargs):
             return handler(*args, **kwargs)
     # Don't catch cherrypy.* Exceptions.
     except (ViewCacheNoDataException, DashboardException) as e:
-        logger.exception('Dashboard Exception')
+        logger.exception('dashboard_exception_handler')
         cherrypy.response.headers['Content-Type'] = 'application/json'
         cherrypy.response.status = getattr(e, 'status', 400)
         return json.dumps(serialize_dashboard_exception(e)).encode('utf-8')
@@ -125,12 +119,4 @@ def handle_send_command_error(component):
     try:
         yield
     except SendCommandError as e:
-        raise DashboardException(e, component=component)
-
-
-@contextmanager
-def handle_orchestrator_error(component):
-    try:
-        yield
-    except OrchestratorError as e:
         raise DashboardException(e, component=component)

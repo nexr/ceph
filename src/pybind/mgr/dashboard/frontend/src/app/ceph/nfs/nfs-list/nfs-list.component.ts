@@ -6,19 +6,16 @@ import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
 import { Subscription } from 'rxjs';
 
 import { NfsService } from '../../../shared/api/nfs.service';
-import { ListWithDetails } from '../../../shared/classes/list-with-details.class';
 import { CriticalConfirmationModalComponent } from '../../../shared/components/critical-confirmation-modal/critical-confirmation-modal.component';
 import { ActionLabelsI18n } from '../../../shared/constants/app.constants';
 import { TableComponent } from '../../../shared/datatable/table/table.component';
 import { CellTemplate } from '../../../shared/enum/cell-template.enum';
-import { Icons } from '../../../shared/enum/icons.enum';
 import { ViewCacheStatus } from '../../../shared/enum/view-cache-status.enum';
 import { CdTableAction } from '../../../shared/models/cd-table-action';
 import { CdTableColumn } from '../../../shared/models/cd-table-column';
 import { CdTableSelection } from '../../../shared/models/cd-table-selection';
 import { FinishedTask } from '../../../shared/models/finished-task';
 import { Permission } from '../../../shared/models/permissions';
-import { Task } from '../../../shared/models/task';
 import { AuthStorageService } from '../../../shared/services/auth-storage.service';
 import { TaskListService } from '../../../shared/services/task-list.service';
 import { TaskWrapperService } from '../../../shared/services/task-wrapper.service';
@@ -29,13 +26,13 @@ import { TaskWrapperService } from '../../../shared/services/task-wrapper.servic
   styleUrls: ['./nfs-list.component.scss'],
   providers: [TaskListService]
 })
-export class NfsListComponent extends ListWithDetails implements OnInit, OnDestroy {
-  @ViewChild('nfsState', { static: false })
+export class NfsListComponent implements OnInit, OnDestroy {
+  @ViewChild('nfsState')
   nfsState: TemplateRef<any>;
-  @ViewChild('nfsFsal', { static: true })
+  @ViewChild('nfsFsal')
   nfsFsal: TemplateRef<any>;
 
-  @ViewChild('table', { static: true })
+  @ViewChild('table')
   table: TableComponent;
 
   columns: CdTableColumn[];
@@ -50,7 +47,7 @@ export class NfsListComponent extends ListWithDetails implements OnInit, OnDestr
   modalRef: BsModalRef;
 
   builders = {
-    'nfs/create': (metadata: any) => {
+    'nfs/create': (metadata) => {
       return {
         path: metadata['path'],
         cluster_id: metadata['cluster_id'],
@@ -68,7 +65,6 @@ export class NfsListComponent extends ListWithDetails implements OnInit, OnDestr
     private taskWrapper: TaskWrapperService,
     public actionLabels: ActionLabelsI18n
   ) {
-    super();
     this.permission = this.authStorageService.getPermissions().nfs;
     const getNfsUri = () =>
       this.selection.first() &&
@@ -78,7 +74,7 @@ export class NfsListComponent extends ListWithDetails implements OnInit, OnDestr
 
     const createAction: CdTableAction = {
       permission: 'create',
-      icon: Icons.add,
+      icon: 'fa-plus',
       routerLink: () => '/nfs/create',
       canBePrimary: (selection: CdTableSelection) => !selection.hasSingleSelection,
       name: this.actionLabels.CREATE
@@ -86,14 +82,14 @@ export class NfsListComponent extends ListWithDetails implements OnInit, OnDestr
 
     const editAction: CdTableAction = {
       permission: 'update',
-      icon: Icons.edit,
+      icon: 'fa-pencil',
       routerLink: () => `/nfs/edit/${getNfsUri()}`,
       name: this.actionLabels.EDIT
     };
 
     const deleteAction: CdTableAction = {
       permission: 'delete',
-      icon: Icons.destroy,
+      icon: 'fa-times',
       click: () => this.deleteNfsModal(),
       name: this.actionLabels.DELETE
     };
@@ -173,8 +169,8 @@ export class NfsListComponent extends ListWithDetails implements OnInit, OnDestr
   }
 
   prepareResponse(resp: any): any[] {
-    let result: any[] = [];
-    resp.forEach((nfs: any) => {
+    let result = [];
+    resp.forEach((nfs) => {
       nfs.id = `${nfs.cluster_id}:${nfs.export_id}`;
       nfs.state = 'LOADING';
       result = result.concat(nfs);
@@ -188,14 +184,14 @@ export class NfsListComponent extends ListWithDetails implements OnInit, OnDestr
     this.viewCacheStatus = { status: ViewCacheStatus.ValueException };
   }
 
-  itemFilter(entry: any, task: Task) {
+  itemFilter(entry, task) {
     return (
       entry.cluster_id === task.metadata['cluster_id'] &&
       entry.export_id === task.metadata['export_id']
     );
   }
 
-  taskFilter(task: Task) {
+  taskFilter(task) {
     return ['nfs/create', 'nfs/delete', 'nfs/edit'].includes(task.name);
   }
 

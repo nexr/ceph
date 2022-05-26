@@ -3,30 +3,21 @@
 # pylint: disable=too-many-branches, too-many-locals, too-many-statements
 from __future__ import absolute_import
 
-from string import punctuation, ascii_lowercase, digits, ascii_uppercase
-
 import errno
 import json
-import logging
 import threading
 import time
-import re
-
-from datetime import datetime, timedelta
 
 import bcrypt
-from mgr_module import CLICheckNonemptyFileInput, CLIReadCommand, CLIWriteCommand
 
-from .. import mgr
+from mgr_module import CLIReadCommand, CLIWriteCommand
+
+from .. import mgr, logger
 from ..security import Scope, Permission
-from ..settings import Settings
 from ..exceptions import RoleAlreadyExists, RoleDoesNotExist, ScopeNotValid, \
                          PermissionNotValid, RoleIsAssociatedWithUser, \
                          UserAlreadyExists, UserDoesNotExist, ScopeNotInRole, \
-                         RoleNotInUser, PasswordPolicyException, PwdExpirationDateNotValid
-
-
-logger = logging.getLogger('access_control')
+                         RoleNotInUser
 
 
 # password hashing algorithm
@@ -41,114 +32,6 @@ def password_hash(password, salt_password=None):
 
 
 _P = Permission  # short alias
-
-
-class PasswordPolicy(object):
-    def __init__(self, password, username=None, old_password=None):
-        """
-        :param password: The new plain password.
-        :type password: str
-        :param username: The name of the user.
-        :type username: str | None
-        :param old_password: The old plain password.
-        :type old_password: str | None
-        """
-        self.password = password
-        self.username = username
-        self.old_password = old_password
-        self.forbidden_words = Settings.PWD_POLICY_EXCLUSION_LIST.split(',')
-        self.complexity_credits = 0
-
-    @staticmethod
-    def _check_if_contains_word(password, word):
-        return re.compile('(?:{0})'.format(word),
-                          flags=re.IGNORECASE).search(password)
-
-    def check_password_complexity(self):
-        if not Settings.PWD_POLICY_CHECK_COMPLEXITY_ENABLED:
-            return Settings.PWD_POLICY_MIN_COMPLEXITY
-        digit_credit = 1
-        small_letter_credit = 1
-        big_letter_credit = 2
-        special_character_credit = 3
-        other_character_credit = 5
-        self.complexity_credits = 0
-        for ch in self.password:
-            if ch in ascii_uppercase:
-                self.complexity_credits += big_letter_credit
-            elif ch in ascii_lowercase:
-                self.complexity_credits += small_letter_credit
-            elif ch in digits:
-                self.complexity_credits += digit_credit
-            elif ch in punctuation:
-                self.complexity_credits += special_character_credit
-            else:
-                self.complexity_credits += other_character_credit
-        return self.complexity_credits
-
-    def check_is_old_password(self):
-        if not Settings.PWD_POLICY_CHECK_OLDPWD_ENABLED:
-            return False
-        return self.old_password and self.password == self.old_password
-
-    def check_if_contains_username(self):
-        if not Settings.PWD_POLICY_CHECK_USERNAME_ENABLED:
-            return False
-        if not self.username:
-            return False
-        return self._check_if_contains_word(self.password, self.username)
-
-    def check_if_contains_forbidden_words(self):
-        if not Settings.PWD_POLICY_CHECK_EXCLUSION_LIST_ENABLED:
-            return False
-        return self._check_if_contains_word(self.password,
-                                            '|'.join(self.forbidden_words))
-
-    def check_if_sequential_characters(self):
-        if not Settings.PWD_POLICY_CHECK_SEQUENTIAL_CHARS_ENABLED:
-            return False
-        for i in range(1, len(self.password) - 1):
-            if ord(self.password[i - 1]) + 1 == ord(self.password[i])\
-               == ord(self.password[i + 1]) - 1:
-                return True
-        return False
-
-    def check_if_repetitive_characters(self):
-        if not Settings.PWD_POLICY_CHECK_REPETITIVE_CHARS_ENABLED:
-            return False
-        for i in range(1, len(self.password) - 1):
-            if self.password[i - 1] == self.password[i] == self.password[i + 1]:
-                return True
-        return False
-
-    def check_password_length(self):
-        if not Settings.PWD_POLICY_CHECK_LENGTH_ENABLED:
-            return True
-        return len(self.password) >= Settings.PWD_POLICY_MIN_LENGTH
-
-    def check_all(self):
-        """
-        Perform all password policy checks.
-        :raise PasswordPolicyException: If a password policy check fails.
-        """
-        if not Settings.PWD_POLICY_ENABLED:
-            return
-        if self.check_password_complexity() < Settings.PWD_POLICY_MIN_COMPLEXITY:
-            raise PasswordPolicyException('Password is too weak.')
-        if not self.check_password_length():
-            raise PasswordPolicyException('Password is too weak.')
-        if self.check_is_old_password():
-            raise PasswordPolicyException('Password must not be the same as the previous one.')
-        if self.check_if_contains_username():
-            raise PasswordPolicyException('Password must not contain username.')
-        result = self.check_if_contains_forbidden_words()
-        if result:
-            raise PasswordPolicyException('Password must not contain the keyword "{}".'.format(
-                result.group(0)))
-        if self.check_if_repetitive_characters():
-            raise PasswordPolicyException('Password must not contain repetitive characters.')
-        if self.check_if_sequential_characters():
-            raise PasswordPolicyException('Password must not contain sequential characters.')
 
 
 class Role(object):
@@ -219,7 +102,7 @@ ADMIN_ROLE = Role('administrator', 'Administrator', {
 # read-only role provides read-only permission for all scopes
 READ_ONLY_ROLE = Role('read-only', 'Read-Only', {
     scope_name: [_P.READ] for scope_name in Scope.all_scopes()
-    if scope_name not in (Scope.DASHBOARD_SETTINGS, Scope.CONFIG_OPT)
+    if scope_name != Scope.DASHBOARD_SETTINGS
 })
 
 
@@ -287,101 +170,50 @@ SYSTEM_ROLES = {
 
 class User(object):
     def __init__(self, username, password, name=None, email=None, roles=None,
-                 last_update=None, enabled=True, pwd_expiration_date=None,
-                 pwd_update_required=False):
+                 lastUpdate=None):
         self.username = username
         self.password = password
         self.name = name
         self.email = email
-        self.invalid_auth_attempt = 0
         if roles is None:
             self.roles = set()
         else:
             self.roles = roles
-        if last_update is None:
-            self.refresh_last_update()
+        if lastUpdate is None:
+            self.refreshLastUpdate()
         else:
-            self.last_update = last_update
-        self._enabled = enabled
-        self.pwd_expiration_date = pwd_expiration_date
-        if self.pwd_expiration_date is None:
-            self.refresh_pwd_expiration_date()
-        self.pwd_update_required = pwd_update_required
+            self.lastUpdate = lastUpdate
 
-    def refresh_last_update(self):
-        self.last_update = int(time.time())
-
-    def refresh_pwd_expiration_date(self):
-        if Settings.USER_PWD_EXPIRATION_SPAN > 0:
-            expiration_date = datetime.utcnow() + timedelta(
-                days=Settings.USER_PWD_EXPIRATION_SPAN)
-            self.pwd_expiration_date = int(time.mktime(expiration_date.timetuple()))
-        else:
-            self.pwd_expiration_date = None
-
-    @property
-    def enabled(self):
-        return self._enabled
-
-    @enabled.setter
-    def enabled(self, value):
-        self._enabled = value
-        self.refresh_last_update()
+    def refreshLastUpdate(self):
+        self.lastUpdate = int(time.time())
 
     def set_password(self, password):
-        self.set_password_hash(password_hash(password))
-
-    def set_password_hash(self, hashed_password):
-        self.invalid_auth_attempt = 0
-        self.password = hashed_password
-        self.refresh_last_update()
-        self.refresh_pwd_expiration_date()
-        self.pwd_update_required = False
-
-    def compare_password(self, password):
-        """
-        Compare the specified password with the user password.
-        :param password: The plain password to check.
-        :type password: str
-        :return: `True` if the passwords are equal, otherwise `False`.
-        :rtype: bool
-        """
-        pass_hash = password_hash(password, salt_password=self.password)
-        return pass_hash == self.password
-
-    def is_pwd_expired(self):
-        if self.pwd_expiration_date:
-            current_time = int(time.mktime(datetime.utcnow().timetuple()))
-            return self.pwd_expiration_date < current_time
-        return False
+        self.password = password_hash(password)
+        self.refreshLastUpdate()
 
     def set_roles(self, roles):
         self.roles = set(roles)
-        self.refresh_last_update()
+        self.refreshLastUpdate()
 
     def add_roles(self, roles):
         self.roles = self.roles.union(set(roles))
-        self.refresh_last_update()
+        self.refreshLastUpdate()
 
     def del_roles(self, roles):
         for role in roles:
             if role not in self.roles:
                 raise RoleNotInUser(role.name, self.username)
         self.roles.difference_update(set(roles))
-        self.refresh_last_update()
+        self.refreshLastUpdate()
 
     def authorize(self, scope, permissions):
-        if self.pwd_update_required:
-            return False
-
         for role in self.roles:
             if role.authorize(scope, permissions):
                 return True
         return False
 
     def permissions_dict(self):
-        # type: () -> dict
-        perms = {}  # type: dict
+        perms = {}
         for role in self.roles:
             for scope, perms_list in role.scopes_permissions.items():
                 if scope in perms:
@@ -399,22 +231,18 @@ class User(object):
             'roles': sorted([r.name for r in self.roles]),
             'name': self.name,
             'email': self.email,
-            'lastUpdate': self.last_update,
-            'enabled': self.enabled,
-            'pwdExpirationDate': self.pwd_expiration_date,
-            'pwdUpdateRequired': self.pwd_update_required
+            'lastUpdate': self.lastUpdate
         }
 
     @classmethod
     def from_dict(cls, u_dict, roles):
         return User(u_dict['username'], u_dict['password'], u_dict['name'],
                     u_dict['email'], {roles[r] for r in u_dict['roles']},
-                    u_dict['lastUpdate'], u_dict['enabled'],
-                    u_dict['pwdExpirationDate'], u_dict['pwdUpdateRequired'])
+                    u_dict['lastUpdate'])
 
 
 class AccessControlDB(object):
-    VERSION = 2
+    VERSION = 1
     ACDB_CONFIG_KEY = "accessdb_v"
 
     def __init__(self, version, users, roles):
@@ -437,23 +265,6 @@ class AccessControlDB(object):
                 raise RoleDoesNotExist(name)
             return self.roles[name]
 
-    def increment_attempt(self, username):
-        with self.lock:
-            if username in self.users:
-                self.users[username].invalid_auth_attempt += 1
-
-    def reset_attempt(self, username):
-        with self.lock:
-            if username in self.users:
-                self.users[username].invalid_auth_attempt = 0
-
-    def get_attempt(self, username):
-        with self.lock:
-            try:
-                return self.users[username].invalid_auth_attempt
-            except KeyError:
-                return 0
-
     def delete_role(self, name):
         with self.lock:
             if name not in self.roles:
@@ -467,18 +278,12 @@ class AccessControlDB(object):
 
             del self.roles[name]
 
-    def create_user(self, username, password, name, email, enabled=True,
-                    pwd_expiration_date=None, pwd_update_required=False):
-        logger.debug("creating user: username=%s", username)
+    def create_user(self, username, password, name, email):
+        logger.debug("AC: creating user: username=%s", username)
         with self.lock:
             if username in self.users:
                 raise UserAlreadyExists(username)
-            if pwd_expiration_date and \
-               (pwd_expiration_date < int(time.mktime(datetime.utcnow().timetuple()))):
-                raise PwdExpirationDateNotValid()
-            user = User(username, password_hash(password), name, email, enabled=enabled,
-                        pwd_expiration_date=pwd_expiration_date,
-                        pwd_update_required=pwd_update_required)
+            user = User(username, password_hash(password), name, email)
             self.users[username] = user
             return user
 
@@ -500,7 +305,7 @@ class AccessControlDB(object):
                 return
             for _, user in self.users.items():
                 if role in user.roles:
-                    user.refresh_last_update()
+                    user.refreshLastUpdate()
 
     def save(self):
         with self.lock:
@@ -518,46 +323,41 @@ class AccessControlDB(object):
         return "{}{}".format(cls.ACDB_CONFIG_KEY, version)
 
     def check_and_update_db(self):
-        logger.debug("Checking for previous DB versions")
-
-        def check_migrate_v1_to_current():
-            # Check if version 1 exists in the DB and migrate it to current version
-            v1_db = mgr.get_store(self.accessdb_config_key(1))
-            if v1_db:
-                logger.debug("Found database v1 credentials")
-                v1_db = json.loads(v1_db)
-
-                for user, _ in v1_db['users'].items():
-                    v1_db['users'][user]['enabled'] = True
-                    v1_db['users'][user]['pwdExpirationDate'] = None
-                    v1_db['users'][user]['pwdUpdateRequired'] = False
-
-                self.roles = {rn: Role.from_dict(r) for rn, r in v1_db.get('roles', {}).items()}
-                self.users = {un: User.from_dict(u, dict(self.roles, **SYSTEM_ROLES))
-                              for un, u in v1_db.get('users', {}).items()}
-
+        logger.debug("AC: Checking for previews DB versions")
+        if self.VERSION == 1:  # current version
+            # check if there is username/password from previous version
+            username = mgr.get_module_option('username', None)
+            password = mgr.get_module_option('password', None)
+            if username and password:
+                logger.debug("AC: Found single user credentials: user=%s",
+                             username)
+                # found user credentials
+                user = self.create_user(username, "", None, None)
+                # password is already hashed, so setting manually
+                user.password = password
+                user.add_roles([ADMIN_ROLE])
                 self.save()
-
-        check_migrate_v1_to_current()
+        else:
+            raise NotImplementedError()
 
     @classmethod
     def load(cls):
-        logger.info("Loading user roles DB version=%s", cls.VERSION)
+        logger.info("AC: Loading user roles DB version=%s", cls.VERSION)
 
         json_db = mgr.get_store(cls.accessdb_config_key())
         if json_db is None:
-            logger.debug("No DB v%s found, creating new...", cls.VERSION)
+            logger.debug("AC: No DB v%s found, creating new...", cls.VERSION)
             db = cls(cls.VERSION, {}, {})
             # check if we can update from a previous version database
             db.check_and_update_db()
             return db
 
-        dict_db = json.loads(json_db)
+        db = json.loads(json_db)
         roles = {rn: Role.from_dict(r)
-                 for rn, r in dict_db.get('roles', {}).items()}
+                 for rn, r in db.get('roles', {}).items()}
         users = {un: User.from_dict(u, dict(roles, **SYSTEM_ROLES))
-                 for un, u in dict_db.get('users', {}).items()}
-        return cls(dict_db['version'], users, roles)
+                 for un, u in db.get('users', {}).items()}
+        return cls(db['version'], users, roles)
 
 
 def load_access_control_db():
@@ -567,11 +367,10 @@ def load_access_control_db():
 # CLI dashboard access control scope commands
 
 @CLIWriteCommand('dashboard set-login-credentials',
-                 'name=username,type=CephString',
-                 'Set the login credentials. Password read from -i <file>')
-@CLICheckNonemptyFileInput
-def set_login_credentials_cmd(_, username, inbuf):
-    password = inbuf
+                 'name=username,type=CephString '
+                 'name=password,type=CephString',
+                 'Set the login credentials')
+def set_login_credentials_cmd(_, username, password):
     try:
         user = mgr.ACCESS_CTRL_DB.get_user(username)
         user.set_password(password)
@@ -701,19 +500,13 @@ def ac_user_show_cmd(_, username=None):
 
 @CLIWriteCommand('dashboard ac-user-create',
                  'name=username,type=CephString '
+                 'name=password,type=CephString,req=false '
                  'name=rolename,type=CephString,req=false '
                  'name=name,type=CephString,req=false '
-                 'name=email,type=CephString,req=false '
-                 'name=enabled,type=CephBool,req=false '
-                 'name=force_password,type=CephBool,req=false '
-                 'name=pwd_expiration_date,type=CephInt,req=false '
-                 'name=pwd_update_required,type=CephBool,req=false',
-                 'Create a user. Password read from -i <file>')
-@CLICheckNonemptyFileInput
-def ac_user_create_cmd(_, username, inbuf, rolename=None, name=None,
-                       email=None, enabled=True, force_password=False,
-                       pwd_expiration_date=None, pwd_update_required=False):
-    password = inbuf
+                 'name=email,type=CephString,req=false',
+                 'Create a user')
+def ac_user_create_cmd(_, username, password=None, rolename=None, name=None,
+                       email=None):
     try:
         role = mgr.ACCESS_CTRL_DB.get_role(rolename) if rolename else None
     except RoleDoesNotExist as ex:
@@ -722,50 +515,14 @@ def ac_user_create_cmd(_, username, inbuf, rolename=None, name=None,
         role = SYSTEM_ROLES[rolename]
 
     try:
-        if not force_password:
-            pw_check = PasswordPolicy(password, username)
-            pw_check.check_all()
-        user = mgr.ACCESS_CTRL_DB.create_user(username, password, name, email,
-                                              enabled, pwd_expiration_date,
-                                              pwd_update_required)
-    except PasswordPolicyException as ex:
-        return -errno.EINVAL, '', str(ex)
+        user = mgr.ACCESS_CTRL_DB.create_user(username, password, name, email)
     except UserAlreadyExists as ex:
-        return 0, str(ex), ''
+        return -errno.EEXIST, '', str(ex)
 
     if role:
         user.set_roles([role])
     mgr.ACCESS_CTRL_DB.save()
     return 0, json.dumps(user.to_dict()), ''
-
-
-@CLIWriteCommand('dashboard ac-user-enable',
-                 'name=username,type=CephString',
-                 'Enable a user')
-def ac_user_enable(_, username):
-    try:
-        user = mgr.ACCESS_CTRL_DB.get_user(username)
-        user.enabled = True
-        mgr.ACCESS_CTRL_DB.reset_attempt(username)
-
-        mgr.ACCESS_CTRL_DB.save()
-        return 0, json.dumps(user.to_dict()), ''
-    except UserDoesNotExist as ex:
-        return -errno.ENOENT, '', str(ex)
-
-
-@CLIWriteCommand('dashboard ac-user-disable',
-                 'name=username,type=CephString',
-                 'Disable a user')
-def ac_user_disable(_, username):
-    try:
-        user = mgr.ACCESS_CTRL_DB.get_user(username)
-        user.enabled = False
-
-        mgr.ACCESS_CTRL_DB.save()
-        return 0, json.dumps(user.to_dict()), ''
-    except UserDoesNotExist as ex:
-        return -errno.ENOENT, '', str(ex)
 
 
 @CLIWriteCommand('dashboard ac-user-delete',
@@ -853,41 +610,15 @@ def ac_user_del_roles_cmd(_, username, roles):
 
 @CLIWriteCommand('dashboard ac-user-set-password',
                  'name=username,type=CephString '
-                 'name=force_password,type=CephBool,req=false',
-                 'Set user password from -i <file>')
-@CLICheckNonemptyFileInput
-def ac_user_set_password(_, username, inbuf, force_password=False):
-    password = inbuf
+                 'name=password,type=CephString',
+                 'Set user password')
+def ac_user_set_password(_, username, password):
     try:
         user = mgr.ACCESS_CTRL_DB.get_user(username)
-        if not force_password:
-            pw_check = PasswordPolicy(password, user.name)
-            pw_check.check_all()
         user.set_password(password)
-        mgr.ACCESS_CTRL_DB.save()
-        return 0, json.dumps(user.to_dict()), ''
-    except PasswordPolicyException as ex:
-        return -errno.EINVAL, '', str(ex)
-    except UserDoesNotExist as ex:
-        return -errno.ENOENT, '', str(ex)
-
-
-@CLIWriteCommand('dashboard ac-user-set-password-hash',
-                 'name=username,type=CephString',
-                 'Set user password bcrypt hash from -i <file>')
-@CLICheckNonemptyFileInput
-def ac_user_set_password_hash(_, username, inbuf):
-    hashed_password = inbuf
-    try:
-        # make sure the hashed_password is actually a bcrypt hash
-        bcrypt.checkpw(b'', hashed_password.encode('utf-8'))
-        user = mgr.ACCESS_CTRL_DB.get_user(username)
-        user.set_password_hash(hashed_password)
 
         mgr.ACCESS_CTRL_DB.save()
         return 0, json.dumps(user.to_dict()), ''
-    except ValueError:
-        return -errno.EINVAL, '', 'Invalid password hash'
     except UserDoesNotExist as ex:
         return -errno.ENOENT, '', str(ex)
 
@@ -921,11 +652,9 @@ class LocalAuthenticator(object):
         try:
             user = mgr.ACCESS_CTRL_DB.get_user(username)
             if user.password:
-                if user.enabled and user.compare_password(password) \
-                   and not user.is_pwd_expired():
-                    return {'permissions': user.permissions_dict(),
-                            'pwdExpirationDate': user.pwd_expiration_date,
-                            'pwdUpdateRequired': user.pwd_update_required}
+                pass_hash = password_hash(password, user.password)
+                if pass_hash == user.password:
+                    return user.permissions_dict()
         except UserDoesNotExist:
             logger.debug("User '%s' does not exist", username)
         return None

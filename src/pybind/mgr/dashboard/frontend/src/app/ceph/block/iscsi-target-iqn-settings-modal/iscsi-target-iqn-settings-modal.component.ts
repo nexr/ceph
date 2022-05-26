@@ -22,7 +22,7 @@ export class IscsiTargetIqnSettingsModalComponent implements OnInit {
   constructor(public modalRef: BsModalRef, public iscsiService: IscsiService) {}
 
   ngOnInit() {
-    const fg: Record<string, FormControl> = {};
+    const fg = {};
     _.forIn(this.target_default_controls, (_value, key) => {
       fg[key] = new FormControl(this.target_controls.value[key]);
     });
@@ -42,7 +42,7 @@ export class IscsiTargetIqnSettingsModalComponent implements OnInit {
     this.modalRef.hide();
   }
 
-  getTargetControlLimits(setting: string) {
+  getTargetControlLimits(setting) {
     if (this.target_controls_limits) {
       return this.target_controls_limits[setting];
     }

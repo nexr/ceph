@@ -9,7 +9,6 @@ import {
   expectItemTasks,
   i18nProviders
 } from '../../../testing/unit-test-helper';
-import { RbdService } from '../api/rbd.service';
 import { ExecutingTask } from '../models/executing-task';
 import { SummaryService } from './summary.service';
 import { TaskListService } from './task-list.service';
@@ -24,12 +23,12 @@ describe('TaskListService', () => {
   let apiResp: any;
   let tasks: any[];
 
-  const addItem = (name: string) => {
+  const addItem = (name) => {
     apiResp.push({ name: name });
   };
 
   configureTestBed({
-    providers: [TaskListService, TaskMessageService, SummaryService, i18nProviders, RbdService],
+    providers: [TaskListService, TaskMessageService, SummaryService, i18nProviders],
     imports: [HttpClientTestingModule, RouterTestingModule]
   });
 
@@ -58,7 +57,7 @@ describe('TaskListService', () => {
       (task) => task.name.startsWith('test'),
       (item, task) => item.name === task.metadata['name'],
       {
-        default: (metadata: object) => ({ name: metadata['name'] })
+        default: (task) => ({ name: task.metadata['name'] })
       }
     );
   });

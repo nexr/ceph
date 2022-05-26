@@ -35,19 +35,17 @@
             ],
             "styles": [
               "node_modules/ngx-toastr/toastr.css",
+              "node_modules/bootstrap/dist/css/bootstrap.css",
+              "node_modules/fork-awesome/css/fork-awesome.css",
+              "node_modules/awesome-bootstrap-checkbox/awesome-bootstrap-checkbox.css",
               "node_modules/ngx-bootstrap/datepicker/bs-datepicker.css",
               "src/styles.scss",
-              "src/styles/vendor.overrides.scss"
+              "src/vendor.overrides.scss",
+              "node_modules/ng2-tree/styles.css"
             ],
             "scripts": [
               "node_modules/chart.js/dist/Chart.bundle.js"
-            ],
-            "stylePreprocessorOptions": {
-              "includePaths": [
-                "src/styles",
-                "src"
-              ]
-            }
+            ]
           },
           "configurations": {
             "production": {
@@ -106,11 +104,6 @@
               "i18nFile": "src/locale/messages.ja-JP.xlf",
               "i18nLocale": "ja-JP"
             },
-            "ko-KR": {
-              "outputPath": "dist/ko-KR/",
-              "i18nFile": "src/locale/messages.ko-KR.xlf",
-              "i18nLocale": "ko-KR"
-            },
             "pl-PL": {
               "outputPath": "dist/pl-PL/",
               "i18nFile": "src/locale/messages.pl-PL.xlf",
@@ -167,9 +160,6 @@
             "ja-JP": {
               "browserTarget": "ceph-dashboard:build:ja-JP"
             },
-            "ko-KR": {
-              "browserTarget": "ceph-dashboard:build:ko-KR"
-            },
             "pl-PL": {
               "browserTarget": "ceph-dashboard:build:pl-PL"
             },
@@ -195,15 +185,39 @@
           "options": {
             "tsConfig": [
               "src/tsconfig.app.json",
-              "tsconfig.spec.json"
+              "src/tsconfig.spec.json"
             ],
             "exclude": [
               "**/node_modules/**"
             ]
           }
         }
-      },
-      "cli": {}
+      }
+    },
+    "ceph-dashboard-e2e": {
+      "root": "",
+      "sourceRoot": "",
+      "projectType": "application",
+      "architect": {
+        "e2e": {
+          "builder": "@angular-devkit/build-angular:protractor",
+          "options": {
+            "protractorConfig": "./protractor.conf.js",
+            "devServerTarget": "ceph-dashboard:serve"
+          }
+        },
+        "lint": {
+          "builder": "@angular-devkit/build-angular:tslint",
+          "options": {
+            "tsConfig": [
+              "e2e/tsconfig.e2e.json"
+            ],
+            "exclude": [
+              "**/node_modules/**"
+            ]
+          }
+        }
+      }
     }
   },
   "defaultProject": "ceph-dashboard",
@@ -215,6 +229,5 @@
     "@schematics/angular:directive": {
       "prefix": "cd"
     }
-  },
-  "cli": {}
+  }
 }

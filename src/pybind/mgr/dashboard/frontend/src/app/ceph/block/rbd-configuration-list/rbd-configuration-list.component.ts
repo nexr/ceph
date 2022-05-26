@@ -21,11 +21,11 @@ export class RbdConfigurationListComponent implements OnInit, OnChanges {
   @Input()
   data: RbdConfigurationEntry[];
   poolConfigurationColumns: CdTableColumn[];
-  @ViewChild('configurationSourceTpl', { static: true })
+  @ViewChild('configurationSourceTpl')
   configurationSourceTpl: TemplateRef<any>;
-  @ViewChild('configurationValueTpl', { static: true })
+  @ViewChild('configurationValueTpl')
   configurationValueTpl: TemplateRef<any>;
-  @ViewChild('poolConfTable', { static: true })
+  @ViewChild('poolConfTable')
   poolConfTable: TableComponent;
 
   readonly sourceField = RbdConfigurationSourceField;

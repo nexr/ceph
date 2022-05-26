@@ -6,9 +6,7 @@ try:
 except ImportError:
     from unittest.mock import patch
 
-from requests import RequestException
-
-from . import ControllerTestCase, KVStoreMockMixin  # pylint: disable=no-name-in-module
+from . import ControllerTestCase, KVStoreMockMixin
 from ..controllers.grafana import Grafana
 from ..grafana import GrafanaRestClient
 from ..settings import Settings
@@ -43,32 +41,23 @@ class GrafanaTest(ControllerTestCase, KVStoreMockMixin):
         self.assertStatus(200)
         self.assertJsonBody({'instance': 'http://localhost:3000'})
 
-    @patch('dashboard.controllers.grafana.GrafanaRestClient.url_validation')
-    def test_validation_endpoint_returns(self, url_validation):
-        """
-        The point of this test is to see that `validation` is an active endpoint that returns a 200
-        status code.
-        """
-        url_validation.return_value = b'404'
+    def test_validation(self):
         self.server_settings()
         self._get('/api/grafana/validation/foo')
-        self.assertStatus(200)
-        self.assertBody(b'"404"')
+        self.assertStatus(500)
 
     def test_dashboards_unavailable_no_url(self):
-        self.server_settings(url="")
+        self.server_settings(url=None)
         self._post('/api/grafana/dashboards')
         self.assertStatus(500)
 
-    @patch('dashboard.controllers.grafana.GrafanaRestClient.push_dashboard')
-    def test_dashboards_unavailable_no_user(self, pd):
-        pd.side_effect = RequestException
-        self.server_settings(user="")
+    def test_dashboards_unavailable_no_user(self):
+        self.server_settings(user=None)
         self._post('/api/grafana/dashboards')
         self.assertStatus(500)
 
     def test_dashboards_unavailable_no_password(self):
-        self.server_settings(password="")
+        self.server_settings(password=None)
         self._post('/api/grafana/dashboards')
         self.assertStatus(500)
 

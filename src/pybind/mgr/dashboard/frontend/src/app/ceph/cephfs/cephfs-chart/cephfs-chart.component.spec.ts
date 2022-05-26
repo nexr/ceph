@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 
-import { ChartsModule } from 'ng2-charts';
+import { ChartsModule } from 'ng2-charts/ng2-charts';
 
 import { configureTestBed } from '../../../../testing/unit-test-helper';
 import { CephfsChartComponent } from './cephfs-chart.component';
@@ -9,12 +9,7 @@ describe('CephfsChartComponent', () => {
   let component: CephfsChartComponent;
   let fixture: ComponentFixture<CephfsChartComponent>;
 
-  const counter = [
-    [0, 15],
-    [5, 15],
-    [10, 25],
-    [15, 50]
-  ];
+  const counter = [[0, 15], [5, 15], [10, 25], [15, 50]];
 
   configureTestBed({
     imports: [ChartsModule],

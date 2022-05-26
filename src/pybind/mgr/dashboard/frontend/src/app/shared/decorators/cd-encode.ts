@@ -12,9 +12,9 @@ import * as _ from 'lodash';
 export function cdEncode(...args: any[]): any {
   switch (args.length) {
     case 1:
-      return encodeClass.apply(undefined, args);
+      return encodeClass.apply(this, args);
     case 3:
-      return encodeMethod.apply(undefined, args);
+      return encodeMethod.apply(this, args);
     default:
       throw new Error();
   }
@@ -31,7 +31,7 @@ export function cdEncode(...args: any[]): any {
  * @param {string} propertyKey
  * @param {number} index
  */
-export function cdEncodeNot(target: object, propertyKey: string, index: number) {
+export function cdEncodeNot(target: Object, propertyKey: string, index: number) {
   const metadataKey = `__ignore_${propertyKey}`;
   if (Array.isArray(target[metadataKey])) {
     target[metadataKey].push(index);
@@ -41,12 +41,11 @@ export function cdEncodeNot(target: object, propertyKey: string, index: number) 
 }
 
 function encodeClass(target: Function) {
-  for (const propertyName of Object.getOwnPropertyNames(target.prototype)) {
+  for (const propertyName of Object.keys(target.prototype)) {
     const descriptor = Object.getOwnPropertyDescriptor(target.prototype, propertyName);
 
     const isMethod = descriptor.value instanceof Function;
-    const isConstructor = propertyName === 'constructor';
-    if (!isMethod || isConstructor) {
+    if (!isMethod) {
       continue;
     }
 
@@ -61,7 +60,7 @@ function encodeMethod(target: any, propertyKey: string, descriptor: PropertyDesc
   }
   const originalMethod = descriptor.value;
 
-  descriptor.value = function () {
+  descriptor.value = function() {
     const metadataKey = `__ignore_${propertyKey}`;
     const indices: number[] = target[metadataKey] || [];
     const args = [];

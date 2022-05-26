@@ -18,36 +18,16 @@ export class PasswordFormComponent {}
 @Component({
   template: `
     <form>
-      <input id="x" type="checkbox" [autofocus]="edit" />
+      <input id="x" type="checkbox" autofocus />
       <input id="y" type="text" />
     </form>
   `
 })
-export class CheckboxFormComponent {
-  public edit = true;
-}
-
-@Component({
-  template: `
-    <form>
-      <input id="x" type="text" [autofocus]="foo" />
-    </form>
-  `
-})
-export class TextFormComponent {
-  foo() {
-    return false;
-  }
-}
+export class CheckboxFormComponent {}
 
 describe('AutofocusDirective', () => {
   configureTestBed({
-    declarations: [
-      AutofocusDirective,
-      CheckboxFormComponent,
-      PasswordFormComponent,
-      TextFormComponent
-    ]
+    declarations: [AutofocusDirective, CheckboxFormComponent, PasswordFormComponent]
   });
 
   it('should create an instance', () => {
@@ -77,14 +57,5 @@ describe('AutofocusDirective', () => {
     expect(focused.attributes.type).toBe('checkbox');
     const element = document.getElementById('x');
     expect(element === document.activeElement).toBeTruthy();
-  });
-
-  it('should not focus the text form field', () => {
-    const fixture: ComponentFixture<TextFormComponent> = TestBed.createComponent(TextFormComponent);
-    fixture.detectChanges();
-    const focused = fixture.debugElement.query(By.css(':focus'));
-    expect(focused).toBeNull();
-    const element = document.getElementById('x');
-    expect(element !== document.activeElement).toBeTruthy();
   });
 });

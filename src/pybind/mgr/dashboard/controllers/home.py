@@ -4,7 +4,6 @@ from __future__ import absolute_import
 import os
 import re
 import json
-import logging
 try:
     from functools import lru_cache
 except ImportError:
@@ -14,10 +13,7 @@ import cherrypy
 from cherrypy.lib.static import serve_file
 
 from . import Controller, UiApiController, BaseController, Proxy, Endpoint
-from .. import mgr
-
-
-logger = logging.getLogger("controllers.home")
+from .. import mgr, logger
 
 
 class LanguageMixin(object):

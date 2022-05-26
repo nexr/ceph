@@ -128,10 +128,7 @@ describe('PrometheusService', () => {
     it('should get rewrite rules only', () => {
       service.getRules('rewrites').subscribe((rules) => {
         expect(rules).toEqual({
-          groups: [
-            { name: 'test', rules: [] },
-            { name: 'recording_rule', rules: [] }
-          ]
+          groups: [{ name: 'test', rules: [] }, { name: 'recording_rule', rules: [] }]
         });
       });
 
@@ -165,7 +162,7 @@ describe('PrometheusService', () => {
 
   describe('ifAlertmanagerConfigured', () => {
     let x: any;
-    let host: string;
+    let host;
 
     const receiveConfig = () => {
       const req = httpTesting.expectOne('api/settings/alertmanager-api-host');
@@ -176,10 +173,7 @@ describe('PrometheusService', () => {
     beforeEach(() => {
       x = false;
       TestBed.get(SettingsService)['settings'] = {};
-      service.ifAlertmanagerConfigured(
-        (v) => (x = v),
-        () => (x = [])
-      );
+      service.ifAlertmanagerConfigured((v) => (x = v), () => (x = []));
       host = 'http://localhost:9093';
     });
 
@@ -206,7 +200,7 @@ describe('PrometheusService', () => {
 
   describe('ifPrometheusConfigured', () => {
     let x: any;
-    let host: string;
+    let host;
 
     const receiveConfig = () => {
       const req = httpTesting.expectOne('api/settings/prometheus-api-host');
@@ -217,10 +211,7 @@ describe('PrometheusService', () => {
     beforeEach(() => {
       x = false;
       TestBed.get(SettingsService)['settings'] = {};
-      service.ifPrometheusConfigured(
-        (v) => (x = v),
-        () => (x = [])
-      );
+      service.ifPrometheusConfigured((v) => (x = v), () => (x = []));
       host = 'http://localhost:9090';
     });
 
