@@ -1,7 +1,9 @@
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterTestingModule } from '@angular/router/testing';
 
+import { TabsModule } from 'ngx-bootstrap/tabs';
 import { ToastrModule } from 'ngx-toastr';
 import { of } from 'rxjs';
 
@@ -14,9 +16,11 @@ import {
 import { RbdService } from '../../../shared/api/rbd.service';
 import { CdTableSelection } from '../../../shared/models/cd-table-selection';
 import { ExecutingTask } from '../../../shared/models/executing-task';
+import { Summary } from '../../../shared/models/summary.model';
 import { SummaryService } from '../../../shared/services/summary.service';
 import { TaskListService } from '../../../shared/services/task-list.service';
 import { SharedModule } from '../../../shared/shared.module';
+import { RbdTabsComponent } from '../rbd-tabs/rbd-tabs.component';
 import { RbdTrashListComponent } from './rbd-trash-list.component';
 
 describe('RbdTrashListComponent', () => {
@@ -26,8 +30,15 @@ describe('RbdTrashListComponent', () => {
   let rbdService: RbdService;
 
   configureTestBed({
-    declarations: [RbdTrashListComponent],
-    imports: [SharedModule, HttpClientTestingModule, RouterTestingModule, ToastrModule.forRoot()],
+    declarations: [RbdTrashListComponent, RbdTabsComponent],
+    imports: [
+      BrowserAnimationsModule,
+      HttpClientTestingModule,
+      RouterTestingModule,
+      SharedModule,
+      TabsModule.forRoot(),
+      ToastrModule.forRoot()
+    ],
     providers: [TaskListService, i18nProviders]
   });
 
@@ -46,26 +57,23 @@ describe('RbdTrashListComponent', () => {
   it('should load trash images when summary is trigged', () => {
     spyOn(rbdService, 'listTrash').and.callThrough();
 
-    summaryService['summaryDataSource'].next({ executingTasks: null });
+    summaryService['summaryDataSource'].next(new Summary());
     expect(rbdService.listTrash).toHaveBeenCalled();
   });
 
   it('should call updateSelection', () => {
-    const selection = new CdTableSelection();
-    selection.selected = ['foo'];
-    selection.update();
-
     expect(component.selection.hasSelection).toBeFalsy();
-    component.updateSelection(selection);
+    component.updateSelection(new CdTableSelection(['foo']));
     expect(component.selection.hasSelection).toBeTruthy();
   });
 
   describe('handling of executing tasks', () => {
     let images: any[];
 
-    const addImage = (id) => {
+    const addImage = (id: string) => {
       images.push({
-        id: id
+        id: id,
+        pool_name: 'pl'
       });
     };
 
@@ -73,7 +81,7 @@ describe('RbdTrashListComponent', () => {
       const task = new ExecutingTask();
       task.name = name;
       task.metadata = {
-        image_id: image_id
+        image_id_spec: `pl/${image_id}`
       };
       summaryService.addRunningTask(task);
     };
@@ -83,7 +91,7 @@ describe('RbdTrashListComponent', () => {
       addImage('1');
       addImage('2');
       component.images = images;
-      summaryService['summaryDataSource'].next({ executingTasks: [] });
+      summaryService['summaryDataSource'].next(new Summary());
       spyOn(rbdService, 'listTrash').and.callFake(() =>
         of([{ pool_name: 'rbd', status: 1, value: images }])
       );
@@ -92,7 +100,9 @@ describe('RbdTrashListComponent', () => {
 
     it('should gets all images without tasks', () => {
       expect(component.images.length).toBe(2);
-      expect(component.images.every((image) => !image.cdExecuting)).toBeTruthy();
+      expect(
+        component.images.every((image: Record<string, any>) => !image.cdExecuting)
+      ).toBeTruthy();
     });
 
     it('should show when an existing image is being modified', () => {
@@ -115,7 +125,7 @@ describe('RbdTrashListComponent', () => {
     };
 
     beforeEach(() => {
-      summaryService['summaryDataSource'].next({ executingTasks: [] });
+      summaryService['summaryDataSource'].next(new Summary());
       spyOn(rbdService, 'listTrash').and.callFake(() => {
         of([{ pool_name: 'rbd', status: 1, value: images }]);
       });

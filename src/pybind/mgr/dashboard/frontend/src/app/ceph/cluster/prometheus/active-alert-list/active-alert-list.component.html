@@ -4,29 +4,29 @@
           [forceIdentifier]="true"
           [customCss]="customCss"
           selectionType="single"
+          [hasDetails]="true"
+          (setExpandedRow)="setExpandedRow($event)"
           (updateSelection)="updateSelection($event)">
   <cd-table-actions class="table-actions"
                     [permission]="permission"
                     [selection]="selection"
                     [tableActions]="tableActions">
   </cd-table-actions>
-  <tabset cdTableDetail *ngIf="selection.hasSingleSelection">
-    <tab i18n-heading
-         heading="Details">
-      <cd-table-key-value [renderObjects]="true"
-                          [hideEmpty]="true"
-                          [appendParentKey]="false"
-                          [data]="selection.first()"
-                          [customCss]="customCss"
-                          [autoReload]="false">
-      </cd-table-key-value>
-    </tab>
-  </tabset>
+
+  <cd-table-key-value cdTableDetail
+                      *ngIf="expandedRow"
+                      [renderObjects]="true"
+                      [hideEmpty]="true"
+                      [appendParentKey]="false"
+                      [data]="expandedRow"
+                      [customCss]="customCss"
+                      [autoReload]="false">
+  </cd-table-key-value>
 </cd-table>
 
 <ng-template #externalLinkTpl
              let-row="row"
              let-value="value">
-  <a [href]="value" target="_blank"><i class="fa fa-line-chart"></i> Source</a>
+  <a [href]="value"
+     target="_blank"><i [ngClass]="[icons.lineChart]"></i> Source</a>
 </ng-template>
-

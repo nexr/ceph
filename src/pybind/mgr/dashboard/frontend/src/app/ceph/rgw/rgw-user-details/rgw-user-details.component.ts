@@ -5,6 +5,7 @@ import * as _ from 'lodash';
 import { BsModalService } from 'ngx-bootstrap/modal';
 
 import { RgwUserService } from '../../../shared/api/rgw-user.service';
+import { Icons } from '../../../shared/enum/icons.enum';
 import { CdTableColumn } from '../../../shared/models/cd-table-column';
 import { CdTableSelection } from '../../../shared/models/cd-table-selection';
 import { RgwUserS3Key } from '../models/rgw-user-s3-key';
@@ -18,13 +19,13 @@ import { RgwUserSwiftKeyModalComponent } from '../rgw-user-swift-key-modal/rgw-u
   styleUrls: ['./rgw-user-details.component.scss']
 })
 export class RgwUserDetailsComponent implements OnChanges, OnInit {
-  @ViewChild('accessKeyTpl')
+  @ViewChild('accessKeyTpl', { static: false })
   public accessKeyTpl: TemplateRef<any>;
-  @ViewChild('secretKeyTpl')
+  @ViewChild('secretKeyTpl', { static: false })
   public secretKeyTpl: TemplateRef<any>;
 
   @Input()
-  selection: CdTableSelection;
+  selection: any;
 
   // Details tab
   user: any;
@@ -34,6 +35,8 @@ export class RgwUserDetailsComponent implements OnChanges, OnInit {
   keys: any = [];
   keysColumns: CdTableColumn[] = [];
   keysSelection: CdTableSelection = new CdTableSelection();
+
+  icons = Icons;
 
   constructor(
     private rgwUserService: RgwUserService,
@@ -61,8 +64,8 @@ export class RgwUserDetailsComponent implements OnChanges, OnInit {
   }
 
   ngOnChanges() {
-    if (this.selection.hasSelection) {
-      this.user = this.selection.first();
+    if (this.selection) {
+      this.user = this.selection;
 
       // Sort subusers and capabilities.
       this.user.subusers = _.sortBy(this.user.subusers, 'id');

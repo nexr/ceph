@@ -9,9 +9,8 @@ import { ToastrModule } from 'ngx-toastr';
 
 import { ActivatedRouteStub } from '../../../../testing/activated-route-stub';
 import { configureTestBed, i18nProviders } from '../../../../testing/unit-test-helper';
-import { CephReleaseNamePipe } from '../../../shared/pipes/ceph-release-name.pipe';
-import { SummaryService } from '../../../shared/services/summary.service';
 import { SharedModule } from '../../../shared/shared.module';
+import { NFSClusterType } from '../nfs-cluster-type.enum';
 import { NfsFormClientComponent } from '../nfs-form-client/nfs-form-client.component';
 import { NfsFormComponent } from './nfs-form.component';
 
@@ -21,61 +20,53 @@ describe('NfsFormComponent', () => {
   let httpTesting: HttpTestingController;
   let activatedRoute: ActivatedRouteStub;
 
-  configureTestBed(
-    {
-      declarations: [NfsFormComponent, NfsFormClientComponent],
-      imports: [
-        HttpClientTestingModule,
-        ReactiveFormsModule,
-        RouterTestingModule,
-        SharedModule,
-        ToastrModule.forRoot(),
-        TypeaheadModule.forRoot()
-      ],
-      providers: [
-        {
-          provide: ActivatedRoute,
-          useValue: new ActivatedRouteStub({ cluster_id: undefined, export_id: undefined })
-        },
-        i18nProviders,
-        SummaryService,
-        CephReleaseNamePipe
-      ]
-    },
-    true
-  );
+  configureTestBed({
+    declarations: [NfsFormComponent, NfsFormClientComponent],
+    imports: [
+      HttpClientTestingModule,
+      ReactiveFormsModule,
+      RouterTestingModule,
+      SharedModule,
+      ToastrModule.forRoot(),
+      TypeaheadModule.forRoot()
+    ],
+    providers: [
+      {
+        provide: ActivatedRoute,
+        useValue: new ActivatedRouteStub({ cluster_id: undefined, export_id: undefined })
+      },
+      i18nProviders
+    ]
+  });
 
   beforeEach(() => {
-    const summaryService = TestBed.get(SummaryService);
-    spyOn(summaryService, 'refresh').and.callFake(() => true);
-    spyOn(summaryService, 'getCurrentSummary').and.callFake(() => {
-      return {
-        version: 'master'
-      };
-    });
-
     fixture = TestBed.createComponent(NfsFormComponent);
     component = fixture.componentInstance;
     httpTesting = TestBed.get(HttpTestingController);
     activatedRoute = TestBed.get(ActivatedRoute);
     fixture.detectChanges();
 
-    httpTesting.expectOne('api/summary').flush([]);
-    httpTesting
-      .expectOne('api/nfs-ganesha/daemon')
-      .flush([
-        { daemon_id: 'node1', cluster_id: 'cluster1' },
-        { daemon_id: 'node2', cluster_id: 'cluster1' },
-        { daemon_id: 'node5', cluster_id: 'cluster2' }
-      ]);
+    httpTesting.expectOne('api/nfs-ganesha/daemon').flush([
+      { daemon_id: 'node1', cluster_id: 'cluster1', cluster_type: NFSClusterType.user },
+      { daemon_id: 'node2', cluster_id: 'cluster1', cluster_type: NFSClusterType.user },
+      { daemon_id: 'node5', cluster_id: 'cluster2', cluster_type: NFSClusterType.orchestrator }
+    ]);
     httpTesting.expectOne('ui-api/nfs-ganesha/fsals').flush(['CEPH', 'RGW']);
     httpTesting.expectOne('ui-api/nfs-ganesha/cephx/clients').flush(['admin', 'fs', 'rgw']);
     httpTesting.expectOne('ui-api/nfs-ganesha/cephfs/filesystems').flush([{ id: 1, name: 'a' }]);
     httpTesting.expectOne('api/rgw/user').flush(['test', 'dev']);
-    httpTesting.expectOne('api/rgw/user/dev').flush({ suspended: 0, user_id: 'dev', keys: ['a'] });
-    httpTesting
-      .expectOne('api/rgw/user/test')
-      .flush({ suspended: 1, user_id: 'test', keys: ['a'] });
+    const user_dev = {
+      suspended: 0,
+      user_id: 'dev',
+      keys: ['a']
+    };
+    httpTesting.expectOne('api/rgw/user/dev').flush(user_dev);
+    const user_test = {
+      suspended: 1,
+      user_id: 'test',
+      keys: ['a']
+    };
+    httpTesting.expectOne('api/rgw/user/test').flush(user_test);
     httpTesting.verify();
   });
 
@@ -103,7 +94,7 @@ describe('NfsFormComponent', () => {
       daemons: [],
       fsal: { fs_name: 'a', name: '', rgw_user_id: '', user_id: '' },
       path: '',
-      protocolNfsv3: true,
+      protocolNfsv3: false,
       protocolNfsv4: true,
       pseudo: '',
       sec_label_xattr: 'security.selinux',
@@ -113,11 +104,13 @@ describe('NfsFormComponent', () => {
       transportTCP: true,
       transportUDP: true
     });
+    expect(component.nfsForm.get('cluster_id').disabled).toBeFalsy();
   });
 
   it('should prepare data when selecting an cluster', () => {
     expect(component.allDaemons).toEqual({ cluster1: ['node1', 'node2'], cluster2: ['node5'] });
     expect(component.daemonsSelections).toEqual([]);
+    expect(component.clusterType).toBeNull();
 
     component.nfsForm.patchValue({ cluster_id: 'cluster1' });
     component.onClusterChange();
@@ -126,6 +119,12 @@ describe('NfsFormComponent', () => {
       { description: '', name: 'node1', selected: false, enabled: true },
       { description: '', name: 'node2', selected: false, enabled: true }
     ]);
+    expect(component.clusterType).toBe(NFSClusterType.user);
+
+    component.nfsForm.patchValue({ cluster_id: 'cluster2' });
+    component.onClusterChange();
+    expect(component.clusterType).toBe(NFSClusterType.orchestrator);
+    expect(component.daemonsSelections).toEqual([]);
   });
 
   it('should clean data when changing cluster', () => {
@@ -134,6 +133,21 @@ describe('NfsFormComponent', () => {
     component.onClusterChange();
 
     expect(component.nfsForm.getValue('daemons')).toEqual([]);
+  });
+
+  it('should not allow changing cluster in edit mode', () => {
+    component.isEdit = true;
+    component.ngOnInit();
+    expect(component.nfsForm.get('cluster_id').disabled).toBeTruthy();
+  });
+
+  it('should mark NFSv4 protocol as required', () => {
+    component.nfsForm.patchValue({
+      protocolNfsv4: false
+    });
+    component.nfsForm.updateValueAndValidity({ emitEvent: false });
+    expect(component.nfsForm.valid).toBeFalsy();
+    expect(component.nfsForm.get('protocolNfsv4').hasError('required')).toBeTruthy();
   });
 
   describe('should submit request', () => {

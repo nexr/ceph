@@ -25,15 +25,15 @@ import { HealthComponent } from './health.component';
 describe('HealthComponent', () => {
   let component: HealthComponent;
   let fixture: ComponentFixture<HealthComponent>;
-  let getHealthSpy;
-  const healthPayload = {
+  let getHealthSpy: jasmine.Spy;
+  const healthPayload: Record<string, any> = {
     health: { status: 'HEALTH_OK' },
     mon_status: { monmap: { mons: [] }, quorum: [] },
     osd_map: { osds: [] },
     mgr_map: { standbys: [] },
     hosts: 0,
     rgw: 0,
-    fs_map: { filesystems: [] },
+    fs_map: { filesystems: [], standbys: [] },
     iscsi_daemons: 0,
     client_perf: {},
     scrub_status: 'Inactive',
@@ -46,7 +46,7 @@ describe('HealthComponent', () => {
       return new Permissions({ log: ['read'] });
     }
   };
-  let fakeFeatureTogglesService;
+  let fakeFeatureTogglesService: jasmine.Spy;
 
   configureTestBed({
     imports: [SharedModule, HttpClientTestingModule, PopoverModule.forRoot()],
@@ -94,7 +94,7 @@ describe('HealthComponent', () => {
     expect(infoGroups.length).toBe(3);
 
     const infoCards = fixture.debugElement.nativeElement.querySelectorAll('cd-info-card');
-    expect(infoCards.length).toBe(18);
+    expect(infoCards.length).toBe(17);
   });
 
   describe('features disabled', () => {
@@ -119,7 +119,7 @@ describe('HealthComponent', () => {
       expect(infoGroups.length).toBe(3);
 
       const infoCards = fixture.debugElement.nativeElement.querySelectorAll('cd-info-card');
-      expect(infoCards.length).toBe(15);
+      expect(infoCards.length).toBe(14);
     });
   });
 
@@ -141,7 +141,7 @@ describe('HealthComponent', () => {
     expect(infoGroups.length).toBe(2);
 
     const infoCards = fixture.debugElement.nativeElement.querySelectorAll('cd-info-card');
-    expect(infoCards.length).toBe(10);
+    expect(infoCards.length).toBe(9);
   });
 
   it('should render all except "Performance" group and cards', () => {
@@ -172,11 +172,11 @@ describe('HealthComponent', () => {
     expect(infoGroups.length).toBe(2);
 
     const infoCards = fixture.debugElement.nativeElement.querySelectorAll('cd-info-card');
-    expect(infoCards.length).toBe(13);
+    expect(infoCards.length).toBe(12);
   });
 
   it('should render all groups and 1 card per group', () => {
-    const payload = { hosts: 0, scrub_status: 'Inactive', pools: [] };
+    const payload: Record<string, any> = { hosts: 0, scrub_status: 'Inactive', pools: [] };
 
     getHealthSpy.and.returnValue(of(payload));
     fixture.detectChanges();
@@ -220,15 +220,16 @@ describe('HealthComponent', () => {
   });
 
   it('event binding "prepareReadWriteRatio" is called', () => {
-    const prepareReadWriteRatio = spyOn(component, 'prepareReadWriteRatio');
+    const prepareReadWriteRatio = spyOn(component, 'prepareReadWriteRatio').and.callThrough();
 
     const payload = _.cloneDeep(healthPayload);
     payload.client_perf['read_op_per_sec'] = 1;
-    payload.client_perf['write_op_per_sec'] = 1;
+    payload.client_perf['write_op_per_sec'] = 3;
     getHealthSpy.and.returnValue(of(payload));
     fixture.detectChanges();
 
     expect(prepareReadWriteRatio).toHaveBeenCalled();
+    expect(prepareReadWriteRatio.calls.mostRecent().args[0].dataset[0].data).toEqual([25, 75]);
   });
 
   it('event binding "prepareRawUsage" is called', () => {
@@ -256,17 +257,25 @@ describe('HealthComponent', () => {
   });
 
   describe('preparePgStatus', () => {
-    const calcPercentage = (data) => Math.round((data / 10) * 100) || 0;
-
-    const expectedChart = (data: number[]) => ({
+    const expectedChart = (data: number[], label: string = null) => ({
       labels: [
-        `Clean (${calcPercentage(data[0])}%)`,
-        `Working (${calcPercentage(data[1])}%)`,
-        `Warning (${calcPercentage(data[2])}%)`,
-        `Unknown (${calcPercentage(data[3])}%)`
+        `Clean: ${component['dimless'].transform(data[0])}`,
+        `Working: ${component['dimless'].transform(data[1])}`,
+        `Warning: ${component['dimless'].transform(data[2])}`,
+        `Unknown: ${component['dimless'].transform(data[3])}`
       ],
       options: {},
-      dataset: [{ data: data }]
+      dataset: [
+        {
+          data: data.map((i) =>
+            component['calcPercentage'](
+              i,
+              data.reduce((j, k) => j + k)
+            )
+          ),
+          label: label
+        }
+      ]
     });
 
     it('gets no data', () => {
@@ -274,7 +283,7 @@ describe('HealthComponent', () => {
       component.preparePgStatus(chart, {
         pg_info: {}
       });
-      expect(chart).toEqual(expectedChart([undefined, undefined, undefined, undefined]));
+      expect(chart).toEqual(expectedChart([0, 0, 0, 0], '0\nPGs'));
     });
 
     it('gets data from all categories', () => {
@@ -289,7 +298,7 @@ describe('HealthComponent', () => {
           }
         }
       });
-      expect(chart).toEqual(expectedChart([1, 2, 3, 4]));
+      expect(chart).toEqual(expectedChart([1, 2, 3, 4], '10\nPGs'));
     });
   });
 

@@ -1,4 +1,4 @@
-@import '../../../../defaults';
+@import 'defaults';
 
 .info-card-popover-cluster-status {
   max-width: 23vw;
@@ -8,21 +8,22 @@
     max-width: 100%;
     max-height: 19vh;
     font-size: 12px;
+    overflow: auto;
   }
 }
 
-@media (max-width: $screen-md-max) {
+@media (max-width: $screen-lg-max) {
   .info-card-popover-cluster-status {
     max-width: 31vw;
   }
 }
 
-@media (max-width: $screen-sm-max) {
+@media (max-width: $screen-md-max) {
   .info-card-popover-cluster-status {
     max-width: 46vw;
   }
 }
-@media (max-width: $screen-xs-max) {
+@media (max-width: $screen-sm-max) {
   .info-card-popover-cluster-status {
     max-width: 83vw;
   }

@@ -28,7 +28,7 @@ export class MonitorComponent {
           prop: 'cdOpenSessions',
           name: this.i18n('Open Sessions'),
           cellTransformation: CellTemplate.sparkline,
-          comparator: (dataA, dataB) => {
+          comparator: (dataA: any, dataB: any) => {
             // We get the last value of time series to compare:
             const lastValueA = _.last(dataA);
             const lastValueB = _.last(dataB);
@@ -40,8 +40,7 @@ export class MonitorComponent {
             return lastValueA > lastValueB ? 1 : -1;
           }
         }
-      ],
-      data: []
+      ]
     };
 
     this.notInQuorum = {
@@ -49,21 +48,20 @@ export class MonitorComponent {
         { prop: 'name', name: this.i18n('Name'), cellTransformation: CellTemplate.routerLink },
         { prop: 'rank', name: this.i18n('Rank') },
         { prop: 'public_addr', name: this.i18n('Public Address') }
-      ],
-      data: []
+      ]
     };
   }
 
   refresh() {
     this.monitorService.getMonitor().subscribe((data: any) => {
-      data.in_quorum.map((row) => {
-        row.cdOpenSessions = row.stats.num_sessions.map((i) => i[1]);
+      data.in_quorum.map((row: any) => {
+        row.cdOpenSessions = row.stats.num_sessions.map((i: string) => i[1]);
         row.cdLink = '/perf_counters/mon/' + row.name;
         row.cdParams = { fromLink: '/monitor' };
         return row;
       });
 
-      data.out_quorum.map((row) => {
+      data.out_quorum.map((row: any) => {
         row.cdLink = '/perf_counters/mon/' + row.name;
         row.cdParams = { fromLink: '/monitor' };
         return row;

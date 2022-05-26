@@ -3,8 +3,7 @@ import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 
 import { I18n } from '@ngx-translate/i18n-polyfill';
 
-import { CephReleaseNamePipe } from '../../../shared/pipes/ceph-release-name.pipe';
-import { SummaryService } from '../../../shared/services/summary.service';
+import { Icons } from '../../../shared/enum/icons.enum';
 import { SettingsService } from '../../api/settings.service';
 
 @Component({
@@ -23,10 +22,11 @@ export class GrafanaComponent implements OnInit, OnChanges {
   grafanaExist = false;
   mode = '&kiosk';
   loading = true;
-  styles = {};
+  styles: Record<string, string> = {};
   dashboardExist = true;
   time: string;
   grafanaTimes: any;
+  icons = Icons;
   readonly DEFAULT_TIME: string = 'from=now-1h&to=now';
 
   @Input()
@@ -36,13 +36,9 @@ export class GrafanaComponent implements OnInit, OnChanges {
   @Input()
   uid: string;
 
-  docsUrl: string;
-
   constructor(
-    private summaryService: SummaryService,
     private sanitizer: DomSanitizer,
     private settingsService: SettingsService,
-    private cephReleaseNamePipe: CephReleaseNamePipe,
     private i18n: I18n
   ) {
     this.grafanaTimes = [
@@ -83,10 +79,6 @@ export class GrafanaComponent implements OnInit, OnChanges {
         value: 'from=now-1d%2Fd&to=now-1d%2Fd'
       },
       {
-        name: this.i18n('Today'),
-        value: 'from=now%2Fd&to=now%2Fd'
-      },
-      {
         name: this.i18n('Today so far'),
         value: 'from=now%2Fd&to=now'
       },
@@ -107,10 +99,6 @@ export class GrafanaComponent implements OnInit, OnChanges {
         value: 'from=now-1w%2Fw&to=now-1w%2Fw'
       },
       {
-        name: this.i18n('This week'),
-        value: 'from=now%2Fw&to=now%2Fw'
-      },
-      {
         name: this.i18n('This week so far'),
         value: 'from=now%2Fw&to=now'
       },
@@ -121,10 +109,6 @@ export class GrafanaComponent implements OnInit, OnChanges {
       {
         name: this.i18n('Previous month'),
         value: 'from=now-1M%2FM&to=now-1M%2FM'
-      },
-      {
-        name: this.i18n('This month'),
-        value: 'from=now%2FM&to=now%2FM'
       },
       {
         name: this.i18n('This month so far'),
@@ -151,10 +135,6 @@ export class GrafanaComponent implements OnInit, OnChanges {
         value: 'from=now-1y%2Fy&to=now-1y%2Fy'
       },
       {
-        name: this.i18n('This year'),
-        value: 'from=now%2Fy&to=now%2Fy'
-      },
-      {
         name: this.i18n('This year so far'),
         value: 'from=now%2Fy&to=now'
       },
@@ -174,23 +154,10 @@ export class GrafanaComponent implements OnInit, OnChanges {
     this.styles = {
       one: 'grafana_one',
       two: 'grafana_two',
-      three: 'grafana_three'
+      three: 'grafana_three',
+      four: 'grafana_four'
     };
 
-    const subs = this.summaryService.subscribe((summary: any) => {
-      if (!summary) {
-        return;
-      }
-
-      const releaseName = this.cephReleaseNamePipe.transform(summary.version);
-      this.docsUrl =
-        `http://docs.ceph.com/docs/${releaseName}/mgr/dashboard/` +
-        `#enabling-the-embedding-of-grafana-dashboards`;
-
-      setTimeout(() => {
-        subs.unsubscribe();
-      }, 0);
-    });
     this.settingsService.ifSettingConfigured('api/grafana/url', (url) => {
       this.grafanaExist = true;
       this.loading = false;

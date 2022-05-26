@@ -71,4 +71,4 @@ class DashboardPluginManager(object):
 PLUGIN_MANAGER = DashboardPluginManager("ceph-mgr.dashboard")
 
 # Load all interfaces and their hooks
-from . import interfaces
+from . import interfaces  # noqa pylint: disable=C0413,W0406

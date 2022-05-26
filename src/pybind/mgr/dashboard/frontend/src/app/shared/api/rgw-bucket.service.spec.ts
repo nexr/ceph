@@ -26,33 +26,10 @@ describe('RgwBucketService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should call list, with enumerate returning empty', () => {
-    let result;
-    service.list().subscribe((resp) => {
-      result = resp;
-    });
-    const req = httpTesting.expectOne('api/rgw/bucket');
-    req.flush([]);
+  it('should call list', () => {
+    service.list().subscribe();
+    const req = httpTesting.expectOne('api/rgw/bucket?stats=true');
     expect(req.request.method).toBe('GET');
-    expect(result).toEqual([]);
-  });
-
-  it('should call list, with enumerate returning 2 elements', () => {
-    let result;
-    service.list().subscribe((resp) => {
-      result = resp;
-    });
-    let req = httpTesting.expectOne('api/rgw/bucket');
-    req.flush(['foo', 'bar']);
-
-    req = httpTesting.expectOne('api/rgw/bucket/foo');
-    req.flush({ name: 'foo' });
-
-    req = httpTesting.expectOne('api/rgw/bucket/bar');
-    req.flush({ name: 'bar' });
-
-    expect(req.request.method).toBe('GET');
-    expect(result).toEqual([{ name: 'foo' }, { name: 'bar' }]);
   });
 
   it('should call get', () => {
@@ -62,14 +39,22 @@ describe('RgwBucketService', () => {
   });
 
   it('should call create', () => {
-    service.create('foo', 'bar').subscribe();
-    const req = httpTesting.expectOne('api/rgw/bucket?bucket=foo&uid=bar');
+    service
+      .create('foo', 'bar', 'default', 'default-placement', false, 'COMPLIANCE', '10', '0')
+      .subscribe();
+    const req = httpTesting.expectOne(
+      'api/rgw/bucket?bucket=foo&uid=bar&zonegroup=default&placement_target=default-placement&lock_enabled=false&lock_mode=COMPLIANCE&lock_retention_period_days=10&lock_retention_period_years=0'
+    );
     expect(req.request.method).toBe('POST');
   });
 
   it('should call update', () => {
-    service.update('foo', 'bar', 'baz').subscribe();
-    const req = httpTesting.expectOne('api/rgw/bucket/foo?bucket_id=bar&uid=baz');
+    service
+      .update('foo', 'bar', 'baz', 'Enabled', 'Enabled', '1', '223344', 'GOVERNANCE', '0', '1')
+      .subscribe();
+    const req = httpTesting.expectOne(
+      'api/rgw/bucket/foo?bucket_id=bar&uid=baz&versioning_state=Enabled&mfa_delete=Enabled&mfa_token_serial=1&mfa_token_pin=223344&lock_mode=GOVERNANCE&lock_retention_period_days=0&lock_retention_period_years=1'
+    );
     expect(req.request.method).toBe('PUT');
   });
 
@@ -90,7 +75,7 @@ describe('RgwBucketService', () => {
     service.exists('foo').subscribe((resp) => {
       result = resp;
     });
-    const req = httpTesting.expectOne('api/rgw/bucket');
+    const req = httpTesting.expectOne('api/rgw/bucket/foo');
     expect(req.request.method).toBe('GET');
     req.flush(['foo', 'bar']);
     expect(result).toBe(true);

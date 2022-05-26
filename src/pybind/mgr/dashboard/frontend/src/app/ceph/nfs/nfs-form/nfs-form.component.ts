@@ -12,15 +12,15 @@ import { RgwUserService } from '../../../shared/api/rgw-user.service';
 import { SelectMessages } from '../../../shared/components/select/select-messages.model';
 import { SelectOption } from '../../../shared/components/select/select-option.model';
 import { ActionLabelsI18n } from '../../../shared/constants/app.constants';
+import { Icons } from '../../../shared/enum/icons.enum';
 import { CdFormBuilder } from '../../../shared/forms/cd-form-builder';
 import { CdFormGroup } from '../../../shared/forms/cd-form-group';
 import { CdValidators } from '../../../shared/forms/cd-validators';
 import { FinishedTask } from '../../../shared/models/finished-task';
 import { Permission } from '../../../shared/models/permissions';
-import { CephReleaseNamePipe } from '../../../shared/pipes/ceph-release-name.pipe';
 import { AuthStorageService } from '../../../shared/services/auth-storage.service';
-import { SummaryService } from '../../../shared/services/summary.service';
 import { TaskWrapperService } from '../../../shared/services/task-wrapper.service';
+import { NFSClusterType } from '../nfs-cluster-type.enum';
 import { NfsFormClientComponent } from '../nfs-form-client/nfs-form-client.component';
 
 @Component({
@@ -29,22 +29,24 @@ import { NfsFormClientComponent } from '../nfs-form-client/nfs-form-client.compo
   styleUrls: ['./nfs-form.component.scss']
 })
 export class NfsFormComponent implements OnInit {
-  @ViewChild('nfsClients')
+  @ViewChild('nfsClients', { static: true })
   nfsClients: NfsFormClientComponent;
 
   permission: Permission;
   nfsForm: CdFormGroup;
   isEdit = false;
 
-  cluster_id = null;
-  export_id = null;
+  cluster_id: string = null;
+  clusterType: string = null;
+  export_id: string = null;
 
   isNewDirectory = false;
   isNewBucket = false;
   isDefaultCluster = false;
 
-  allClusters: string[] = null;
+  allClusters: { cluster_id: string; cluster_type: string }[] = null;
   allDaemons = {};
+  icons = Icons;
 
   allFsals: any[] = [];
   allRgwUsers: any[] = [];
@@ -57,7 +59,6 @@ export class NfsFormComponent implements OnInit {
 
   action: string;
   resource: string;
-  docsUrl: string;
 
   daemonsSelections: SelectOption[] = [];
   daemonsMessages = new SelectMessages(
@@ -83,8 +84,6 @@ export class NfsFormComponent implements OnInit {
     private router: Router,
     private rgwUserService: RgwUserService,
     private formBuilder: CdFormBuilder,
-    private summaryservice: SummaryService,
-    private cephReleaseNamePipe: CephReleaseNamePipe,
     private taskWrapper: TaskWrapperService,
     private cdRef: ChangeDetectorRef,
     private i18n: I18n,
@@ -96,7 +95,7 @@ export class NfsFormComponent implements OnInit {
   }
 
   ngOnInit() {
-    const promises: any[] = [
+    const promises: Observable<any>[] = [
       this.nfsService.daemon(),
       this.nfsService.fsals(),
       this.nfsService.clients(),
@@ -116,17 +115,14 @@ export class NfsFormComponent implements OnInit {
 
         this.getData(promises);
       });
+      this.nfsForm.get('cluster_id').disable();
     } else {
       this.action = this.actionLabels.CREATE;
       this.getData(promises);
     }
-
-    const summary = this.summaryservice.getCurrentSummary();
-    const releaseName = this.cephReleaseNamePipe.transform(summary.version);
-    this.docsUrl = `http://docs.ceph.com/docs/${releaseName}/radosgw/nfs/`;
   }
 
-  getData(promises) {
+  getData(promises: Observable<any>[]) {
     forkJoin(promises).subscribe((data: any[]) => {
       this.resolveDaemons(data[0]);
       this.resolvefsals(data[1]);
@@ -171,16 +167,16 @@ export class NfsFormComponent implements OnInit {
         })
       }),
       path: new FormControl(''),
-      protocolNfsv3: new FormControl(true, {
+      protocolNfsv3: new FormControl(false, {
         validators: [
-          CdValidators.requiredIf({ protocolNfsv4: false }, (value) => {
+          CdValidators.requiredIf({ protocolNfsv4: false }, (value: boolean) => {
             return !value;
           })
         ]
       }),
       protocolNfsv4: new FormControl(true, {
         validators: [
-          CdValidators.requiredIf({ protocolNfsv3: false }, (value) => {
+          CdValidators.requiredIf({ protocolNfsv3: false }, (value: boolean) => {
             return !value;
           })
         ]
@@ -200,14 +196,14 @@ export class NfsFormComponent implements OnInit {
       }),
       transportUDP: new FormControl(true, {
         validators: [
-          CdValidators.requiredIf({ transportTCP: false }, (value) => {
+          CdValidators.requiredIf({ transportTCP: false }, (value: boolean) => {
             return !value;
           })
         ]
       }),
       transportTCP: new FormControl(true, {
         validators: [
-          CdValidators.requiredIf({ transportUDP: false }, (value) => {
+          CdValidators.requiredIf({ transportUDP: false }, (value: boolean) => {
             return !value;
           })
         ]
@@ -221,16 +217,18 @@ export class NfsFormComponent implements OnInit {
     });
   }
 
-  resolveModel(res) {
+  resolveModel(res: any) {
     if (res.fsal.name === 'CEPH') {
       res.sec_label_xattr = res.fsal.sec_label_xattr;
     }
 
-    this.daemonsSelections = _.map(
-      this.allDaemons[res.cluster_id],
-      (daemon) => new SelectOption(res.daemons.indexOf(daemon) !== -1, daemon, '')
-    );
-    this.daemonsSelections = [...this.daemonsSelections];
+    if (this.clusterType === NFSClusterType.user) {
+      this.daemonsSelections = _.map(
+        this.allDaemons[res.cluster_id],
+        (daemon) => new SelectOption(res.daemons.indexOf(daemon) !== -1, daemon, '')
+      );
+      this.daemonsSelections = [...this.daemonsSelections];
+    }
 
     res.protocolNfsv3 = res.protocols.indexOf(3) !== -1;
     res.protocolNfsv4 = res.protocols.indexOf(4) !== -1;
@@ -240,9 +238,9 @@ export class NfsFormComponent implements OnInit {
     res.transportUDP = res.transports.indexOf('UDP') !== -1;
     delete res.transports;
 
-    res.clients.forEach((client) => {
+    res.clients.forEach((client: any) => {
       let addressStr = '';
-      client.addresses.forEach((address) => {
+      client.addresses.forEach((address: string) => {
         addressStr += address + ', ';
       });
       if (addressStr.length >= 2) {
@@ -256,27 +254,30 @@ export class NfsFormComponent implements OnInit {
     this.nfsClients.resolveModel(res.clients);
   }
 
-  resolveDaemons(daemons) {
+  resolveDaemons(daemons: Record<string, any>) {
     daemons = _.sortBy(daemons, ['daemon_id']);
+    const clusters = _.groupBy(daemons, 'cluster_id');
 
-    this.allClusters = _(daemons)
-      .map((daemon) => daemon.cluster_id)
-      .sortedUniq()
-      .value();
-
-    _.forEach(this.allClusters, (cluster) => {
-      this.allDaemons[cluster] = [];
+    this.allClusters = [];
+    _.forIn(clusters, (cluster, cluster_id) => {
+      this.allClusters.push({ cluster_id: cluster_id, cluster_type: cluster[0].cluster_type });
+      this.allDaemons[cluster_id] = [];
     });
 
     _.forEach(daemons, (daemon) => {
       this.allDaemons[daemon.cluster_id].push(daemon.daemon_id);
     });
 
+    if (this.isEdit) {
+      const cluster = _.find(this.allClusters, { cluster_id: this.cluster_id });
+      this.clusterType = cluster ? cluster.cluster_type : null;
+    }
+
     const hasOneCluster = _.isArray(this.allClusters) && this.allClusters.length === 1;
-    this.isDefaultCluster = hasOneCluster && this.allClusters[0] === '_default_';
+    this.isDefaultCluster = hasOneCluster && this.allClusters[0].cluster_id === '_default_';
     if (hasOneCluster) {
       this.nfsForm.patchValue({
-        cluster_id: this.allClusters[0]
+        cluster_id: this.allClusters[0].cluster_id
       });
       this.onClusterChange();
     }
@@ -292,7 +293,7 @@ export class NfsFormComponent implements OnInit {
         this.allFsals.push(fsalItem);
         if (fsalItem.value === 'RGW') {
           this.rgwUserService.list().subscribe((result: any) => {
-            result.forEach((user) => {
+            result.forEach((user: Record<string, any>) => {
               if (user.suspended === 0 && user.keys.length > 0) {
                 this.allRgwUsers.push(user.user_id);
               }
@@ -309,11 +310,11 @@ export class NfsFormComponent implements OnInit {
     }
   }
 
-  resolveClients(clients) {
+  resolveClients(clients: any[]) {
     this.allCephxClients = clients;
   }
 
-  resolveFilesystems(filesystems) {
+  resolveFilesystems(filesystems: any[]) {
     this.allFsNames = filesystems;
     if (filesystems.length === 1) {
       this.nfsForm.patchValue({
@@ -360,7 +361,7 @@ export class NfsFormComponent implements OnInit {
     });
   }
 
-  getAccessTypeHelp(accessType) {
+  getAccessTypeHelp(accessType: string) {
     const accessTypeItem = this.nfsAccessType.find((currentAccessTypeItem) => {
       if (accessType === currentAccessTypeItem.value) {
         return currentAccessTypeItem;
@@ -379,12 +380,13 @@ export class NfsFormComponent implements OnInit {
     return '';
   }
 
-  getPathTypeahead(path) {
+  getPathTypeahead(path: any) {
     if (!_.isString(path) || path === '/') {
       return of([]);
     }
 
-    return this.nfsService.lsDir(path);
+    const fsName = this.nfsForm.getValue('fsal').fs_name;
+    return this.nfsService.lsDir(fsName, path);
   }
 
   pathChangeHandler() {
@@ -465,15 +467,21 @@ export class NfsFormComponent implements OnInit {
 
   onClusterChange() {
     const cluster_id = this.nfsForm.getValue('cluster_id');
-    this.daemonsSelections = _.map(
-      this.allDaemons[cluster_id],
-      (daemon) => new SelectOption(false, daemon, '')
-    );
-    this.daemonsSelections = [...this.daemonsSelections];
+    const cluster = _.find(this.allClusters, { cluster_id: cluster_id });
+    this.clusterType = cluster ? cluster.cluster_type : null;
+    if (this.clusterType === NFSClusterType.user) {
+      this.daemonsSelections = _.map(
+        this.allDaemons[cluster_id],
+        (daemon) => new SelectOption(false, daemon, '')
+      );
+      this.daemonsSelections = [...this.daemonsSelections];
+    } else {
+      this.daemonsSelections = [];
+    }
     this.nfsForm.patchValue({ daemons: [] });
   }
 
-  removeDaemon(index, daemon) {
+  removeDaemon(index: number, daemon: string) {
     this.daemonsSelections.forEach((value) => {
       if (value.name === daemon) {
         value.selected = false;
@@ -489,6 +497,13 @@ export class NfsFormComponent implements OnInit {
 
   onDaemonSelection() {
     this.nfsForm.get('daemons').setValue(this.nfsForm.getValue('daemons'));
+  }
+
+  onToggleAllDaemonsSelection() {
+    const cluster_id = this.nfsForm.getValue('cluster_id');
+    const daemons =
+      this.nfsForm.getValue('daemons').length === 0 ? this.allDaemons[cluster_id] : [];
+    this.nfsForm.patchValue({ daemons: daemons });
   }
 
   submitAction() {
@@ -564,7 +579,7 @@ export class NfsFormComponent implements OnInit {
     }
     delete requestModel.transportUDP;
 
-    requestModel.clients.forEach((client) => {
+    requestModel.clients.forEach((client: any) => {
       if (_.isString(client.addresses)) {
         client.addresses = _(client.addresses)
           .split(/[ ,]+/)

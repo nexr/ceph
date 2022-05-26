@@ -6,16 +6,19 @@ import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
 import { Subscription } from 'rxjs';
 
 import { NfsService } from '../../../shared/api/nfs.service';
+import { ListWithDetails } from '../../../shared/classes/list-with-details.class';
 import { CriticalConfirmationModalComponent } from '../../../shared/components/critical-confirmation-modal/critical-confirmation-modal.component';
 import { ActionLabelsI18n } from '../../../shared/constants/app.constants';
 import { TableComponent } from '../../../shared/datatable/table/table.component';
 import { CellTemplate } from '../../../shared/enum/cell-template.enum';
+import { Icons } from '../../../shared/enum/icons.enum';
 import { ViewCacheStatus } from '../../../shared/enum/view-cache-status.enum';
 import { CdTableAction } from '../../../shared/models/cd-table-action';
 import { CdTableColumn } from '../../../shared/models/cd-table-column';
 import { CdTableSelection } from '../../../shared/models/cd-table-selection';
 import { FinishedTask } from '../../../shared/models/finished-task';
 import { Permission } from '../../../shared/models/permissions';
+import { Task } from '../../../shared/models/task';
 import { AuthStorageService } from '../../../shared/services/auth-storage.service';
 import { TaskListService } from '../../../shared/services/task-list.service';
 import { TaskWrapperService } from '../../../shared/services/task-wrapper.service';
@@ -26,13 +29,13 @@ import { TaskWrapperService } from '../../../shared/services/task-wrapper.servic
   styleUrls: ['./nfs-list.component.scss'],
   providers: [TaskListService]
 })
-export class NfsListComponent implements OnInit, OnDestroy {
-  @ViewChild('nfsState')
+export class NfsListComponent extends ListWithDetails implements OnInit, OnDestroy {
+  @ViewChild('nfsState', { static: false })
   nfsState: TemplateRef<any>;
-  @ViewChild('nfsFsal')
+  @ViewChild('nfsFsal', { static: true })
   nfsFsal: TemplateRef<any>;
 
-  @ViewChild('table')
+  @ViewChild('table', { static: true })
   table: TableComponent;
 
   columns: CdTableColumn[];
@@ -47,7 +50,7 @@ export class NfsListComponent implements OnInit, OnDestroy {
   modalRef: BsModalRef;
 
   builders = {
-    'nfs/create': (metadata) => {
+    'nfs/create': (metadata: any) => {
       return {
         path: metadata['path'],
         cluster_id: metadata['cluster_id'],
@@ -65,6 +68,7 @@ export class NfsListComponent implements OnInit, OnDestroy {
     private taskWrapper: TaskWrapperService,
     public actionLabels: ActionLabelsI18n
   ) {
+    super();
     this.permission = this.authStorageService.getPermissions().nfs;
     const getNfsUri = () =>
       this.selection.first() &&
@@ -74,7 +78,7 @@ export class NfsListComponent implements OnInit, OnDestroy {
 
     const createAction: CdTableAction = {
       permission: 'create',
-      icon: 'fa-plus',
+      icon: Icons.add,
       routerLink: () => '/nfs/create',
       canBePrimary: (selection: CdTableSelection) => !selection.hasSingleSelection,
       name: this.actionLabels.CREATE
@@ -82,14 +86,14 @@ export class NfsListComponent implements OnInit, OnDestroy {
 
     const editAction: CdTableAction = {
       permission: 'update',
-      icon: 'fa-pencil',
+      icon: Icons.edit,
       routerLink: () => `/nfs/edit/${getNfsUri()}`,
       name: this.actionLabels.EDIT
     };
 
     const deleteAction: CdTableAction = {
       permission: 'delete',
-      icon: 'fa-times',
+      icon: Icons.destroy,
       click: () => this.deleteNfsModal(),
       name: this.actionLabels.DELETE
     };
@@ -169,8 +173,8 @@ export class NfsListComponent implements OnInit, OnDestroy {
   }
 
   prepareResponse(resp: any): any[] {
-    let result = [];
-    resp.forEach((nfs) => {
+    let result: any[] = [];
+    resp.forEach((nfs: any) => {
       nfs.id = `${nfs.cluster_id}:${nfs.export_id}`;
       nfs.state = 'LOADING';
       result = result.concat(nfs);
@@ -184,14 +188,14 @@ export class NfsListComponent implements OnInit, OnDestroy {
     this.viewCacheStatus = { status: ViewCacheStatus.ValueException };
   }
 
-  itemFilter(entry, task) {
+  itemFilter(entry: any, task: Task) {
     return (
       entry.cluster_id === task.metadata['cluster_id'] &&
       entry.export_id === task.metadata['export_id']
     );
   }
 
-  taskFilter(task) {
+  taskFilter(task: Task) {
     return ['nfs/create', 'nfs/delete', 'nfs/edit'].includes(task.name);
   }
 

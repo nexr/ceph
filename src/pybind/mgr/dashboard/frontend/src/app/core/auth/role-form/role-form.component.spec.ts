@@ -24,27 +24,24 @@ describe('RoleFormComponent', () => {
   let httpTesting: HttpTestingController;
   let roleService: RoleService;
   let router: Router;
-  const setUrl = (url) => Object.defineProperty(router, 'url', { value: url });
+  const setUrl = (url: string) => Object.defineProperty(router, 'url', { value: url });
 
   @Component({ selector: 'cd-fake', template: '' })
   class FakeComponent {}
 
   const routes: Routes = [{ path: 'roles', component: FakeComponent }];
 
-  configureTestBed(
-    {
-      imports: [
-        RouterTestingModule.withRoutes(routes),
-        HttpClientTestingModule,
-        ReactiveFormsModule,
-        ToastrModule.forRoot(),
-        SharedModule
-      ],
-      declarations: [RoleFormComponent, FakeComponent],
-      providers: i18nProviders
-    },
-    true
-  );
+  configureTestBed({
+    imports: [
+      RouterTestingModule.withRoutes(routes),
+      HttpClientTestingModule,
+      ReactiveFormsModule,
+      ToastrModule.forRoot(),
+      SharedModule
+    ],
+    declarations: [RoleFormComponent, FakeComponent],
+    providers: i18nProviders
+  });
 
   beforeEach(() => {
     fixture = TestBed.createComponent(RoleFormComponent);

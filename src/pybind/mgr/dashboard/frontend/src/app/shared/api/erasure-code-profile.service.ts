@@ -14,7 +14,7 @@ export class ErasureCodeProfileService {
   apiPath = 'api/erasure_code_profile';
 
   formTooltips = {
-    // Copied from /srv/cephmgr/ceph-dev/doc/rados/operations/erasure-code.*.rst
+    // Copied from /doc/rados/operations/erasure-code.*.rst
     k: this.i18n(`Each object is split in data-chunks parts, each stored on a different OSD.`),
 
     m: this.i18n(`Compute coding chunks for each object and store them on different OSDs.
@@ -29,7 +29,7 @@ export class ErasureCodeProfileService {
           carefully. All of reed_sol_r6_op, liberation, blaum_roth, liber8tion are RAID6 equivalents
           in the sense that they can only be configured with m=2.`),
         packetSize: this.i18n(`The encoding will be done on packets of bytes size at a time.
-          Chosing the right packet size is difficult.
+          Choosing the right packet size is difficult.
           The jerasure documentation contains extensive information on this topic.`)
       },
       lrc: {
@@ -63,6 +63,21 @@ export class ErasureCodeProfileService {
         c: this.i18n(`The number of parity chunks each of which includes each data chunk in its
           calculation range. The number is used as a durability estimator. For instance, if c=2,
           2 OSDs can be down without losing data.`)
+      },
+      clay: {
+        description: this.i18n(`CLAY (short for coupled-layer) codes are erasure codes designed to
+          bring about significant savings in terms of network bandwidth and disk IO when a failed
+          node/OSD/rack is being repaired.`),
+        d: this.i18n(`Number of OSDs requested to send data during recovery of a single chunk.
+          d needs to be chosen such that k+1 <= d <= k+m-1. The larger the d, the better
+          the savings.`),
+        scalar_mds: this.i18n(`scalar_mds specifies the plugin that is used as a building block
+          in the layered construction. It can be one of jerasure, isa, shec.`),
+        technique: this.i18n(`technique specifies the technique that will be picked
+          within the 'scalar_mds' plugin specified. Supported techniques
+          are 'reed_sol_van', 'reed_sol_r6_op', 'cauchy_orig',
+          'cauchy_good', 'liber8tion' for jerasure, 'reed_sol_van',
+          'cauchy' for isa and 'single', 'multiple' for shec.`)
       }
     },
 
@@ -89,19 +104,11 @@ export class ErasureCodeProfileService {
     return this.http.post(this.apiPath, ecp, { observe: 'response' });
   }
 
-  update(ecp: ErasureCodeProfile) {
-    return this.http.put(`${this.apiPath}/${ecp.name}`, ecp, { observe: 'response' });
-  }
-
   delete(name: string) {
     return this.http.delete(`${this.apiPath}/${name}`, { observe: 'response' });
   }
 
-  get(name: string) {
-    return this.http.get(`${this.apiPath}/${name}`);
-  }
-
   getInfo() {
-    return this.http.get(`${this.apiPath}/_info`);
+    return this.http.get(`ui-${this.apiPath}/info`);
   }
 }

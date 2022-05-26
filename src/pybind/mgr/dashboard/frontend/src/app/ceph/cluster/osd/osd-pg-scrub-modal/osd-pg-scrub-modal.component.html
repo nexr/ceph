@@ -3,10 +3,10 @@
                 class="modal-title">{{ action | titlecase }} {{ resource | upperFirst }}</ng-container>
 
   <ng-container class="modal-content">
-    <form class="form-horizontal"
-          #formDir="ngForm"
+    <form #formDir="ngForm"
           [formGroup]="osdPgScrubForm"
-          novalidate>
+          novalidate
+          cdFormScope="osd">
       <div class="modal-body osd-modal">
         <!-- Basic -->
         <cd-config-option [optionNames]="basicOptions"
@@ -24,8 +24,8 @@
           </div>
         </div>
         <div *ngIf="advancedEnabled">
-          <h2 class="page-header"
-              i18n>Advanced configuration options</h2>
+          <h3 class="page-header"
+              i18n>Advanced configuration options</h3>
           <cd-config-option [optionNames]="advancedOptions"
                             [optionsForm]="osdPgScrubForm"
                             [optionsFormDir]="formDir"
@@ -37,9 +37,8 @@
         <div class="button-group text-right">
           <cd-submit-button *ngIf="permissions.configOpt.update"
                             (submitAction)="submitAction()"
-                            [form]="osdPgScrubForm"
                             i18n="form action button|Example: Create Pool@@formActionButton"
-                            type="button">{{ action | titlecase }} {{ resource | upperFirst }}</cd-submit-button>
+                            [form]="osdPgScrubForm">{{ action | titlecase }} {{ resource | upperFirst }}</cd-submit-button>
           <cd-back-button [back]="bsModalRef.hide">
           </cd-back-button>
         </div>

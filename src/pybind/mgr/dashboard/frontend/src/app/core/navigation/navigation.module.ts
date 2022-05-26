@@ -6,6 +6,7 @@ import { CollapseModule } from 'ngx-bootstrap/collapse';
 import { BsDropdownModule } from 'ngx-bootstrap/dropdown';
 import { PopoverModule } from 'ngx-bootstrap/popover';
 import { TooltipModule } from 'ngx-bootstrap/tooltip';
+import { SimplebarAngularModule } from 'simplebar-angular';
 
 import { AppRoutingModule } from '../../app-routing.module';
 import { SharedModule } from '../../shared/shared.module';
@@ -17,7 +18,6 @@ import { DashboardHelpComponent } from './dashboard-help/dashboard-help.componen
 import { IdentityComponent } from './identity/identity.component';
 import { NavigationComponent } from './navigation/navigation.component';
 import { NotificationsComponent } from './notifications/notifications.component';
-import { TaskManagerComponent } from './task-manager/task-manager.component';
 
 @NgModule({
   entryComponents: [AboutComponent],
@@ -30,6 +30,7 @@ import { TaskManagerComponent } from './task-manager/task-manager.component';
     TooltipModule.forRoot(),
     AppRoutingModule,
     SharedModule,
+    SimplebarAngularModule,
     RouterModule
   ],
   declarations: [
@@ -37,7 +38,6 @@ import { TaskManagerComponent } from './task-manager/task-manager.component';
     BreadcrumbsComponent,
     NavigationComponent,
     NotificationsComponent,
-    TaskManagerComponent,
     DashboardHelpComponent,
     AdministrationComponent,
     IdentityComponent

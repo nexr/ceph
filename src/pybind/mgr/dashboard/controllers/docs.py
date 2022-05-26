@@ -1,12 +1,17 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
+from typing import Any, Dict, Union
 
+import logging
 import cherrypy
 
 from . import Controller, BaseController, Endpoint, ENDPOINT_MAP
-from .. import logger, mgr
+from .. import mgr
 
 from ..tools import str_to_bool
+
+
+logger = logging.getLogger('controllers.docs')
 
 
 @Controller('/docs', secure=False)
@@ -27,7 +32,7 @@ class Docs(BaseController):
                 if endpoint.is_api or all_endpoints:
                     list_of_ctrl.add(endpoint.ctrl)
 
-        TAG_MAP = {}
+        tag_map: Dict[str, str] = {}
         for ctrl in list_of_ctrl:
             tag_name = ctrl.__name__
             tag_descr = ""
@@ -35,11 +40,11 @@ class Docs(BaseController):
                 if ctrl.doc_info['tag']:
                     tag_name = ctrl.doc_info['tag']
                 tag_descr = ctrl.doc_info['tag_descr']
-            if tag_name not in TAG_MAP or not TAG_MAP[tag_name]:
-                TAG_MAP[tag_name] = tag_descr
+            if tag_name not in tag_map or not tag_map[tag_name]:
+                tag_map[tag_name] = tag_descr
 
         tags = [{'name': k, 'description': v if v else "*No description available*"}
-                for k, v in TAG_MAP.items()]
+                for k, v in tag_map.items()]
         tags.sort(key=lambda e: e['name'])
         return tags
 
@@ -179,7 +184,7 @@ class Docs(BaseController):
 
     @classmethod
     def _gen_responses(cls, method, resp_object=None):
-        resp = {
+        resp: Dict[str, Dict[str, Union[str, Any]]] = {
             '400': {
                 "description": "Operation exception. Please check the "
                                "response body for details."
@@ -248,8 +253,8 @@ class Docs(BaseController):
         return parameters
 
     @classmethod
-    def _gen_paths(cls, all_endpoints, baseUrl):
-        METHOD_ORDER = ['get', 'post', 'put', 'delete']
+    def _gen_paths(cls, all_endpoints):
+        method_order = ['get', 'post', 'put', 'delete']
         paths = {}
         for path, endpoints in sorted(list(ENDPOINT_MAP.items()),
                                       key=lambda p: p[0]):
@@ -257,7 +262,7 @@ class Docs(BaseController):
             skip = False
 
             endpoint_list = sorted(endpoints, key=lambda e:
-                                   METHOD_ORDER.index(e.method.lower()))
+                                   method_order.index(e.method.lower()))
             for endpoint in endpoint_list:
                 if not endpoint.is_api and not all_endpoints:
                     skip = True
@@ -304,7 +309,7 @@ class Docs(BaseController):
                     methods[method.lower()]['security'] = [{'jwt': []}]
 
             if not skip:
-                paths[path[len(baseUrl):]] = methods
+                paths[path] = methods
 
         return paths
 
@@ -314,9 +319,9 @@ class Docs(BaseController):
 
         host = cherrypy.request.base
         host = host[host.index(':')+3:]
-        logger.debug("DOCS: Host: %s", host)
+        logger.debug("Host: %s", host)
 
-        paths = self._gen_paths(all_endpoints, base_url)
+        paths = self._gen_paths(all_endpoints)
 
         if not base_url:
             base_url = "/"
@@ -359,33 +364,18 @@ class Docs(BaseController):
 
     @Endpoint(path="api.json")
     def api_json(self):
-        return self._gen_spec(False, "/api")
+        return self._gen_spec(False, "/")
 
     @Endpoint(path="api-all.json")
     def api_all_json(self):
-        return self._gen_spec(True, "/api")
+        return self._gen_spec(True, "/")
 
-    def _swagger_ui_page(self, all_endpoints=False, token=None):
+    def _swagger_ui_page(self, all_endpoints=False):
         base = cherrypy.request.base
         if all_endpoints:
             spec_url = "{}/docs/api-all.json".format(base)
         else:
             spec_url = "{}/docs/api.json".format(base)
-
-        auth_header = cherrypy.request.headers.get('authorization')
-        jwt_token = ""
-        if auth_header is not None:
-            scheme, params = auth_header.split(' ', 1)
-            if scheme.lower() == 'bearer':
-                jwt_token = params
-        else:
-            if token is not None:
-                jwt_token = token
-
-        api_key_callback = """, onComplete: () => {{
-                        ui.preauthorizeApiKey('jwt', '{}');
-                    }}
-        """.format(jwt_token)
 
         page = """
         <!DOCTYPE html>
@@ -427,22 +417,16 @@ class Docs(BaseController):
                         SwaggerUIBundle.presets.apis
                     ],
                     layout: "BaseLayout"
-                    {}
                 }})
                 window.ui = ui
             }}
         </script>
         </body>
         </html>
-        """.format(spec_url, api_key_callback)
+        """.format(spec_url)
 
         return page
 
     @Endpoint(json_response=False)
     def __call__(self, all_endpoints=False):
         return self._swagger_ui_page(all_endpoints)
-
-    @Endpoint('POST', path="/", json_response=False,
-              query_params="{all_endpoints}")
-    def _with_token(self, token, all_endpoints=False):
-        return self._swagger_ui_page(all_endpoints, token)
