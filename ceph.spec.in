@@ -93,7 +93,7 @@
 %{!?_udevrulesdir: %global _udevrulesdir /lib/udev/rules.d}
 %{!?tmpfiles_create: %global tmpfiles_create systemd-tmpfiles --create}
 %{!?python3_pkgversion: %global python3_pkgversion 3}
-%{!?python3_version_nodots: %global python3_version_nodots 3}
+%{!?python3_version_nodots: %global python3_version_nodots 36}
 %{!?python3_version: %global python3_version 3}
 # define _python_buildid macro which will expand to the empty string when
 # building with python2
@@ -573,11 +573,14 @@ BuildArch:      noarch
 Group:          System/Filesystems
 %endif
 Requires:       ceph-mgr = %{_epoch_prefix}%{version}-%{release}
-Requires:       python%{python3_pkgversion}-numpy
-Requires:       python3-scipy
 %if 0%{?rhel} == 7
+Requires:	      python%{python3_version_nodots}-numpy
+Requires:	      python%{python3_version_nodots}-scipy
 Requires:       numpy
 Requires:       scipy
+%else
+Requires:       python%{python3_pkgversion}-numpy
+Requires:       python3-scipy
 %endif
 %description mgr-diskprediction-local
 ceph-mgr-diskprediction-local is a ceph-mgr module that tries to predict
