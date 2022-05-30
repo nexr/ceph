@@ -28,6 +28,7 @@ enum class ceph_release_t : std::uint8_t {
   nautilus,
   apex,
   octopus,
+  belfry,
   max,
 };
 
