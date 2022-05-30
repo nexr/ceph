@@ -59,6 +59,13 @@
 %global _fillupdir /var/adm/fillup-templates
 %endif
 %endif
+%if 0%{?fedora} >= 29 || 0%{?suse_version} >= 1500 || 0%{?rhel} >= 8
+# distros that need a py3 Ceph build
+%bcond_with python2
+%else
+# distros that need a py2 Ceph build
+%bcond_without python2
+%endif
 %bcond_with seastar
 %if 0%{?fedora} || 0%{?suse_version} >= 1500
 # distros that ship cmd2 and/or colorama
@@ -66,6 +73,9 @@
 %else
 # distros that do _not_ ship cmd2/colorama
 %bcond_with cephfs_shell
+%endif
+%if 0%{without python2}
+%global _defined_if_python2_absent 1
 %endif
 %if 0%{?fedora} || 0%{?suse_version} || 0%{?rhel} >= 8
 %global weak_deps 1
@@ -85,6 +95,9 @@
 %{!?python3_pkgversion: %global python3_pkgversion 3}
 %{!?python3_version_nodots: %global python3_version_nodots 3}
 %{!?python3_version: %global python3_version 3}
+# define _python_buildid macro which will expand to the empty string when
+# building with python2
+%global _python_buildid %{?_defined_if_python2_absent:%{python3_pkgversion}}
 %if 0%{?rhel} == 7
 %define __python %{__python3}
 %endif
@@ -526,12 +539,11 @@ Group:          System/Filesystems
 %endif
 Requires:       ceph-mgr = %{_epoch_prefix}%{version}-%{release}
 Requires:       ceph-grafana-dashboards = %{_epoch_prefix}%{version}-%{release}
-Requires:       ceph-prometheus-alerts = %{_epoch_prefix}%{version}-%{release}
 %if 0%{?fedora} || 0%{?rhel}
-Requires:       python%{python3_pkgversion}-cherrypy
-Requires:       python%{python3_pkgversion}-jwt
-Requires:       python%{python3_pkgversion}-routes
-Requires:       python%{python3_pkgversion}-werkzeug
+Requires:       python-cherrypy
+Requires:       python-jwt
+Requires:       python-routes
+Requires:       python-werkzeug
 %if 0%{?weak_deps}
 Recommends:     python%{python3_pkgversion}-saml
 %endif
@@ -542,6 +554,11 @@ Requires:       python%{python3_pkgversion}-PyJWT
 Requires:       python%{python3_pkgversion}-Routes
 Requires:       python%{python3_pkgversion}-Werkzeug
 Recommends:     python%{python3_pkgversion}-python3-saml
+%endif
+%if 0%{?rhel} == 7
+Requires:       pyOpenSSL
+%else
+Requires:       python%{_python_buildid}-pyOpenSSL
 %endif
 %description mgr-dashboard
 ceph-mgr-dashboard is a manager module, providing a web-based application
