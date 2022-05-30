@@ -78,6 +78,8 @@ const char *ceph_release_name(int r)
 	switch (r) {
 	case CEPH_RELEASE_APEX:
 		return "apex";
+	case CEPH_RELEASE_BELFRY:
+		return "belfry";
 	case CEPH_RELEASE_ARGONAUT:
 		return "argonaut";
 	case CEPH_RELEASE_BOBTAIL:

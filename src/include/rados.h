@@ -202,7 +202,8 @@ extern const char *ceph_osd_state_name(int s);
 #define CEPH_RELEASE_NAUTILUS   14
 #define CEPH_RELEASE_APEX       15
 #define CEPH_RELEASE_OCTOPUS    16
-#define CEPH_RELEASE_MAX        17  /* highest + 1 */
+#define CEPH_RELEASE_BELFRY     17
+#define CEPH_RELEASE_MAX        18  /* highest + 1 */
 
 
 /*
