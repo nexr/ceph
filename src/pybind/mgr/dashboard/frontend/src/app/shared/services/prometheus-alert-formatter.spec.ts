@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 
 import { ToastrModule } from 'ngx-toastr';
 
+import { HttpClientTestingModule } from '@angular/common/http/testing';
 import {
   configureTestBed,
   i18nProviders,
@@ -20,7 +21,7 @@ describe('PrometheusAlertFormatter', () => {
   let prometheus: PrometheusHelper;
 
   configureTestBed({
-    imports: [ToastrModule.forRoot(), SharedModule],
+    imports: [ToastrModule.forRoot(), SharedModule, HttpClientTestingModule],
     providers: [PrometheusAlertFormatter, i18nProviders]
   });
 
@@ -54,7 +55,7 @@ describe('PrometheusAlertFormatter', () => {
         {
           status: 'active',
           name: 'Something',
-          summary: 'Something is active',
+          description: 'Something is active',
           url: 'http://Something',
           fingerprint: 'Something'
         } as PrometheusCustomAlert
@@ -69,7 +70,7 @@ describe('PrometheusAlertFormatter', () => {
           fingerprint: false,
           status: 'active',
           name: 'Something',
-          summary: 'Something is firing',
+          description: 'Something is firing',
           url: 'http://Something'
         } as PrometheusCustomAlert
       ]);
@@ -80,7 +81,7 @@ describe('PrometheusAlertFormatter', () => {
     const alert: PrometheusCustomAlert = {
       status: 'active',
       name: 'Some alert',
-      summary: 'Some alert is active',
+      description: 'Some alert is active',
       url: 'http://some-alert',
       fingerprint: '42'
     };

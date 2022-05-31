@@ -1,18 +1,33 @@
 # -*- coding: utf-8 -*-
 from __future__ import absolute_import
+import json
+import logging
+import time
 
+from ceph.deployment.drive_group import DriveGroupSpec, DriveGroupValidationError
 from mgr_util import get_most_recent_rate
 
-from . import ApiController, RESTController, UpdatePermission
-from .. import mgr, logger
+from . import ApiController, RESTController, Endpoint, Task, allow_empty_body
+from . import CreatePermission, ReadPermission, UpdatePermission, DeletePermission
+from .orchestrator import raise_if_no_orchestrator
+from .. import mgr
+from ..exceptions import DashboardException
 from ..security import Scope
 from ..services.ceph_service import CephService, SendCommandError
-from ..services.exception import handle_send_command_error
+from ..services.exception import handle_send_command_error, handle_orchestrator_error
+from ..services.orchestrator import OrchClient
 from ..tools import str_to_bool
 try:
-    from typing import Dict, List, Any, Union  # pylint: disable=unused-import
-except ImportError:
+    from typing import Dict, List, Any, Union  # noqa: F401 pylint: disable=unused-import
+except ImportError:  # pragma: no cover
     pass  # For typing only
+
+
+logger = logging.getLogger('controllers.osd')
+
+
+def osd_task(name, metadata, wait_for=2.0):
+    return Task("osd/{}".format(name), metadata, wait_for)
 
 
 @ApiController('/osd', Scope.OSD)
@@ -43,7 +58,7 @@ class Osd(RESTController):
             osd['stats_history'] = {}
             osd_spec = str(osd_id)
             if 'osd' not in osd:
-                continue
+                continue  # pragma: no cover - simple early continue
             for stat in ['osd.op_w', 'osd.op_in_bytes', 'osd.op_r', 'osd.op_out_bytes']:
                 prop = stat.split('.')[1]
                 rates = CephService.get_rates('osd', osd_spec, stat)
@@ -57,31 +72,44 @@ class Osd(RESTController):
 
     @staticmethod
     def get_osd_map(svc_id=None):
-        # type: (Union[int, None]) -> Dict[int, Union[Dict[str, Any], Any]]
+        # type: (Union[int, None]) -> Dict[int, Union[dict, Any]]
         def add_id(osd):
             osd['id'] = osd['osd']
             return osd
+
         resp = {
             osd['osd']: add_id(osd)
             for osd in mgr.get('osd_map')['osds'] if svc_id is None or osd['osd'] == int(svc_id)
         }
         return resp if svc_id is None else resp[int(svc_id)]
 
+    @staticmethod
+    def _get_smart_data(osd_id):
+        # type: (str) -> dict
+        """Returns S.M.A.R.T data for the given OSD ID."""
+        logger.debug('[SMART] retrieving data from OSD with ID %s', osd_id)
+        return CephService.get_smart_data_by_daemon('osd', osd_id)
+
+    @RESTController.Resource('GET')
+    def smart(self, svc_id):
+        # type: (str) -> dict
+        return self._get_smart_data(svc_id)
+
     @handle_send_command_error('osd')
     def get(self, svc_id):
         """
         Returns collected data about an OSD.
 
-        :return: Returns the requested data. The `histogram` key man contain a
-                 string with an error that occurred when the OSD is down.
+        :return: Returns the requested data. The `histogram` key may contain a
+                 string with an error that occurred if the OSD is down.
         """
         try:
-            histogram = CephService.send_command('osd', srv_spec=svc_id,
-                                                 prefix='perf histogram dump')
-        except SendCommandError as e:
-            if 'osd down' in str(e):
+            histogram = CephService.send_command(
+                'osd', srv_spec=svc_id, prefix='perf histogram dump')
+        except SendCommandError as e:  # pragma: no cover - the handling is too obvious
+            if 'osd down' in str(e):  # pragma: no cover - no complexity there
                 histogram = str(e)
-            else:
+            else:  # pragma: no cover - no complexity there
                 raise
 
         return {
@@ -90,25 +118,117 @@ class Osd(RESTController):
             'histogram': histogram,
         }
 
+    @RESTController.Resource('GET')
+    @handle_send_command_error('osd')
+    def histogram(self, svc_id):
+        # type: (int) -> Dict[str, Any]
+        """
+        :return: Returns the histogram data.
+        """
+        try:
+            histogram = CephService.send_command(
+                'osd', srv_spec=svc_id, prefix='perf histogram dump')
+        except SendCommandError as e:  # pragma: no cover - the handling is too obvious
+            raise DashboardException(
+                component='osd', http_status_code=400, msg=str(e))
+
+        return histogram
+
+    def set(self, svc_id, device_class):  # pragma: no cover
+        old_device_class = CephService.send_command('mon', 'osd crush get-device-class',
+                                                    ids=[svc_id])
+        old_device_class = old_device_class[0]['device_class']
+        if old_device_class != device_class:
+            CephService.send_command('mon', 'osd crush rm-device-class',
+                                     ids=[svc_id])
+            if device_class:
+                CephService.send_command('mon', 'osd crush set-device-class', **{
+                    'class': device_class,
+                    'ids': [svc_id]
+                })
+
+    def _check_delete(self, osd_ids):
+        # type: (List[str]) -> Dict[str, Any]
+        """
+        Check if it's safe to remove OSD(s).
+
+        :param osd_ids: list of OSD IDs
+        :return: a dictionary contains the following attributes:
+            `safe`: bool, indicate if it's safe to remove OSDs.
+            `message`: str, help message if it's not safe to remove OSDs.
+        """
+        _ = osd_ids
+        health_data = mgr.get('health')  # type: ignore
+        health = json.loads(health_data['json'])
+        checks = health['checks'].keys()
+        unsafe_checks = set(['OSD_FULL', 'OSD_BACKFILLFULL', 'OSD_NEARFULL'])
+        failed_checks = checks & unsafe_checks
+        msg = 'Removing OSD(s) is not recommended because of these failed health check(s): {}.'.\
+            format(', '.join(failed_checks)) if failed_checks else ''
+        return {
+            'safe': not bool(failed_checks),
+            'message': msg
+        }
+
+    @DeletePermission
+    @raise_if_no_orchestrator
+    @handle_orchestrator_error('osd')
+    @osd_task('delete', {'svc_id': '{svc_id}'})
+    def delete(self, svc_id, preserve_id=None, force=None):  # pragma: no cover
+        replace = False
+        check = False
+        try:
+            if preserve_id is not None:
+                replace = str_to_bool(preserve_id)
+            if force is not None:
+                check = not str_to_bool(force)
+        except ValueError:
+            raise DashboardException(
+                component='osd', http_status_code=400, msg='Invalid parameter(s)')
+
+        orch = OrchClient.instance()
+        if check:
+            logger.info('Check for removing osd.%s...', svc_id)
+            check = self._check_delete([svc_id])
+            if not check['safe']:
+                logger.error('Unable to remove osd.%s: %s', svc_id, check['message'])
+                raise DashboardException(component='osd', msg=check['message'])
+
+        logger.info('Start removing osd.%s (replace: %s)...', svc_id, replace)
+        orch.osds.remove([svc_id], replace)
+        while True:
+            removal_osds = orch.osds.removing_status()
+            logger.info('Current removing OSDs %s', removal_osds)
+            pending = [osd for osd in removal_osds if osd.osd_id == svc_id]
+            if not pending:
+                break
+            logger.info('Wait until osd.%s is removed...', svc_id)
+            time.sleep(60)
+
     @RESTController.Resource('POST', query_params=['deep'])
     @UpdatePermission
+    @allow_empty_body
     def scrub(self, svc_id, deep=False):
         api_scrub = "osd deep-scrub" if str_to_bool(deep) else "osd scrub"
         CephService.send_command("mon", api_scrub, who=svc_id)
 
     @RESTController.Resource('POST')
+    @allow_empty_body
     def mark_out(self, svc_id):
         CephService.send_command('mon', 'osd out', ids=[svc_id])
 
     @RESTController.Resource('POST')
+    @allow_empty_body
     def mark_in(self, svc_id):
         CephService.send_command('mon', 'osd in', ids=[svc_id])
 
     @RESTController.Resource('POST')
+    @allow_empty_body
     def mark_down(self, svc_id):
         CephService.send_command('mon', 'osd down', ids=[svc_id])
 
     @RESTController.Resource('POST')
+    @allow_empty_body
     def reweight(self, svc_id, weight):
         """
         Reweights the OSD temporarily.
@@ -130,6 +250,7 @@ class Osd(RESTController):
             weight=float(weight))
 
     @RESTController.Resource('POST')
+    @allow_empty_body
     def mark_lost(self, svc_id):
         """
         Note: osd must be marked `down` before marking lost.
@@ -140,21 +261,50 @@ class Osd(RESTController):
             id=int(svc_id),
             yes_i_really_mean_it=True)
 
-    def create(self, uuid=None, svc_id=None):
+    def _create_bare(self, data):
+        """Create a OSD container that has no associated device.
+
+        :param data: contain attributes to create a bare OSD.
+        :    `uuid`: will be set automatically if the OSD starts up
+        :    `svc_id`: the ID is only used if a valid uuid is given.
         """
-        :param uuid: Will be set automatically if the OSD starts up.
-        :param id: The ID is only used if a valid uuid is given.
-        :return:
-        """
+        try:
+            uuid = data['uuid']
+            svc_id = int(data['svc_id'])
+        except (KeyError, ValueError) as e:
+            raise DashboardException(e, component='osd', http_status_code=400)
+
         result = CephService.send_command(
-            'mon', 'osd create', id=int(svc_id), uuid=uuid)
+            'mon', 'osd create', id=svc_id, uuid=uuid)
         return {
             'result': result,
-            'svc_id': int(svc_id),
+            'svc_id': svc_id,
             'uuid': uuid,
         }
 
+    @raise_if_no_orchestrator
+    @handle_orchestrator_error('osd')
+    def _create_with_drive_groups(self, drive_groups):
+        """Create OSDs with DriveGroups."""
+        orch = OrchClient.instance()
+        try:
+            dg_specs = [DriveGroupSpec.from_json(dg) for dg in drive_groups]
+            orch.osds.create(dg_specs)
+        except (ValueError, TypeError, DriveGroupValidationError) as e:
+            raise DashboardException(e, component='osd')
+
+    @CreatePermission
+    @osd_task('create', {'tracking_id': '{tracking_id}'})
+    def create(self, method, data, tracking_id):  # pylint: disable=unused-argument
+        if method == 'bare':
+            return self._create_bare(data)
+        if method == 'drive_groups':
+            return self._create_with_drive_groups(data)
+        raise DashboardException(
+            component='osd', http_status_code=400, msg='Unknown method: {}'.format(method))
+
     @RESTController.Resource('POST')
+    @allow_empty_body
     def purge(self, svc_id):
         """
         Note: osd must be marked `down` before removal.
@@ -163,6 +313,7 @@ class Osd(RESTController):
                                  yes_i_really_mean_it=True)
 
     @RESTController.Resource('POST')
+    @allow_empty_body
     def destroy(self, svc_id):
         """
         Mark osd as being destroyed. Keeps the ID intact (allowing reuse), but
@@ -174,18 +325,23 @@ class Osd(RESTController):
         CephService.send_command(
             'mon', 'osd destroy-actual', id=int(svc_id), yes_i_really_mean_it=True)
 
-    @RESTController.Resource('GET')
-    def safe_to_destroy(self, svc_id):
+    @Endpoint('GET', query_params=['ids'])
+    @ReadPermission
+    def safe_to_destroy(self, ids):
         """
-        :type svc_id: int|[int]
+        :type ids: int|[int]
         """
-        if not isinstance(svc_id, list):
-            svc_id = [svc_id]
-        svc_id = list(map(str, svc_id))
+
+        ids = json.loads(ids)
+        if isinstance(ids, list):
+            ids = list(map(str, ids))
+        else:
+            ids = [str(ids)]
+
         try:
             result = CephService.send_command(
-                'mon', 'osd safe-to-destroy', ids=svc_id, target=('mgr', ''))
-            result['is_safe_to_destroy'] = set(result['safe_to_destroy']) == set(map(int, svc_id))
+                'mon', 'osd safe-to-destroy', ids=ids, target=('mgr', ''))
+            result['is_safe_to_destroy'] = set(result['safe_to_destroy']) == set(map(int, ids))
             return result
 
         except SendCommandError as e:
@@ -193,6 +349,25 @@ class Osd(RESTController):
                 'message': str(e),
                 'is_safe_to_destroy': False,
             }
+
+    @Endpoint('GET', query_params=['svc_ids'])
+    @ReadPermission
+    @raise_if_no_orchestrator
+    @handle_orchestrator_error('osd')
+    def safe_to_delete(self, svc_ids):
+        """
+        :type ids: int|[int]
+        """
+        check = self._check_delete(svc_ids)
+        return {
+            'is_safe_to_delete': check.get('safe', False),
+            'message': check.get('message', '')
+        }
+
+    @RESTController.Resource('GET')
+    def devices(self, svc_id):
+        # (str) -> dict
+        return CephService.send_command('mon', 'device ls-by-daemon', who='osd.{}'.format(svc_id))
 
 
 @ApiController('/osd/flags', Scope.OSD)
@@ -209,6 +384,17 @@ class OsdFlagsController(RESTController):
                 set(enabled_flags) - {'pauserd', 'pausewr'} | {'pause'})
         return sorted(enabled_flags)
 
+    @staticmethod
+    def _update_flags(action, flags, ids=None):
+        if ids:
+            if flags:
+                ids = list(map(str, ids))
+                CephService.send_command('mon', 'osd ' + action, who=ids,
+                                         flags=','.join(flags))
+        else:
+            for flag in flags:
+                CephService.send_command('mon', 'osd ' + action, '', key=flag)
+
     def list(self):
         return self._osd_flags()
 
@@ -224,10 +410,56 @@ class OsdFlagsController(RESTController):
         data = set(flags)
         added = data - enabled_flags
         removed = enabled_flags - data
-        for flag in added:
-            CephService.send_command('mon', 'osd set', '', key=flag)
-        for flag in removed:
-            CephService.send_command('mon', 'osd unset', '', key=flag)
+
+        self._update_flags('set', added)
+        self._update_flags('unset', removed)
+
         logger.info('Changed OSD flags: added=%s removed=%s', added, removed)
 
         return sorted(enabled_flags - removed | added)
+
+    @Endpoint('PUT', 'individual')
+    @UpdatePermission
+    def set_individual(self, flags, ids):
+        """
+        Updates flags (`noout`, `noin`, `nodown`, `noup`) for an individual
+        subset of OSDs.
+        """
+        assert isinstance(flags, dict)
+        assert isinstance(ids, list)
+        assert all(isinstance(id, int) for id in ids)
+
+        # These are to only flags that can be applied to an OSD individually.
+        all_flags = {'noin', 'noout', 'nodown', 'noup'}
+        added = set()
+        removed = set()
+        for flag, activated in flags.items():
+            if flag in all_flags:
+                if activated is not None:
+                    if activated:
+                        added.add(flag)
+                    else:
+                        removed.add(flag)
+
+        self._update_flags('set-group', added, ids)
+        self._update_flags('unset-group', removed, ids)
+
+        logger.error('Changed individual OSD flags: added=%s removed=%s for ids=%s',
+                     added, removed, ids)
+
+        return {'added': sorted(added),
+                'removed': sorted(removed),
+                'ids': ids}
+
+    @Endpoint('GET', 'individual')
+    @ReadPermission
+    def get_individual(self):
+        osd_map = mgr.get('osd_map')['osds']
+        resp = []
+
+        for osd in osd_map:
+            resp.append({
+                'osd': osd['osd'],
+                'flags': osd['state']
+            })
+        return resp

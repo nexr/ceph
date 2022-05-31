@@ -5,8 +5,10 @@ import { BlockUI, NgBlockUI } from 'ng-block-ui';
 import { timer as observableTimer } from 'rxjs';
 
 import { MgrModuleService } from '../../../../shared/api/mgr-module.service';
+import { ListWithDetails } from '../../../../shared/classes/list-with-details.class';
 import { TableComponent } from '../../../../shared/datatable/table/table.component';
 import { CellTemplate } from '../../../../shared/enum/cell-template.enum';
+import { Icons } from '../../../../shared/enum/icons.enum';
 import { CdTableAction } from '../../../../shared/models/cd-table-action';
 import { CdTableColumn } from '../../../../shared/models/cd-table-column';
 import { CdTableFetchDataContext } from '../../../../shared/models/cd-table-fetch-data-context';
@@ -20,8 +22,8 @@ import { NotificationService } from '../../../../shared/services/notification.se
   templateUrl: './mgr-module-list.component.html',
   styleUrls: ['./mgr-module-list.component.scss']
 })
-export class MgrModuleListComponent {
-  @ViewChild(TableComponent)
+export class MgrModuleListComponent extends ListWithDetails {
+  @ViewChild(TableComponent, { static: true })
   table: TableComponent;
   @BlockUI()
   blockUI: NgBlockUI;
@@ -38,6 +40,7 @@ export class MgrModuleListComponent {
     private notificationService: NotificationService,
     private i18n: I18n
   ) {
+    super();
     this.permission = this.authStorageService.getPermissions().configOpt;
     this.columns = [
       {
@@ -48,6 +51,13 @@ export class MgrModuleListComponent {
       {
         name: this.i18n('Enabled'),
         prop: 'enabled',
+        flexGrow: 1,
+        cellClass: 'text-center',
+        cellTransformation: CellTemplate.checkIcon
+      },
+      {
+        name: this.i18n('Always-On'),
+        prop: 'always_on',
         flexGrow: 1,
         cellClass: 'text-center',
         cellTransformation: CellTemplate.checkIcon
@@ -67,22 +77,21 @@ export class MgrModuleListComponent {
           return Object.values(this.selection.first().options).length === 0;
         },
         routerLink: () => `/mgr-modules/edit/${getModuleUri()}`,
-        icon: 'fa-pencil'
+        icon: Icons.edit
       },
       {
         name: this.i18n('Enable'),
         permission: 'update',
         click: () => this.updateModuleState(),
         disable: () => this.isTableActionDisabled('enabled'),
-        icon: 'fa-play'
+        icon: Icons.start
       },
       {
         name: this.i18n('Disable'),
         permission: 'update',
         click: () => this.updateModuleState(),
-        disable: () => this.isTableActionDisabled('disabled'),
-        disableDesc: () => this.getTableActionDisabledDesc(),
-        icon: 'fa-stop'
+        disable: () => this.getTableActionDisabledDesc(),
+        icon: Icons.stop
       }
     ];
   }
@@ -131,13 +140,12 @@ export class MgrModuleListComponent {
     }
   }
 
-  getTableActionDisabledDesc(): string | undefined {
-    if (this.selection.hasSelection) {
-      const selected = this.selection.first();
-      if (selected.always_on) {
-        return this.i18n('This Manager module is always on.');
-      }
+  getTableActionDisabledDesc(): string | boolean {
+    if (this.selection && this.selection.first().always_on) {
+      return this.i18n('This Manager module is always on.');
     }
+
+    return this.isTableActionDisabled('disabled');
   }
 
   /**

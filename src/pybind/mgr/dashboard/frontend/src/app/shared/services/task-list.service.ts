@@ -15,7 +15,7 @@ export class TaskListService implements OnDestroy {
   setList: (_: any[]) => void;
   onFetchError: (error: any) => void;
   taskFilter: (task: ExecutingTask) => boolean;
-  itemFilter: (item, task: ExecutingTask) => boolean;
+  itemFilter: (item: any, task: ExecutingTask) => boolean;
   builders: object;
 
   constructor(
@@ -45,7 +45,7 @@ export class TaskListService implements OnDestroy {
     setList: (_: any[]) => void,
     onFetchError: (error: any) => void,
     taskFilter: (task: ExecutingTask) => boolean,
-    itemFilter: (item, task: ExecutingTask) => boolean,
+    itemFilter: (item: any, task: ExecutingTask) => boolean,
     builders: object
   ) {
     this.getUpdate = getUpdate;
@@ -56,12 +56,10 @@ export class TaskListService implements OnDestroy {
     this.itemFilter = itemFilter;
     this.builders = builders || {};
 
-    this.summaryDataSubscription = this.summaryService.subscribe((tasks: any) => {
-      if (tasks) {
-        this.getUpdate().subscribe((resp: any) => {
-          this.updateData(resp, tasks.executing_tasks.filter(this.taskFilter));
-        }, this.onFetchError);
-      }
+    this.summaryDataSubscription = this.summaryService.subscribe((summary) => {
+      this.getUpdate().subscribe((resp: any) => {
+        this.updateData(resp, summary['executing_tasks'].filter(this.taskFilter));
+      }, this.onFetchError);
     }, this.onFetchError);
   }
 
@@ -76,19 +74,19 @@ export class TaskListService implements OnDestroy {
   }
 
   private addMissing(data: any[], tasks: ExecutingTask[]) {
-    const defaultBuilder = this.builders['default'] || {};
+    const defaultBuilder = this.builders['default'];
     tasks.forEach((task) => {
       const existing = data.find((item) => this.itemFilter(item, task));
       const builder = this.builders[task.name];
       if (!existing && (builder || defaultBuilder)) {
-        data.push(builder ? builder(task.metadata) : defaultBuilder(task));
+        data.push(builder ? builder(task.metadata) : defaultBuilder(task.metadata));
       }
     });
   }
 
   private getTaskAction(tasks: ExecutingTask[]): string {
     if (tasks.length === 0) {
-      return;
+      return undefined;
     }
     return tasks
       .map((task) => {

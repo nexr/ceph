@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component } from '@angular/core';
 import { I18n } from '@ngx-translate/i18n-polyfill';
 import { SortDirection, SortPropDir } from '@swimlane/ngx-datatable';
 
@@ -6,6 +6,7 @@ import { BsModalRef, BsModalService } from 'ngx-bootstrap/modal';
 import { Observable, Subscriber } from 'rxjs';
 
 import { PrometheusService } from '../../../../shared/api/prometheus.service';
+import { ListWithDetails } from '../../../../shared/classes/list-with-details.class';
 import { CriticalConfirmationModalComponent } from '../../../../shared/components/critical-confirmation-modal/critical-confirmation-modal.component';
 import {
   ActionLabelsI18n,
@@ -32,7 +33,7 @@ const BASE_URL = 'monitoring/silence';
   templateUrl: './silence-list.component.html',
   styleUrls: ['./silence-list.component.scss']
 })
-export class SilenceListComponent implements OnInit {
+export class SilenceListComponent extends ListWithDetails {
   silences: AlertmanagerSilence[] = [];
   columns: CdTableColumn[];
   tableActions: CdTableAction[];
@@ -40,9 +41,9 @@ export class SilenceListComponent implements OnInit {
   selection = new CdTableSelection();
   modalRef: BsModalRef;
   customCss = {
-    'label label-danger': 'active',
-    'label label-warning': 'pending',
-    'label label-default': 'expired'
+    'badge badge-danger': 'active',
+    'badge badge-warning': 'pending',
+    'badge badge-default': 'expired'
   };
   sorts: SortPropDir[] = [{ prop: 'endsAt', dir: SortDirection.desc }];
 
@@ -57,12 +58,10 @@ export class SilenceListComponent implements OnInit {
     private actionLabels: ActionLabelsI18n,
     private succeededLabels: SucceededActionLabelsI18n
   ) {
+    super();
     this.permission = this.authStorageService.getPermissions().prometheus;
-  }
-
-  ngOnInit() {
     const selectionExpired = (selection: CdTableSelection) =>
-      selection.first() && selection.first().status.state === 'expired';
+      selection.first() && selection.first().status && selection.first().status.state === 'expired';
     this.tableActions = [
       {
         permission: 'create',

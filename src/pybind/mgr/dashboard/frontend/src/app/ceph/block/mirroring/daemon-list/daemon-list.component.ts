@@ -12,7 +12,7 @@ import { CephShortVersionPipe } from '../../../../shared/pipes/ceph-short-versio
   styleUrls: ['./daemon-list.component.scss']
 })
 export class DaemonListComponent implements OnInit, OnDestroy {
-  @ViewChild('healthTmpl')
+  @ViewChild('healthTmpl', { static: true })
   healthTmpl: TemplateRef<any>;
 
   subs: Subscription;
@@ -45,10 +45,7 @@ export class DaemonListComponent implements OnInit, OnDestroy {
       }
     ];
 
-    this.subs = this.rbdMirroringService.subscribeSummary((data: any) => {
-      if (!data) {
-        return;
-      }
+    this.subs = this.rbdMirroringService.subscribeSummary((data) => {
       this.data = data.content_data.daemons;
     });
   }

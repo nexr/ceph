@@ -1,4 +1,4 @@
-import { HTTP_INTERCEPTORS, HttpClientModule } from '@angular/common/http';
+import { HttpClientModule, HTTP_INTERCEPTORS } from '@angular/common/http';
 import {
   ErrorHandler,
   LOCALE_ID,
@@ -9,9 +9,9 @@ import {
 import { BrowserModule } from '@angular/platform-browser';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 
-import { JwtModule } from '@auth0/angular-jwt';
 import { I18n } from '@ngx-translate/i18n-polyfill';
-import { BlockUIModule } from 'ng-block-ui';
+import { NgBootstrapFormValidationModule } from 'ng-bootstrap-form-validation';
+
 import { AccordionModule } from 'ngx-bootstrap/accordion';
 import { BsDropdownModule } from 'ngx-bootstrap/dropdown';
 import { TabsModule } from 'ngx-bootstrap/tabs';
@@ -27,15 +27,10 @@ import { SharedModule } from './shared/shared.module';
 
 import { environment } from '../environments/environment';
 
-export function jwtTokenGetter() {
-  return localStorage.getItem('access_token');
-}
-
 @NgModule({
   declarations: [AppComponent],
   imports: [
     HttpClientModule,
-    BlockUIModule.forRoot(),
     BrowserModule,
     BrowserAnimationsModule,
     ToastrModule.forRoot({
@@ -50,11 +45,7 @@ export function jwtTokenGetter() {
     AccordionModule.forRoot(),
     BsDropdownModule.forRoot(),
     TabsModule.forRoot(),
-    JwtModule.forRoot({
-      config: {
-        tokenGetter: jwtTokenGetter
-      }
-    })
+    NgBootstrapFormValidationModule.forRoot()
   ],
   exports: [SharedModule],
   providers: [
@@ -69,10 +60,10 @@ export function jwtTokenGetter() {
     },
     {
       provide: TRANSLATIONS,
-      useFactory: (locale) => {
+      useFactory: (locale: string) => {
         locale = locale || environment.default_lang;
         try {
-          return require(`raw-loader!locale/messages.${locale}.xlf`);
+          return require(`raw-loader!locale/messages.${locale}.xlf`).default;
         } catch (error) {
           return [];
         }

@@ -2,11 +2,26 @@
 # pylint: disable=too-many-public-methods
 import unittest
 
+try:
+    from unittest.mock import patch
+except ImportError:
+    from mock import patch  # type: ignore
+
 from ..services.rgw_client import RgwClient, _parse_frontend_config
 from ..settings import Settings
-from . import KVStoreMockMixin
+from . import KVStoreMockMixin  # pylint: disable=no-name-in-module
 
 
+def _dummy_daemon_info():
+    return {
+        'addr': '172.20.0.2:0/256594694',
+        'metadata': {
+            'zonegroup_name': 'zonegroup2-realm1'
+        }
+    }
+
+
+@patch('dashboard.services.rgw_client._get_daemon_info', _dummy_daemon_info)
 class RgwClientTest(unittest.TestCase, KVStoreMockMixin):
     def setUp(self):
         RgwClient._user_instances.clear()  # pylint: disable=protected-access
@@ -27,6 +42,54 @@ class RgwClientTest(unittest.TestCase, KVStoreMockMixin):
         Settings.RGW_API_SSL_VERIFY = False
         instance = RgwClient.admin_instance()
         self.assertFalse(instance.session.verify)
+
+    @patch.object(RgwClient, '_get_daemon_zone_info')
+    def test_get_placement_targets_from_zone(self, zone_info):
+        zone_info.return_value = {
+            'id': 'a0df30ea-4b5b-4830-b143-2bedf684663d',
+            'placement_pools': [
+                {
+                    'key': 'default-placement',
+                    'val': {
+                        'index_pool': 'default.rgw.buckets.index',
+                        'storage_classes': {
+                            'STANDARD': {
+                                'data_pool': 'default.rgw.buckets.data'
+                            }
+                        }
+                    }
+                }
+            ]
+        }
+
+        instance = RgwClient.admin_instance()
+        expected_result = {
+            'zonegroup': 'zonegroup2-realm1',
+            'placement_targets': [
+                {
+                    'name': 'default-placement',
+                    'data_pool': 'default.rgw.buckets.data'
+                }
+            ]
+        }
+        self.assertEqual(expected_result, instance.get_placement_targets())
+
+    @patch.object(RgwClient, '_get_realms_info')
+    def test_get_realms(self, realms_info):
+        realms_info.side_effect = [
+            {
+                'default_info': '51de8373-bc24-4f74-a9b7-8e9ef4cb71f7',
+                'realms': [
+                    'realm1',
+                    'realm2'
+                ]
+            },
+            {}
+        ]
+        instance = RgwClient.admin_instance()
+
+        self.assertEqual(['realm1', 'realm2'], instance.get_realms())
+        self.assertEqual([], instance.get_realms())
 
 
 class RgwClientHelperTest(unittest.TestCase):

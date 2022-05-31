@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 
 import * as _ from 'lodash';
 
+import { Icons } from '../../shared/enum/icons.enum';
 import { NotificationType } from '../enum/notification-type.enum';
 import { CdNotificationConfig } from '../models/cd-notification';
 import {
@@ -32,7 +33,7 @@ export class PrometheusAlertFormatter {
             : this.getPrometheusNotificationStatus(alert as AlertmanagerNotificationAlert),
           name: alert.labels.alertname,
           url: alert.generatorURL,
-          summary: alert.annotations.summary,
+          description: alert.annotations.description,
           fingerprint: _.isObject(alert.status) && (alert as AlertmanagerAlert).fingerprint
         };
       }),
@@ -52,7 +53,7 @@ export class PrometheusAlertFormatter {
     return new CdNotificationConfig(
       this.formatType(alert.status),
       `${alert.name} (${alert.status})`,
-      this.appendSourceLink(alert, alert.summary),
+      this.appendSourceLink(alert, alert.description),
       undefined,
       'Prometheus'
     );
@@ -68,6 +69,6 @@ export class PrometheusAlertFormatter {
   }
 
   private appendSourceLink(alert: PrometheusCustomAlert, message: string): string {
-    return `${message} <a href="${alert.url}" target="_blank"><i class="fa fa-line-chart"></i></a>`;
+    return `${message} <a href="${alert.url}" target="_blank"><i class="${Icons.lineChart}"></i></a>`;
   }
 }

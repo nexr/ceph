@@ -9,7 +9,8 @@ import { configureTestBed, i18nProviders } from '../../../../testing/unit-test-h
 import { SummaryService } from '../../../shared/services/summary.service';
 import { SettingsService } from '../../api/settings.service';
 import { CephReleaseNamePipe } from '../../pipes/ceph-release-name.pipe';
-import { InfoPanelComponent } from '../info-panel/info-panel.component';
+import { AlertPanelComponent } from '../alert-panel/alert-panel.component';
+import { DocComponent } from '../doc/doc.component';
 import { LoadingPanelComponent } from '../loading-panel/loading-panel.component';
 import { GrafanaComponent } from './grafana.component';
 
@@ -18,7 +19,7 @@ describe('GrafanaComponent', () => {
   let fixture: ComponentFixture<GrafanaComponent>;
 
   configureTestBed({
-    declarations: [GrafanaComponent, InfoPanelComponent, LoadingPanelComponent],
+    declarations: [GrafanaComponent, AlertPanelComponent, LoadingPanelComponent, DocComponent],
     imports: [AlertModule.forRoot(), HttpClientTestingModule, RouterTestingModule, FormsModule],
     providers: [CephReleaseNamePipe, SettingsService, SummaryService, i18nProviders]
   });

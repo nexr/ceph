@@ -1,5 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 
+import { Icons } from '../../../shared/enum/icons.enum';
 import { Permission } from '../../../shared/models/permissions';
 import { AuthStorageService } from '../../../shared/services/auth-storage.service';
 
@@ -10,9 +11,13 @@ import { AuthStorageService } from '../../../shared/services/auth-storage.servic
 })
 export class AdministrationComponent implements OnInit {
   userPermission: Permission;
+  configOptPermission: Permission;
+  icons = Icons;
 
   constructor(private authStorageService: AuthStorageService) {
-    this.userPermission = this.authStorageService.getPermissions().user;
+    const permissions = this.authStorageService.getPermissions();
+    this.userPermission = permissions.user;
+    this.configOptPermission = permissions.configOpt;
   }
 
   ngOnInit() {}
