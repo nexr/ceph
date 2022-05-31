@@ -3001,11 +3001,6 @@ std::vector<Option> get_global_options() {
     .set_description("Feed a pullee, and force primary to pull "
                      "a currently missing object from it"),
 
-    Option("osd_debug_feed_pullee", Option::TYPE_INT, Option::LEVEL_DEV)
-    .set_default(-1)
-    .set_description("Feed a pullee, and force primary to pull "
-                     "a currently missing object from it"),
-
     Option("osd_backfill_scan_min", Option::TYPE_INT, Option::LEVEL_ADVANCED)
     .set_default(64)
     .set_description(""),
