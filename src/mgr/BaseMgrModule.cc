@@ -301,7 +301,7 @@ ceph_set_health_checks(BaseMgrModule *self, PyObject *args)
                << " severity value not string" << dendl;
           continue;
         }
-        if (const string vs = PyUnicode_AsUTF8(v); vs == "warning") {
+        if (const string vs = PyString_AsString(v); vs == "warning") {
           severity = HEALTH_WARN;
         } else if (vs == "error") {
           severity = HEALTH_ERR;
@@ -312,7 +312,7 @@ ceph_set_health_checks(BaseMgrModule *self, PyObject *args)
                << " summary value not [unicode] string" << dendl;
           continue;
         } else {
-          summary = PyUnicode_AsUTF8(v);
+          summary = PyString_AsString(v);
         }
       } else if (ks == "count") {
         if (PyLong_Check(v)) {
@@ -335,7 +335,7 @@ ceph_set_health_checks(BaseMgrModule *self, PyObject *args)
                  << " detail item " << k << " not a [unicode] string" << dendl;
             continue;
           } else {
-            detail.push_back(PyUnicode_AsUTF8(di));
+            detail.push_back(PyString_AsString(di));
           }
         }
       } else {
@@ -866,7 +866,7 @@ ceph_add_osd_perf_query(BaseMgrModule *self, PyObject *args)
                    << " contains invalid param " << param_name << dendl;
               Py_RETURN_NONE;
             }
-            auto type = PyUnicode_AsUTF8(param_value);
+            auto type = PyString_AsString(param_value);
             auto it = sub_key_types.find(type);
             if (it == sub_key_types.end()) {
               derr << __func__ << " query " << query_param_name << " item " << j
@@ -880,7 +880,7 @@ ceph_add_osd_perf_query(BaseMgrModule *self, PyObject *args)
                    << " contains invalid param " << param_name << dendl;
               Py_RETURN_NONE;
             }
-            d.regex_str = PyUnicode_AsUTF8(param_value);
+            d.regex_str = PyString_AsString(param_value);
             try {
               d.regex = d.regex_str.c_str();
             } catch (const std::regex_error& e) {
@@ -920,7 +920,7 @@ ceph_add_osd_perf_query(BaseMgrModule *self, PyObject *args)
                << " not a string" << dendl;
           Py_RETURN_NONE;
         }
-        auto type = PyUnicode_AsUTF8(py_type);
+        auto type = PyString_AsString(py_type);
         auto it = counter_types.find(type);
         if (it == counter_types.end()) {
           derr << __func__ << " query " << query_param_name << " item " << type
@@ -956,7 +956,7 @@ ceph_add_osd_perf_query(BaseMgrModule *self, PyObject *args)
                  << dendl;
             Py_RETURN_NONE;
           }
-          auto order_by = PyUnicode_AsUTF8(limit_param_val);
+          auto order_by = PyString_AsString(limit_param_val);
           auto it = counter_types.find(order_by);
           if (it == counter_types.end()) {
             derr << __func__ << " limit " << limit_param_name

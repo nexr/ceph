@@ -134,9 +134,9 @@ static PyObject *osdmap_calc_pg_upmaps(BasePyOSDMap* self, PyObject *args)
       return nullptr;
     }
     auto pool_id = self->osdmap->lookup_pg_pool_name(
-      PyUnicode_AsUTF8(pool_name));
+      PyString_AsString(pool_name));
     if (pool_id < 0) {
-      derr << __func__ << " pool '" << PyUnicode_AsUTF8(pool_name)
+      derr << __func__ << " pool '" << PyString_AsString(pool_name)
            << "' does not exist" << dendl;
       return nullptr;
     }

@@ -236,8 +236,8 @@ int ActivePyModule::handle_command(
       r = -EINVAL;
     } else {
       r = PyLong_AsLong(PyTuple_GetItem(pResult, 0));
-      *ds << PyUnicode_AsUTF8(PyTuple_GetItem(pResult, 1));
-      *ss << PyUnicode_AsUTF8(PyTuple_GetItem(pResult, 2));
+      *ds << PyString_AsString(PyTuple_GetItem(pResult, 1));
+      *ss << PyString_AsString(PyTuple_GetItem(pResult, 2));
     }
 
     Py_DECREF(pResult);

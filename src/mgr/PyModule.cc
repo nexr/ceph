@@ -56,7 +56,7 @@ std::string handle_pyerror()
           // returning only the exception string value
           PyObject *name_attr = PyObject_GetAttrString(exc, "__name__");
           std::stringstream ss;
-          ss << PyUnicode_AsUTF8(name_attr) << ": " << PyUnicode_AsUTF8(val);
+          ss << PyString_AsString(name_attr) << ": " << PyString_AsString(val);
           Py_XDECREF(name_attr);
           ss << "\nError processing exception object: " << peek_pyerror();
           return ss.str();
@@ -70,7 +70,7 @@ std::string handle_pyerror()
           // returning only the exception string value
           PyObject *name_attr = PyObject_GetAttrString(exc, "__name__");
           std::stringstream ss;
-          ss << PyUnicode_AsUTF8(name_attr) << ": " << PyUnicode_AsUTF8(val);
+          ss << PyString_AsString(name_attr) << ": " << PyString_AsString(val);
           Py_XDECREF(name_attr);
           ss << "\nError processing exception object: " << peek_pyerror();
           return ss.str();
@@ -91,7 +91,7 @@ std::string peek_pyerror()
   ceph_assert(ptype);
   ceph_assert(pvalue);
   PyObject *pvalue_str = PyObject_Str(pvalue);
-  std::string exc_msg = PyUnicode_AsUTF8(pvalue_str);
+  std::string exc_msg = PyString_AsString(pvalue_str);
   Py_DECREF(pvalue_str);
   PyErr_Restore(ptype, pvalue, ptraceback);
 
@@ -206,7 +206,7 @@ std::string PyModule::get_site_packages()
       if (i != 0) {
         site_packages << ":";
       }
-      site_packages << PyUnicode_AsUTF8(PyList_GetItem(site_packages_list, i));
+      site_packages << PyString_AsString(PyList_GetItem(site_packages_list, i));
     }
 
     Py_DECREF(site_packages_list);
@@ -235,13 +235,13 @@ std::string PyModule::get_site_packages()
     auto n = PyList_Size(sys_path);
     bool first = true;
     for (Py_ssize_t i = 0; i < n; ++i) {
-      dout(1) << "  " << PyUnicode_AsUTF8(PyList_GetItem(sys_path, i)) << dendl;
+      dout(1) << "  " << PyString_AsString(PyList_GetItem(sys_path, i)) << dendl;
       if (first) {
         first = false;
       } else {
         site_packages << ":";
       }
-      site_packages << PyUnicode_AsUTF8(PyList_GetItem(sys_path, i));
+      site_packages << PyString_AsString(PyList_GetItem(sys_path, i));
     }
 
     Py_DECREF(sys_path);
@@ -415,7 +415,7 @@ int PyModule::load(PyThreadState *pMainThreadState)
         } else {
           can_run = (pCanRun == Py_True);
           if (!can_run) {
-            error_string = PyUnicode_AsUTF8(can_run_str);
+            error_string = PyString_AsString(can_run_str);
             dout(4) << "Module " << get_name()
                     << " reported that it cannot run: "
                     << error_string << dendl;
@@ -513,22 +513,22 @@ int PyModule::load_commands()
 
     PyObject *pCmd = PyDict_GetItemString(pCommand, "cmd");
     ceph_assert(pCmd != nullptr);
-    command.cmdstring = PyUnicode_AsUTF8(pCmd);
+    command.cmdstring = PyString_AsString(pCmd);
 
     dout(20) << "loaded command " << command.cmdstring << dendl;
 
     PyObject *pDesc = PyDict_GetItemString(pCommand, "desc");
     ceph_assert(pDesc != nullptr);
-    command.helpstring = PyUnicode_AsUTF8(pDesc);
+    command.helpstring = PyString_AsString(pDesc);
 
     PyObject *pPerm = PyDict_GetItemString(pCommand, "perm");
     ceph_assert(pPerm != nullptr);
-    command.perm = PyUnicode_AsUTF8(pPerm);
+    command.perm = PyString_AsString(pPerm);
 
     command.polling = false;
     PyObject *pPoll = PyDict_GetItemString(pCommand, "poll");
     if (pPoll) {
-      std::string polling = PyUnicode_AsUTF8(pPoll);
+      std::string polling = PyString_AsString(pPoll);
       if (boost::iequals(polling, "true")) {
         command.polling = true;
       }
@@ -553,11 +553,11 @@ int PyModule::load_options()
     PyObject *p;
     p = PyDict_GetItemString(pOption, "name");
     ceph_assert(p != nullptr);
-    option.name = PyUnicode_AsUTF8(p);
+    option.name = PyString_AsString(p);
     option.type = Option::TYPE_STR;
     p = PyDict_GetItemString(pOption, "type");
     if (p && PyObject_TypeCheck(p, &PyUnicode_Type)) {
-      std::string s = PyUnicode_AsUTF8(p);
+      std::string s = PyString_AsString(p);
       int t = Option::str_to_type(s);
       if (t >= 0) {
 	option.type = t;
@@ -565,28 +565,28 @@ int PyModule::load_options()
     }
     p = PyDict_GetItemString(pOption, "desc");
     if (p && PyObject_TypeCheck(p, &PyUnicode_Type)) {
-      option.desc = PyUnicode_AsUTF8(p);
+      option.desc = PyString_AsString(p);
     }
     p = PyDict_GetItemString(pOption, "long_desc");
     if (p && PyObject_TypeCheck(p, &PyUnicode_Type)) {
-      option.long_desc = PyUnicode_AsUTF8(p);
+      option.long_desc = PyString_AsString(p);
     }
     p = PyDict_GetItemString(pOption, "default");
     if (p) {
       auto q = PyObject_Str(p);
-      option.default_value = PyUnicode_AsUTF8(q);
+      option.default_value = PyString_AsString(q);
       Py_DECREF(q);
     }
     p = PyDict_GetItemString(pOption, "min");
     if (p) {
       auto q = PyObject_Str(p);
-      option.min = PyUnicode_AsUTF8(q);
+      option.min = PyString_AsString(q);
       Py_DECREF(q);
     }
     p = PyDict_GetItemString(pOption, "max");
     if (p) {
       auto q = PyObject_Str(p);
-      option.max = PyUnicode_AsUTF8(q);
+      option.max = PyString_AsString(q);
       Py_DECREF(q);
     }
     p = PyDict_GetItemString(pOption, "enum_allowed");
@@ -595,7 +595,7 @@ int PyModule::load_options()
 	auto q = PyList_GetItem(p, i);
 	if (q) {
 	  auto r = PyObject_Str(q);
-	  option.enum_allowed.insert(PyUnicode_AsUTF8(r));
+	  option.enum_allowed.insert(PyString_AsString(r));
 	  Py_DECREF(r);
 	}
       }
@@ -605,7 +605,7 @@ int PyModule::load_options()
       for (unsigned i = 0; i < PyList_Size(p); ++i) {
 	auto q = PyList_GetItem(p, i);
 	if (q && PyObject_TypeCheck(q, &PyUnicode_Type)) {
-	  option.see_also.insert(PyUnicode_AsUTF8(q));
+	  option.see_also.insert(PyString_AsString(q));
 	}
       }
     }
@@ -614,7 +614,7 @@ int PyModule::load_options()
       for (unsigned i = 0; i < PyList_Size(p); ++i) {
 	auto q = PyList_GetItem(p, i);
 	if (q && PyObject_TypeCheck(q, &PyUnicode_Type)) {
-	  option.tags.insert(PyUnicode_AsUTF8(q));
+	  option.tags.insert(PyString_AsString(q));
 	}
       }
     }
@@ -697,7 +697,7 @@ int PyModule::load_subclass_of(const char* base_class, PyObject** py_class)
     if (PyObject_RichCompareBool(value, mgr_module_type, Py_EQ)) {
       continue;
     }
-    auto class_name = PyUnicode_AsUTF8(key);
+    auto class_name = PyString_AsString(key);
     if (*py_class) {
       derr << __func__ << ": ignoring '"
 	   << module_name << "." << class_name << "'"
