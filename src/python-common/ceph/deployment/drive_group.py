@@ -47,7 +47,7 @@ class DeviceSelection(object):
         #: Size specification of format LOW:HIGH.
         #: Can also take the the form :HIGH, LOW:
         #: or an exact value (as ceph-volume inventory reports)
-        self.size:  Optional[str] = size
+        self.size = size # type: Optional[str]
 
         #: is the drive rotating or not
         self.rotational = rotational
@@ -90,7 +90,7 @@ class DeviceSelection(object):
 
     def to_json(self):
         # type: () -> Dict[str, Any]
-        ret: Dict[str, Any] = {}
+        ret = {} # type: Dict[str, Any]
         if self.paths:
             ret['paths'] = [p.path for p in self.paths]
         if self.model:
@@ -187,13 +187,13 @@ class DriveGroupSpec(ServiceSpec):
         self.journal_devices = journal_devices
 
         #: Set (or override) the "bluestore_block_wal_size" value, in bytes
-        self.block_wal_size: Union[int, str, None] = block_wal_size
+        self.block_wal_size = block_wal_size # type: Union[int, str, None]
 
         #: Set (or override) the "bluestore_block_db_size" value, in bytes
-        self.block_db_size: Union[int, str, None] = block_db_size
+        self.block_db_size = block_db_size # type: Union[int, str, None]
 
         #: set journal_size in bytes
-        self.journal_size: Union[int, str, None] = journal_size
+        self.journal_size = journal_size # type: Union[int, str, None]
 
         #: Number of osd daemons per "DATA" device.
         #: To fully utilize nvme devices multiple osds are required.
@@ -259,7 +259,8 @@ class DriveGroupSpec(ServiceSpec):
         return cls(**args)
 
     @classmethod
-    def _drive_group_spec_from_json(cls, json_drive_group: dict) -> dict:
+    def _drive_group_spec_from_json(cls, json_drive_group):
+        # type: (dict) -> dict
         for applied_filter in list(json_drive_group.keys()):
             if applied_filter not in cls._supported_features:
                 raise DriveGroupValidationError(
@@ -293,8 +294,8 @@ class DriveGroupSpec(ServiceSpec):
                 raise DriveGroupValidationError("`all` is only allowed for data_devices")
 
         if self.objectstore not in ('bluestore'):
-            raise DriveGroupValidationError(f"{self.objectstore} is not supported. Must be "
-                                            f"one of ('bluestore')")
+            raise DriveGroupValidationError("%s is not supported. Must be " \
+                                          + "one of ('bluestore')" % self.objectstore)
 
         if self.block_wal_size is not None and type(self.block_wal_size) not in [int, str]:
             raise DriveGroupValidationError('block_wal_size must be of type int or string')

@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 class IscsiService(CephService):
     TYPE = 'iscsi'
 
-    def config(self, spec: IscsiServiceSpec) -> None:
+    def config(self, spec):
+        # type: (IscsiServiceSpec) -> None
         assert self.TYPE == spec.service_type
         assert spec.pool
         self.mgr._check_pool_exists(spec.pool, spec.service_name())
@@ -24,7 +25,8 @@ class IscsiService(CephService):
             spec.service_name(), spec.placement.pretty_str()))
         self.mgr.spec_store.save(spec)
 
-    def prepare_create(self, daemon_spec: CephadmDaemonSpec[IscsiServiceSpec]) -> CephadmDaemonSpec:
+    def prepare_create(self, daemon_spec):
+        # type: (CephadmDaemonSpec[IscsiServiceSpec]) -> CephadmDaemonSpec
         assert self.TYPE == daemon_spec.daemon_type
         assert daemon_spec.spec
 
@@ -48,7 +50,7 @@ class IscsiService(CephService):
                 cert_data = spec.ssl_cert
             ret, out, err = self.mgr.check_mon_command({
                 'prefix': 'config-key set',
-                'key': f'iscsi/{utils.name_to_config_section("iscsi")}.{igw_id}/iscsi-gateway.crt',
+                'key': 'iscsi/%s.%s/iscsi-gateway.crt' % (utils.name_to_config_section("iscsi"), igw_id),
                 'val': cert_data,
             })
 
@@ -59,7 +61,7 @@ class IscsiService(CephService):
                 key_data = spec.ssl_key
             ret, out, err = self.mgr.check_mon_command({
                 'prefix': 'config-key set',
-                'key': f'iscsi/{utils.name_to_config_section("iscsi")}.{igw_id}/iscsi-gateway.key',
+                'key': 'iscsi/%s.%s/iscsi-gateway.key' % (utils.name_to_config_section("iscsi"), igw_id),
                 'val': key_data,
             })
 
@@ -74,8 +76,10 @@ class IscsiService(CephService):
 
         return daemon_spec
 
-    def config_dashboard(self, daemon_descrs: List[DaemonDescription]) -> None:
-        def get_set_cmd_dicts(out: str) -> List[dict]:
+    def config_dashboard(self, daemon_descrs):
+        # type: (List[DaemonDescription]) -> None
+        def get_set_cmd_dicts(out):
+            # type: (str) -> List[dict]
             gateways = json.loads(out)['gateways']
             cmd_dicts = []
             spec = cast(IscsiServiceSpec,

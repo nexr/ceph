@@ -66,7 +66,7 @@ def test_parse_host_placement_specs(test_input, expected, require_network):
 def test_parse_placement_specs(test_input, expected):
     ret = PlacementSpec.from_string(test_input)
     assert str(ret) == expected
-    assert PlacementSpec.from_string(ret.pretty_str()) == ret, f'"{ret.pretty_str()}" != "{test_input}"'
+    assert PlacementSpec.from_string(ret.pretty_str()) == ret, '"%s" != "%s"' % (ret.pretty_str(), test_input)
 
 @pytest.mark.parametrize(
     "test_input",
@@ -242,9 +242,10 @@ spec:
                                      True
                              ),
                          ])
-def test_spec_hash_eq(spec1: ServiceSpec,
-                      spec2: ServiceSpec,
-                      eq: bool):
+def test_spec_hash_eq(spec1, # type: ServiceSpec
+                      spec2, # type: ServiceSpec
+                      eq # type: bool
+                      ):
 
     assert (spec1 == spec2) is eq
 

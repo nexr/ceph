@@ -412,7 +412,7 @@ class Module(MgrModule):
                 # ideally devid is 'vendor_model_serial',
                 # but can also be 'model_serial', 'serial'
                 if '_' in devid:
-                    anon_devid = f"{devid.rsplit('_', 1)[0]}_{uuid.uuid1()}"
+                    anon_devid = "%s_%s" % (devid.rsplit('_', 1)[0], uuid.uuid1())
                 else:
                     anon_devid = str(uuid.uuid1())
                 self.set_store('devid-id/%s' % devid, anon_devid)

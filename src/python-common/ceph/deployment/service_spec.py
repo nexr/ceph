@@ -18,8 +18,8 @@ class ServiceSpecValidationError(Exception):
     if it was raised in a different mgr module.
     """
     def __init__(self,
-                 msg: str,
-                 errno: int = -errno.EINVAL):
+                 msg, # type: str
+                 errno = -errno.EINVAL): # type: int
         super(ServiceSpecValidationError, self).__init__(msg)
         self.errno = errno
 
@@ -64,7 +64,8 @@ class HostPlacementSpec(namedtuple('HostPlacementSpec', ['hostname', 'network', 
             return cls.parse(data)
         return cls(**data)
 
-    def to_json(self) -> str:
+    def to_json(self):
+        # type: () -> str
         return str(self)
 
     @classmethod
@@ -190,10 +191,12 @@ class PlacementSpec(object):
                           for x in hosts if x]
 
     # deprecated
-    def filter_matching_hosts(self, _get_hosts_func: Callable) -> List[str]:
+    def filter_matching_hosts(self, _get_hosts_func):
+        # type: (Callable) -> List[str]
         return self.filter_matching_hostspecs(_get_hosts_func(as_hostspec=True))
 
-    def filter_matching_hostspecs(self, hostspecs: Iterable[HostSpec]) -> List[str]:
+    def filter_matching_hostspecs(self, hostspecs):
+        # type: (Iterable[HostSpec]) -> List[str]
         if self.hosts:
             all_hosts = [hs.hostname for hs in hostspecs]
             return [h.hostname for h in self.hosts if h.hostname in all_hosts]
@@ -207,7 +210,8 @@ class PlacementSpec(object):
             # get_host_selection_size
             return []
 
-    def get_host_selection_size(self, hostspecs: Iterable[HostSpec]):
+    def get_host_selection_size(self, hostspecs):
+        # type: (Iterable[HostSpec]) -> int
         if self.count:
             return self.count
         return len(self.filter_matching_hostspecs(hostspecs))
@@ -417,12 +421,12 @@ class ServiceSpec(object):
         return object.__new__(sub_cls)
 
     def __init__(self,
-                 service_type: str,
-                 service_id: Optional[str] = None,
-                 placement: Optional[PlacementSpec] = None,
-                 count: Optional[int] = None,
-                 unmanaged: bool = False,
-                 preview_only: bool = False,
+                 service_type, # type: str
+                 service_id = None, # type: Optional[str]
+                 placement = None, # type: Optional[PlacementSpec]
+                 count = None, # type: Optional[int]
+                 unmanaged = False, # type: bool
+                 preview_only = False, # type: bool
                  ):
         self.placement = PlacementSpec() if placement is None else placement  # type: PlacementSpec
 
@@ -518,7 +522,7 @@ class ServiceSpec(object):
 
     def to_json(self):
         # type: () -> OrderedDict[str, Any]
-        ret: OrderedDict[str, Any] = OrderedDict()
+        ret = OrderedDict() # type: OrderedDict[str, Any]
         ret['service_type'] = self.service_type
         if self.service_id:
             ret['service_id'] = self.service_id
@@ -548,7 +552,7 @@ class ServiceSpec(object):
                 raise ServiceSpecValidationError('Cannot add Service: id required')
         elif self.service_id:
             raise ServiceSpecValidationError(
-                    f'Service of type \'{self.service_type}\' should not contain a service id')
+                    'Service of type \'%s\' should not contain a service id' % self.service_type)
 
         if self.placement is not None:
             self.placement.validate()
@@ -565,7 +569,8 @@ class ServiceSpec(object):
         return '<{} for service_name={}>'.format(self.__class__.__name__, self.service_name())
 
     @staticmethod
-    def yaml_representer(dumper: 'yaml.SafeDumper', data: 'ServiceSpec'):
+    def yaml_representer(dumper, data):
+        # type: ('yaml.SafeDumper', 'ServiceSpec')
         return dumper.represent_dict(data.to_json().items())
 
 
@@ -574,13 +579,13 @@ yaml.add_representer(ServiceSpec, ServiceSpec.yaml_representer)
 
 class NFSServiceSpec(ServiceSpec):
     def __init__(self,
-                 service_type: str = 'nfs',
-                 service_id: Optional[str] = None,
-                 pool: Optional[str] = None,
-                 namespace: Optional[str] = None,
-                 placement: Optional[PlacementSpec] = None,
-                 unmanaged: bool = False,
-                 preview_only: bool = False
+                 service_type = 'nfs', # type: str
+                 service_id = None, # type: Optional[str]
+                 pool = None, # type: Optional[str]
+                 namespace = None, # type: Optional[str]
+                 placement = None, # type: Optional[PlacementSpec]
+                 unmanaged = False, # type: bool
+                 preview_only = False # type: bool
                  ):
         assert service_type == 'nfs'
         super(NFSServiceSpec, self).__init__(
@@ -624,18 +629,18 @@ class RGWSpec(ServiceSpec):
 
     """
     def __init__(self,
-                 service_type: str = 'rgw',
-                 service_id: Optional[str] = None,
-                 placement: Optional[PlacementSpec] = None,
-                 rgw_realm: Optional[str] = None,
-                 rgw_zone: Optional[str] = None,
-                 subcluster: Optional[str] = None,
-                 rgw_frontend_port: Optional[int] = None,
-                 rgw_frontend_ssl_certificate: Optional[List[str]] = None,
-                 rgw_frontend_ssl_key: Optional[List[str]] = None,
-                 unmanaged: bool = False,
-                 ssl: bool = False,
-                 preview_only: bool = False,
+                 service_type = 'rgw', # type: str
+                 service_id = None, # type: Optional[str]
+                 placement = None, # type: Optional[PlacementSpec]
+                 rgw_realm = None, # type: Optional[str]
+                 rgw_zone = None, # type: Optional[str]
+                 subcluster = None, # type: Optional[str]
+                 rgw_frontend_port = None, # type: Optional[int]
+                 rgw_frontend_ssl_certificate = None, # type: Optional[List[str]]
+                 rgw_frontend_ssl_key = None, # type: Optional[List[str]]
+                 unmanaged = False, # type: bool
+                 ssl = False, # type: bool
+                 preview_only = False, # type: bool
                  ):
         assert service_type == 'rgw', service_type
         if service_id:
@@ -674,12 +679,12 @@ class RGWSpec(ServiceSpec):
     def rgw_frontends_config_value(self):
         ports = []
         if self.ssl:
-            ports.append(f"ssl_port={self.get_port()}")
-            ports.append(f"ssl_certificate=config://rgw/cert/{self.rgw_realm}/{self.rgw_zone}.crt")
-            ports.append(f"ssl_key=config://rgw/cert/{self.rgw_realm}/{self.rgw_zone}.key")
+            ports.append("ssl_port=%s" % self.get_port())
+            ports.append("ssl_certificate=config://rgw/cert/%s/%s.crt" % (self.rgw_realm, self.rgw_zone))
+            ports.append("ssl_key=config://rgw/cert/%s/%s.key" % (self.rgw_realm, self.rgw_zone))
         else:
-            ports.append(f"port={self.get_port()}")
-        return f'beast {" ".join(ports)}'
+            ports.append("port=%s" % self.get_port())
+        return 'beast %s' % " ".join(ports)
 
     def validate(self):
         super(RGWSpec, self).validate()
@@ -697,19 +702,19 @@ yaml.add_representer(RGWSpec, ServiceSpec.yaml_representer)
 
 class IscsiServiceSpec(ServiceSpec):
     def __init__(self,
-                 service_type: str = 'iscsi',
-                 service_id: Optional[str] = None,
-                 pool: Optional[str] = None,
-                 trusted_ip_list: Optional[str] = None,
-                 api_port: Optional[int] = None,
-                 api_user: Optional[str] = None,
-                 api_password: Optional[str] = None,
-                 api_secure: Optional[bool] = None,
-                 ssl_cert: Optional[str] = None,
-                 ssl_key: Optional[str] = None,
-                 placement: Optional[PlacementSpec] = None,
-                 unmanaged: bool = False,
-                 preview_only: bool = False
+                 service_type = 'iscsi', # type: str
+                 service_id = None, # type: Optional[str]
+                 pool = None, # type: Optional[str]
+                 trusted_ip_list = None, # type: Optional[str]
+                 api_port = None, # type: Optional[int]
+                 api_user = None, # type: Optional[str]
+                 api_password = None, # type: Optional[str]
+                 api_secure = None, # type: Optional[bool]
+                 ssl_cert = None, # type: Optional[str]
+                 ssl_key = None, # type: Optional[str]
+                 placement = None, # type: Optional[PlacementSpec]
+                 unmanaged = False, # type:: bool
+                 preview_only = False # type:: bool
                  ):
         assert service_type == 'iscsi'
         super(IscsiServiceSpec, self).__init__('iscsi', service_id=service_id,
@@ -748,12 +753,12 @@ yaml.add_representer(IscsiServiceSpec, ServiceSpec.yaml_representer)
 
 class AlertManagerSpec(ServiceSpec):
     def __init__(self,
-                 service_type: str = 'alertmanager',
-                 service_id: Optional[str] = None,
-                 placement: Optional[PlacementSpec] = None,
-                 unmanaged: bool = False,
-                 preview_only: bool = False,
-                 user_data: Optional[Dict[str, Any]] = None,
+                 service_type = 'alertmanager', # type: str
+                 service_id = None, # type: Optional[str]
+                 placement = None, # type: Optional[PlacementSpec]
+                 unmanaged = False, # type: bool
+                 preview_only = False, # type: bool
+                 user_data = None, # type: Optional[Dict[str, Any]]
                  ):
         assert service_type == 'alertmanager'
         super(AlertManagerSpec, self).__init__(
@@ -783,23 +788,23 @@ yaml.add_representer(AlertManagerSpec, ServiceSpec.yaml_representer)
 
 class CustomContainerSpec(ServiceSpec):
     def __init__(self,
-                 service_type: str = 'container',
-                 service_id: str = None,
-                 placement: Optional[PlacementSpec] = None,
-                 unmanaged: bool = False,
-                 preview_only: bool = False,
-                 image: str = None,
-                 entrypoint: Optional[str] = None,
-                 uid: Optional[int] = None,
-                 gid: Optional[int] = None,
-                 volume_mounts: Optional[Dict[str, str]] = {},
-                 args: Optional[List[str]] = [],
-                 envs: Optional[List[str]] = [],
-                 privileged: Optional[bool] = False,
-                 bind_mounts: Optional[List[List[str]]] = None,
-                 ports: Optional[List[int]] = [],
-                 dirs: Optional[List[str]] = [],
-                 files: Optional[Dict[str, Any]] = {},
+                 service_type = 'container', # type: str
+                 service_id = None, # type: str
+                 placement = None, # type: Optional[PlacementSpec]
+                 unmanaged = False, # type: bool
+                 preview_only = False, # type: bool
+                 image = None, # type: str
+                 entrypoint = None, # type: Optional[str]
+                 uid = None, # type: Optional[int]
+                 gid = None, # type: Optional[int]
+                 volume_mounts = {}, # type: Optional[Dict[str, str]]
+                 args = [], # type: Optional[List[str]]
+                 envs = [], # type: Optional[List[str]]
+                 privileged = False, # type: Optional[bool]
+                 bind_mounts = None, # type: Optional[List[List[str]]]
+                 ports = [], # type: Optional[List[int]]
+                 dirs = [], # type: Optional[List[str]]
+                 files = {}, # type: Optional[Dict[str, Any]]
                  ):
         assert service_type == 'container'
         assert service_id is not None
@@ -823,7 +828,8 @@ class CustomContainerSpec(ServiceSpec):
         self.dirs = dirs
         self.files = files
 
-    def config_json(self) -> Dict[str, Any]:
+    def config_json(self):
+        # type: () -> Dict[str, Any]
         """
         Helper function to get the value of the `--config-json` cephadm
         command line option. It will contain all specification properties

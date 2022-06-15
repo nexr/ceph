@@ -21,23 +21,25 @@ logger = logging.getLogger(__name__)
 
 class UpgradeState:
     def __init__(self,
-                 target_name: str,
-                 progress_id: str,
-                 target_id: Optional[str] = None,
-                 repo_digest: Optional[str] = None,
-                 target_version: Optional[str] = None,
-                 error: Optional[str] = None,
-                 paused: Optional[bool] = None,
+                 target_name,
+                 progress_id,
+                 target_id = None,
+                 repo_digest = None,
+                 target_version = None,
+                 error = None,
+                 paused = None,
                  ):
-        self._target_name: str = target_name  # Use CephadmUpgrade.target_image instead.
-        self.progress_id: str = progress_id
-        self.target_id: Optional[str] = target_id
-        self.repo_digest: Optional[str] = repo_digest
-        self.target_version: Optional[str] = target_version
-        self.error: Optional[str] = error
-        self.paused: bool = paused or False
+        # type: (str, str, Optional[str], Optional[str], Optional[str], Optional[str], Optional[bool]) -> None
+        self._target_name = target_name  # Use CephadmUpgrade.target_image instead.
+        self.progress_id = progress_id
+        self.target_id = target_id
+        self.repo_digest = repo_digest
+        self.target_version = target_version
+        self.error = error
+        self.paused = paused or False
 
-    def to_json(self) -> dict:
+    def to_json(self):
+        # type: () -> dict
         return {
             'target_name': self._target_name,
             'progress_id': self.progress_id,
@@ -49,7 +51,8 @@ class UpgradeState:
         }
 
     @classmethod
-    def from_json(cls, data: dict) -> Optional['UpgradeState']:
+    def from_json(cls, data):
+        # type: (dict) -> Optional['UpgradeState']
         if data:
             return cls(**data)
         else:
@@ -63,17 +66,19 @@ class CephadmUpgrade:
         'UPGRADE_REDEPLOY_DAEMON',
     ]
 
-    def __init__(self, mgr: "CephadmOrchestrator"):
+    def __init__(self, mgr):
+        # type: ("CephadmOrchestrator") -> None
         self.mgr = mgr
 
         t = self.mgr.get_store('upgrade_state')
         if t:
-            self.upgrade_state: Optional[UpgradeState] = UpgradeState.from_json(json.loads(t))
+            self.upgrade_state = UpgradeState.from_json(json.loads(t)) # type: Optional[UpgradeState]
         else:
             self.upgrade_state = None
 
     @property
-    def target_image(self) -> str:
+    def target_image(self):
+        # type: () -> str
         assert self.upgrade_state
         if not self.mgr.use_repo_digest:
             return self.upgrade_state._target_name
@@ -82,7 +87,8 @@ class CephadmUpgrade:
 
         return self.upgrade_state.repo_digest
 
-    def upgrade_status(self) -> orchestrator.UpgradeStatusSpec:
+    def upgrade_status(self):
+        # type: () -> orchestrator.UpgradeStatusSpec
         r = orchestrator.UpgradeStatusSpec()
         if self.upgrade_state:
             r.target_image = self.target_image
@@ -93,7 +99,8 @@ class CephadmUpgrade:
                 r.message = 'Upgrade paused'
         return r
 
-    def upgrade_start(self, image: str, version: str) -> str:
+    def upgrade_start(self, image, version):
+        # type: (str, str) -> str
         if self.mgr.mode != 'root':
             raise OrchestratorError('upgrade is not supported in %s mode' % (
                 self.mgr.mode))
@@ -131,7 +138,8 @@ class CephadmUpgrade:
         self.mgr.event.set()
         return 'Initiating upgrade to %s' % (target_name)
 
-    def upgrade_pause(self) -> str:
+    def upgrade_pause(self):
+        # type: () -> str
         if not self.upgrade_state:
             raise OrchestratorError('No upgrade in progress')
         if self.upgrade_state.paused:
@@ -140,7 +148,8 @@ class CephadmUpgrade:
         self._save_upgrade_state()
         return 'Paused upgrade to %s' % self.target_image
 
-    def upgrade_resume(self) -> str:
+    def upgrade_resume(self):
+        # type: () -> str
         if not self.upgrade_state:
             raise OrchestratorError('No upgrade in progress')
         if not self.upgrade_state.paused:
@@ -150,7 +159,8 @@ class CephadmUpgrade:
         self.mgr.event.set()
         return 'Resumed upgrade to %s' % self.target_image
 
-    def upgrade_stop(self) -> str:
+    def upgrade_stop(self):
+        # type: () -> str
         if not self.upgrade_state:
             return 'No upgrade in progress'
         if self.upgrade_state.progress_id:
@@ -163,7 +173,8 @@ class CephadmUpgrade:
         self.mgr.event.set()
         return 'Stopped upgrade to %s' % target_image
 
-    def continue_upgrade(self) -> bool:
+    def continue_upgrade(self):
+        # type: () -> bool
         """
         Returns false, if nothing was done.
         :return:
@@ -173,7 +184,8 @@ class CephadmUpgrade:
             return True
         return False
 
-    def _wait_for_ok_to_stop(self, s: DaemonDescription) -> bool:
+    def _wait_for_ok_to_stop(self, s):
+        # type: (DaemonDescription) -> bool
         # only wait a little bit; the service might go away for something
         tries = 4
         while tries > 0:
@@ -183,21 +195,23 @@ class CephadmUpgrade:
             r = self.mgr.cephadm_services[s.daemon_type].ok_to_stop([s.daemon_id])
 
             if not r.retval:
-                logger.info(f'Upgrade: {r.stdout}')
+                logger.info('Upgrade: ' + r.stdout)
                 return True
-            logger.error(f'Upgrade: {r.stderr}')
+            logger.error('Upgrade: ' + r.stderr)
 
             time.sleep(15)
             tries -= 1
         return False
 
-    def _clear_upgrade_health_checks(self) -> None:
+    def _clear_upgrade_health_checks(self):
+        # type: () -> None
         for k in self.UPGRADE_ERRORS:
             if k in self.mgr.health_checks:
                 del self.mgr.health_checks[k]
         self.mgr.set_health_checks(self.mgr.health_checks)
 
-    def _fail_upgrade(self, alert_id: str, alert: dict) -> None:
+    def _fail_upgrade(self, alert_id, alert):
+        # type: (str, dict) -> None
         assert alert_id in self.UPGRADE_ERRORS
         logger.error('Upgrade: Paused due to %s: %s' % (alert_id,
                                                         alert['summary']))
@@ -210,7 +224,8 @@ class CephadmUpgrade:
         self.mgr.health_checks[alert_id] = alert
         self.mgr.set_health_checks(self.mgr.health_checks)
 
-    def _update_upgrade_progress(self, progress: float) -> None:
+    def _update_upgrade_progress(self, progress):
+        # type: (float) -> None
         if not self.upgrade_state:
             assert False, 'No upgrade in progress'
 
@@ -221,13 +236,15 @@ class CephadmUpgrade:
                         ev_msg='Upgrade to %s' % self.target_image,
                         ev_progress=progress)
 
-    def _save_upgrade_state(self) -> None:
+    def _save_upgrade_state(self):
+        # type: () -> None
         if not self.upgrade_state:
             self.mgr.set_store('upgrade_state', None)
             return
         self.mgr.set_store('upgrade_state', json.dumps(self.upgrade_state.to_json()))
 
-    def get_distinct_container_image_settings(self) -> Dict[str, str]:
+    def get_distinct_container_image_settings(self):
+        # type: () -> Dict[str, str]
         # get all distinct container_image settings
         image_settings = {}
         ret, out, err = self.mgr.check_mon_command({
@@ -346,10 +363,10 @@ class CephadmUpgrade:
                 except Exception as e:
                     self._fail_upgrade('UPGRADE_REDEPLOY_DAEMON', {
                         'severity': 'warning',
-                        'summary': f'Upgrading daemon {d.name()} on host {d.hostname} failed.',
+                        'summary': 'Upgrading daemon %s on host %s failed.' % (d.name(), d.hostname),
                         'count': 1,
                         'detail': [
-                            f'Upgrade daemon: {d.name()}: {e}'
+                            'Upgrade daemon: %s: %s' % (d.name(), e)
                         ],
                     })
                 return
@@ -360,7 +377,7 @@ class CephadmUpgrade:
                 except OrchestratorError as e:
                     self._fail_upgrade('UPGRADE_NO_STANDBY_MGR', {
                         'severity': 'warning',
-                        'summary': f'Upgrade: {e}',
+                        'summary': 'Upgrade: ' + e,
                         'count': 1,
                         'detail': [
                             'The upgrade process needs to upgrade the mgr, '

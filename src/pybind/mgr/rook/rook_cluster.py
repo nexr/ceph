@@ -654,7 +654,8 @@ class RookCluster(object):
                 self.rook_api_post("{}/".format(crd_name),
                                    body=new.to_json())
             return "Created"
-    def get_ceph_image(self) -> str:
+    def get_ceph_image(self):
+        # type: () -> str
         try:
             api_response = self.coreV1_api.list_namespaced_pod(self.rook_env.namespace,
                                                                label_selector="app=rook-ceph-mon",
@@ -668,7 +669,8 @@ class RookCluster(object):
             raise orchestrator.OrchestratorError("Error getting ceph image: {}".format(e))
 
 
-    def _execute_blight_job(self, ident_fault: str, on: bool, loc: orchestrator.DeviceLightLoc) -> str:
+    def _execute_blight_job(self, ident_fault, on, loc):
+        # type: (str, bool, orchestrator.DeviceLightLoc) -> str
         operation_id = str(hash(loc))
         message = ""
 

@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 
 class Migrations:
-    def __init__(self, mgr: "CephadmOrchestrator"):
+    def __init__(self, mgr):
+        # type: (CephadmOrchestrator) -> None
         self.mgr = mgr
 
         # Why having a global counter, instead of spec versions?
@@ -36,20 +37,24 @@ class Migrations:
         # let's try to shortcut things here.
         self.migrate()
 
-    def set(self, val: int) -> None:
+    def set(self, val):
+        # type: (int) -> None
         self.mgr.set_module_option('migration_current', val)
         self.mgr.migration_current = val
 
-    def is_migration_ongoing(self) -> bool:
+    def is_migration_ongoing(self):
+        # type: () -> bool
         return self.mgr.migration_current != LAST_MIGRATION
 
-    def verify_no_migration(self) -> None:
+    def verify_no_migration(self):
+        # type: () -> None
         if self.is_migration_ongoing():
             # this is raised in module.serve()
             raise OrchestratorError(
                 "cephadm migration still ongoing. Please wait, until the migration is complete.")
 
-    def migrate(self) -> None:
+    def migrate(self):
+        # type: () -> None
         if self.mgr.migration_current == 0:
             if self.migrate_0_1():
                 self.set(1)
@@ -58,7 +63,8 @@ class Migrations:
             if self.migrate_1_2():
                 self.set(2)
 
-    def migrate_0_1(self) -> bool:
+    def migrate_0_1(self):
+        # type: () -> bool
         """
         Migration 0 -> 1
         New scheduler that takes PlacementSpec as the bound and not as recommendation.
@@ -75,7 +81,8 @@ class Migrations:
         I think this is ok.
         """
 
-        def interesting_specs() -> Iterator[ServiceSpec]:
+        def interesting_specs():
+            # type: () -> Iterator[ServiceSpec]
             for s in self.mgr.spec_store.specs.values():
                 if s.unmanaged:
                     continue
@@ -88,7 +95,8 @@ class Migrations:
                     continue
                 yield s
 
-        def convert_to_explicit(spec: ServiceSpec) -> None:
+        def convert_to_explicit(spec):
+            # type: (ServiceSpec) -> None
             placements = HostAssignment(
                 spec=spec,
                 hosts=self.mgr.inventory.all_specs(),
@@ -116,7 +124,7 @@ class Migrations:
             new_spec = ServiceSpec.from_json(spec.to_json())
             new_spec.placement = new_placement
 
-            logger.info(f"Migrating {spec.one_line_str()} to explicit placement")
+            logger.info("Migrating %s to explicit placement" % spec.one_line_str())
 
             self.mgr.spec_store.save(new_spec)
 
@@ -133,7 +141,8 @@ class Migrations:
 
         return True
 
-    def migrate_1_2(self) -> bool:
+    def migrate_1_2(self):
+        # type: () -> bool
         """
         After 15.2.4, we unified some service IDs: MONs, MGRs etc no longer have a service id.
         Which means, the service names changed:

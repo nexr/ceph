@@ -23,7 +23,8 @@ class CephadmNoImage(Enum):
 cephadmNoImage = CephadmNoImage.token
 
 
-def name_to_config_section(name: str) -> ConfEntity:
+def name_to_config_section(name):
+    # type: (str) -> ConfEntity
     """
     Map from daemon names to ceph entity names (as seen in config)
     """
@@ -36,9 +37,11 @@ def name_to_config_section(name: str) -> ConfEntity:
         return ConfEntity('mon')
 
 
-def forall_hosts(f: Callable[..., T]) -> Callable[..., List[T]]:
+def forall_hosts(f):
+    # type: (Callable[..., T]) -> Callable[..., List[T]]
     @wraps(f)
-    def forall_hosts_wrapper(*args: Any) -> List[T]:
+    def forall_hosts_wrapper(*args):
+        # type: (Any) -> List[T]
         from cephadm.module import CephadmOrchestrator
 
         # Some weired logic to make calling functions with multiple arguments work.
@@ -50,7 +53,8 @@ def forall_hosts(f: Callable[..., T]) -> Callable[..., List[T]]:
         else:
             assert 'either f([...]) or self.f([...])'
 
-        def do_work(arg: Any) -> T:
+        def do_work(arg):
+            # type: (Any) -> T
             if not isinstance(arg, tuple):
                 arg = (arg, )
             try:
@@ -58,7 +62,7 @@ def forall_hosts(f: Callable[..., T]) -> Callable[..., List[T]]:
                     return f(self, *arg)
                 return f(*arg)
             except Exception as e:
-                logger.exception(f'executing {f.__name__}({args}) failed.')
+                logger.exception('executing %s(%s) failed.' % (f.__name__, args))
                 raise
 
         assert CephadmOrchestrator.instance is not None
@@ -67,7 +71,8 @@ def forall_hosts(f: Callable[..., T]) -> Callable[..., List[T]]:
     return forall_hosts_wrapper
 
 
-def get_cluster_health(mgr: 'CephadmOrchestrator') -> str:
+def get_cluster_health(mgr):
+    # type: ('CephadmOrchestrator') -> str
     # check cluster health
     ret, out, err = mgr.check_mon_command({
         'prefix': 'health',
@@ -83,15 +88,17 @@ def get_cluster_health(mgr: 'CephadmOrchestrator') -> str:
     return j['status']
 
 
-def is_repo_digest(image_name: str) -> bool:
+def is_repo_digest(image_name):
+    # type: (str) -> bool
     """
     repo digest are something like "ceph/ceph@sha256:blablabla"
     """
     return '@' in image_name
 
 
-def resolve_ip(hostname: str) -> str:
+def resolve_ip(hostname):
+    # type: (str) -> str
     try:
         return socket.getaddrinfo(hostname, None, flags=socket.AI_CANONNAME, type=socket.SOCK_STREAM)[0][4][0]
     except socket.gaierror as e:
-        raise OrchestratorError(f"Cannot resolve ip for host {hostname}: {e}")
+        raise OrchestratorError("Cannot resolve ip for host %s: %s" % (hostname, e))

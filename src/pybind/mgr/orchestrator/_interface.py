@@ -49,10 +49,8 @@ class OrchestratorError(Exception):
     It's not intended for programming errors or orchestrator internal errors.
     """
 
-    def __init__(self,
-                 msg: str,
-                 errno: int = -errno.EINVAL,
-                 event_kind_subject: Optional[Tuple[str, str]] = None):
+    def __init__(self, msg, errno = -errno.EINVAL, event_kind_subject = None):
+        # type: (str, int, Optional[Tuple[str, str]]) -> None
         super(Exception, self).__init__(msg)
         self.errno = errno
         # See OrchestratorEvent.subject
@@ -126,7 +124,7 @@ class CLICommandMeta(type):
     """
     def __init__(cls, name, bases, dct):
         super(CLICommandMeta, cls).__init__(name, bases, dct)
-        dispatch: Dict[str, CLICommand] = {}
+        dispatch = {} # type: Dict[str, CLICommand]
         for v in dct.values():
             try:
                 dispatch[v._prefix] = v._cli_command
@@ -162,31 +160,28 @@ class _Promise(object):
     RUNNING = 2
     FINISHED = 3  # we have a final result
 
-    NO_RESULT: None = _no_result()
+    NO_RESULT = _no_result() # type: None
     ASYNC_RESULT = object()
 
-    def __init__(self,
-                 _first_promise: Optional["_Promise"] = None,
-                 value: Optional[Any] = NO_RESULT,
-                 on_complete: Optional[Callable] = None,
-                 name: Optional[str] = None,
-                 ):
+    def __init__(self, _first_promise = None, value = NO_RESULT, on_complete = None, name = None):
+        # type: (Optional["_Promise"], Optional[Any], Optional[Callable], Optional[str]) -> None
         self._on_complete_ = on_complete
         self._name = name
-        self._next_promise: Optional[_Promise] = None
+        self._next_promise = None # type: Optional[_Promise]
 
         self._state = self.INITIALIZED
-        self._exception: Optional[Exception] = None
+        self._exception = None # type: Optional[Exception]
 
         # Value of this _Promise. may be an intermediate result.
         self._value = value
 
         # _Promise is not a continuation monad, as `_result` is of type
         # T instead of (T -> r) -> r. Therefore we need to store the first promise here.
-        self._first_promise: '_Promise' = _first_promise or self
+        self._first_promise = _first_promise or self # type: '_Promise'
 
     @property
-    def _exception(self) -> Optional[Exception]:
+    def _exception(self):
+        # type: () -> Optional[Exception]
         return getattr(self, '_exception_', None)
 
     @_exception.setter
@@ -195,7 +190,7 @@ class _Promise(object):
         try:
             self._serialized_exception_ = pickle.dumps(e) if e is not None else None
         except pickle.PicklingError:
-            logger.error(f"failed to pickle {e}")
+            logger.error("failed to pickle " + e)
             if isinstance(e, Exception):
                 e = Exception(*e.args)
             else:
@@ -204,16 +199,19 @@ class _Promise(object):
             self._serialized_exception_ = pickle.dumps(e)
 
     @property
-    def _serialized_exception(self) -> Optional[bytes]:
+    def _serialized_exception(self):
+        # type: () -> Optional[bytes]
         return getattr(self, '_serialized_exception_', None)
 
     @property
-    def _on_complete(self) -> Optional[Callable]:
+    def _on_complete(self):
+        # type: () -> Optional[Callable]
         # https://github.com/python/mypy/issues/4125
         return self._on_complete_
 
     @_on_complete.setter
-    def _on_complete(self, val: Optional[Callable]) -> None:
+    def _on_complete(self, val):
+        # type: (Optional[Callable]) -> None
         self._on_complete_ = val
 
     def __repr__(self):
@@ -242,7 +240,8 @@ class _Promise(object):
         }[self._state]
         return '{} {}({}),'.format(prefix, name, val)
 
-    def then(self: Any, on_complete: Callable) -> Any:
+    def then(self, on_complete):
+        # type: (Callable) -> Any
         """
         Call ``on_complete`` as soon as this promise is finalized.
         """
@@ -263,7 +262,8 @@ class _Promise(object):
             self._set_next_promise(self.__class__(_first_promise=self._first_promise))
             return self._next_promise
 
-    def _set_next_promise(self, next: '_Promise') -> None:
+    def _set_next_promise(self, next):
+        # type: ('_Promise') -> None
         assert self is not next
         assert self._state in (self.INITIALIZED, self.RUNNING)
 
@@ -327,7 +327,8 @@ class _Promise(object):
         if self._next_promise:
             self._next_promise._finalize()
 
-    def fail(self, e: Exception) -> None:
+    def fail(self, e):
+        # type: (Exception) -> None
         """
         Sets the whole completion to be faild with this exception and end the
         evaluation.
@@ -338,7 +339,7 @@ class _Promise(object):
         assert self._state in (self.INITIALIZED, self.RUNNING)
         logger.exception('_Promise failed')
         self._exception = e
-        self._value = f'_exception: {e}'
+        self._value = '_exception: ' + e
         if self._next_promise:
             self._next_promise.fail(e)
         self._state = self.FINISHED
@@ -359,16 +360,14 @@ class _Promise(object):
             assert other not in self
             self._last_promise()._set_next_promise(other)
 
-    def _last_promise(self) -> '_Promise':
+    def _last_promise(self):
+        # type: () -> '_Promise'
         return list(iter(self))[-1]
 
 
 class ProgressReference(object):
-    def __init__(self,
-                 message: str,
-                 mgr,
-                 completion: Optional[Callable[[], 'Completion']] = None
-                 ):
+    def __init__(self, message, mgr, completion = None):
+        # type: (str, MgrModule, Optional[Callable[[], 'Completion']]) -> None
         """
         ProgressReference can be used within Completions::
 
@@ -390,7 +389,7 @@ class ProgressReference(object):
         #: The completion can already have a result, before the write
         #: operation is effective. progress == 1 means, the services are
         #: created / removed.
-        self.completion: Optional[Callable[[], Completion]] = completion
+        self.completion = completion # type: Optional[Callable[[], Completion]]
 
         #: if a orchestrator module can provide a more detailed
         #: progress information, it needs to also call ``progress.update()``.
@@ -482,22 +481,20 @@ class Completion(_Promise, Generic[T]):
 
     """
 
-    def __init__(self,
-                 _first_promise: Optional["Completion"] = None,
-                 value: Any = _Promise.NO_RESULT,
-                 on_complete: Optional[Callable] = None,
-                 name: Optional[str] = None,
-                 ):
+    def __init__(self, _first_promise = None, value = _Promise.NO_RESULT, on_complete = None, name = None):
+        # type: (Optional["Completion"], Any, Optional[Callable], Optional[str]) -> None
         super(Completion, self).__init__(_first_promise, value, on_complete, name)
 
     @property
-    def _progress_reference(self) -> Optional[ProgressReference]:
+    def _progress_reference(self):
+        # type: () -> Optional[ProgressReference]
         if hasattr(self._on_complete, 'progress_id'):
             return self._on_complete  # type: ignore
         return None
 
     @property
-    def progress_reference(self) -> Optional[ProgressReference]:
+    def progress_reference(self):
+        # type: () -> Optional[ProgressReference]
         """
         ProgressReference. Marks this completion
         as a write completeion.
@@ -511,14 +508,10 @@ class Completion(_Promise, Generic[T]):
         return None
 
     @classmethod
-    def with_progress(cls: Any,
-                      message: str,
-                      mgr,
-                      _first_promise: Optional["Completion"] = None,
-                      value: Any = _Promise.NO_RESULT,
-                      on_complete: Optional[Callable] = None,
-                      calc_percent: Optional[Callable[[], Any]] = None
-                      ) -> Any:
+    def with_progress(cls, message, mgr, _first_promise = None, value = _Promise.NO_RESULT,
+                      on_complete = None, calc_percent = None):
+        # type: (str, MgrModule, Optional["Completion"], Any,
+        #        Optional[Callable], Optional[Callable[[], Any]]) -> Any
 
         c = cls(
             _first_promise=_first_promise,
@@ -528,11 +521,8 @@ class Completion(_Promise, Generic[T]):
 
         return c._first_promise
 
-    def add_progress(self,
-                     message: str,
-                     mgr,
-                     calc_percent: Optional[Callable[[], Any]] = None
-                     ):
+    def add_progress(self, message, mgr, calc_percent = None):
+        # type: (str, MgrModule, Optional[Callable[[], Any]]) -> Any
         return self.then(
             on_complete=ProgressReference(
                 message=message,
@@ -541,17 +531,20 @@ class Completion(_Promise, Generic[T]):
             )
         )
 
-    def fail(self, e: Exception):
+    def fail(self, e):
+        # type: (Exception) -> None
         super(Completion, self).fail(e)
         if self._progress_reference:
             self._progress_reference.fail()
 
-    def finalize(self, result: Union[None, object, T] = _Promise.NO_RESULT):
+    def finalize(self, result = _Promise.NO_RESULT):
+        # type: (Union[None, object, T]) -> None
         if self._first_promise._state == self.INITIALIZED:
             self._first_promise._finalize(result)
 
     @property
-    def result(self) -> T:
+    def result(self):
+        # type: () -> T
         """
         The result of the operation that we were waited
         for.  Only valid after calling Orchestrator.process() on this
@@ -561,7 +554,8 @@ class Completion(_Promise, Generic[T]):
         assert last._state == _Promise.FINISHED
         return cast(T, last._value)
 
-    def result_str(self) -> str:
+    def result_str(self):
+        # type: () -> str
         """Force a string."""
         if self.result is None:
             return ''
@@ -570,15 +564,18 @@ class Completion(_Promise, Generic[T]):
         return str(self.result)
 
     @property
-    def exception(self) -> Optional[Exception]:
+    def exception(self):
+        # type: () -> Optional[Exception]
         return self._last_promise()._exception
 
     @property
-    def serialized_exception(self) -> Optional[bytes]:
+    def serialized_exception(self):
+        # type: () -> Optional[bytes]
         return self._last_promise()._serialized_exception
 
     @property
-    def has_result(self) -> bool:
+    def has_result(self):
+        # type: () -> bool
         """
         Has the operation already a result?
 
@@ -594,7 +591,8 @@ class Completion(_Promise, Generic[T]):
         return self._last_promise()._state == _Promise.FINISHED
 
     @property
-    def is_errored(self) -> bool:
+    def is_errored(self):
+        # type: () -> bool
         """
         Has the completion failed. Default implementation looks for
         self.exception. Can be overwritten.
@@ -602,7 +600,8 @@ class Completion(_Promise, Generic[T]):
         return self.exception is not None
 
     @property
-    def needs_result(self) -> bool:
+    def needs_result(self):
+        # type: () -> bool
         """
         Could the external operation be deemed as complete,
         or should we wait?
@@ -611,7 +610,8 @@ class Completion(_Promise, Generic[T]):
         return not self.is_errored and not self.has_result
 
     @property
-    def is_finished(self) -> bool:
+    def is_finished(self):
+        # type: () -> bool
         """
         Could the external operation be deemed as complete,
         or should we wait?
@@ -625,11 +625,13 @@ class Completion(_Promise, Generic[T]):
         return """<{}>[\n{}\n]""".format(self.__class__.__name__, reprs)
 
 
-def pretty_print(completions: Sequence[Completion]) -> str:
+def pretty_print(completions):
+    # type: (Sequence[Completion]) -> str
     return ', '.join(c.pretty_print() for c in completions)
 
 
-def raise_if_exception(c: Completion) -> None:
+def raise_if_exception(c):
+    # type: (Completion) -> None
     """
     :raises OrchestratorError: Some user error or a config error.
     :raises Exception: Some internal error
@@ -647,7 +649,8 @@ class TrivialReadCompletion(Completion[T]):
     This is the trivial completion simply wrapping a result.
     """
 
-    def __init__(self, result: T):
+    def __init__(self, result):
+        # type: (T) -> None
         super(TrivialReadCompletion, self).__init__()
         if result:
             self.finalize(result)
@@ -692,7 +695,8 @@ class Orchestrator(object):
         return True
 
     @_hide_in_features
-    def available(self) -> Tuple[bool, str]:
+    def available(self):
+        # type: () -> Tuple[bool, str]
         """
         Report whether we can talk to the orchestrator.  This is the
         place to give the user a meaningful message if the orchestrator
@@ -718,7 +722,8 @@ class Orchestrator(object):
         raise NotImplementedError()
 
     @_hide_in_features
-    def process(self, completions: List[Completion]) -> None:
+    def process(self, completions):
+        # type: (List[Completion]) -> None
         """
         Given a list of Completion instances, process any which are
         incomplete.
@@ -763,19 +768,23 @@ class Orchestrator(object):
                     }
         return features
 
-    def cancel_completions(self) -> None:
+    def cancel_completions(self):
+        # type: () -> None
         """
         Cancels ongoing completions. Unstuck the mgr.
         """
         raise NotImplementedError()
 
-    def pause(self) -> None:
+    def pause(self):
+        # type: () -> None
         raise NotImplementedError()
 
-    def resume(self) -> None:
+    def resume(self):
+        # type: () -> None
         raise NotImplementedError()
 
-    def add_host(self, host_spec: HostSpec) -> Completion[str]:
+    def add_host(self, host_spec):
+        # type: (HostSpec) -> Completion[str]
         """
         Add a host to the orchestrator inventory.
 
@@ -783,7 +792,8 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def remove_host(self, host: str) -> Completion[str]:
+    def remove_host(self, host):
+        # type: (str) -> Completion[str]
         """
         Remove a host from the orchestrator inventory.
 
@@ -791,7 +801,8 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def update_host_addr(self, host: str, addr: str) -> Completion[str]:
+    def update_host_addr(self, host, addr):
+        # type: (str, str) -> Completion[str]
         """
         Update a host's address
 
@@ -800,7 +811,8 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def get_hosts(self) -> Completion[List[HostSpec]]:
+    def get_hosts(self):
+        # type: () -> Completion[List[HostSpec]]
         """
         Report the hosts in the cluster.
 
@@ -808,19 +820,22 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def add_host_label(self, host: str, label: str) -> Completion[str]:
+    def add_host_label(self, host, label):
+        # type: (str, str) -> Completion[str]
         """
         Add a host label
         """
         raise NotImplementedError()
 
-    def remove_host_label(self, host: str, label: str) -> Completion[str]:
+    def remove_host_label(self, host, label):
+        # type: (str, str) -> Completion[str]
         """
         Remove a host label
         """
         raise NotImplementedError()
 
-    def host_ok_to_stop(self, hostname: str) -> Completion:
+    def host_ok_to_stop(self, hostname):
+        # type: (str) -> Completion
         """
         Check if the specified host can be safely stopped without reducing availability
 
@@ -828,7 +843,8 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def get_inventory(self, host_filter: Optional['InventoryFilter'] = None, refresh: bool = False) -> Completion[List['InventoryHost']]:
+    def get_inventory(self, host_filter = None, refresh = False):
+        # type: (Optional['InventoryFilter'], bool) -> Completion[List['InventoryHost']]
         """
         Returns something that was created by `ceph-volume inventory`.
 
@@ -836,7 +852,8 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def describe_service(self, service_type: Optional[str] = None, service_name: Optional[str] = None, refresh: bool = False) -> Completion[List['ServiceDescription']]:
+    def describe_service(self, service_type = None, service_name = None, refresh = False):
+        # type: (Optional[str], Optional[str], bool) -> Completion[List['ServiceDescription']]
         """
         Describe a service (of any kind) that is already configured in
         the orchestrator.  For example, when viewing an OSD in the dashboard
@@ -850,7 +867,9 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def list_daemons(self, service_name: Optional[str] = None, daemon_type: Optional[str] = None, daemon_id: Optional[str] = None, host: Optional[str] = None, refresh: bool = False) -> Completion[List['DaemonDescription']]:
+    def list_daemons(self, service_name = None, daemon_type = None, daemon_id = None, host = None, refresh = False):
+        # type: (Optional[str], Optional[str], Optional[str], Optional[str], bool)
+        #       -> Completion[List['DaemonDescription']]
         """
         Describe a daemon (of any kind) that is already configured in
         the orchestrator.
@@ -859,11 +878,12 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def apply(self, specs: List["GenericSpec"]) -> Completion[List[str]]:
+    def apply(self, specs):
+        # type: (List["GenericSpec"]) -> Completion[List[str]]
         """
         Applies any spec
         """
-        fns: Dict[str, function] = {
+        fns = {
             'alertmanager': self.apply_alertmanager,
             'crash': self.apply_crash,
             'grafana': self.apply_grafana,
@@ -878,14 +898,15 @@ class Orchestrator(object):
             'rbd-mirror': self.apply_rbd_mirror,
             'rgw': self.apply_rgw,
             'host': self.add_host,
-        }
+        } # type: Dict[str, function]
 
         def merge(ls, r):
             if isinstance(ls, list):
                 return ls + [r]
             return [ls, r]
 
-        spec, *specs = specs
+        spec  = specs[0]
+        specs = specs[1:]
 
         fn = cast(Callable[["GenericSpec"], Completion], fns[spec.service_type])
         completion = fn(spec)
@@ -896,13 +917,15 @@ class Orchestrator(object):
             completion = completion.then(next)
         return completion
 
-    def plan(self, spec: List["GenericSpec"]) -> Completion[List]:
+    def plan(self, spec):
+        # type: (List["GenericSpec"]) -> Completion[List]
         """
         Plan (Dry-run, Preview) a List of Specs.
         """
         raise NotImplementedError()
 
-    def remove_daemons(self, names: List[str]) -> Completion[List[str]]:
+    def remove_daemons(self, names):
+        # type: (List[str]) -> Completion[List[str]]
         """
         Remove specific daemon(s).
 
@@ -910,7 +933,8 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def remove_service(self, service_name: str) -> Completion[str]:
+    def remove_service(self, service_name):
+        # type: (str) -> Completion[str]
         """
         Remove a service (a collection of daemons).
 
@@ -918,7 +942,8 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def service_action(self, action: str, service_name: str) -> Completion[List[str]]:
+    def service_action(self, action, service_name):
+        # type: (str, str) -> Completion[List[str]]
         """
         Perform an action (start/stop/reload) on a service (i.e., all daemons
         providing the logical service).
@@ -931,7 +956,8 @@ class Orchestrator(object):
         # assert action in ["start", "stop", "reload, "restart", "redeploy"]
         raise NotImplementedError()
 
-    def daemon_action(self, action: str, daemon_name: str, image: Optional[str] = None) -> Completion[str]:
+    def daemon_action(self, action, daemon_name, image = None):
+        # type: (str, str, Optional[str]) -> Completion[str]
         """
         Perform an action (start/stop/reload) on a daemon.
 
@@ -943,7 +969,8 @@ class Orchestrator(object):
         # assert action in ["start", "stop", "reload, "restart", "redeploy"]
         raise NotImplementedError()
 
-    def create_osds(self, drive_group: DriveGroupSpec) -> Completion[str]:
+    def create_osds(self, drive_group):
+        # type: (DriveGroupSpec) -> Completion[str]
         """
         Create one or more OSDs within a single Drive Group.
 
@@ -954,27 +981,22 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def apply_drivegroups(self, specs: List[DriveGroupSpec]) -> Completion[List[str]]:
+    def apply_drivegroups(self, specs):
+        # type: (List[DriveGroupSpec]) -> Completion[List[str]]
         """ Update OSD cluster """
         raise NotImplementedError()
 
-    def set_unmanaged_flag(self,
-                           unmanaged_flag: bool,
-                           service_type: str = 'osd',
-                           service_name=None
-                           ) -> HandleCommandResult:
+    def set_unmanaged_flag(self, unmanaged_flag, service_type = 'osd', service_name=None):
+        # type: (bool, str, str) -> HandleCommandResult
         raise NotImplementedError()
 
-    def preview_osdspecs(self,
-                         osdspec_name: Optional[str] = 'osd',
-                         osdspecs: Optional[List[DriveGroupSpec]] = None
-                         ) -> Completion[str]:
+    def preview_osdspecs(self, osdspec_name = 'osd', osdspecs = None):
+        # type: (Optional[str], Optional[List[DriveGroupSpec]]) -> Completion[str]
         """ Get a preview for OSD deployments """
         raise NotImplementedError()
 
-    def remove_osds(self, osd_ids: List[str],
-                    replace: bool = False,
-                    force: bool = False) -> Completion[str]:
+    def remove_osds(self, osd_ids, replace = False, force = False):
+        # type: (List[str], bool, bool) -> Completion[str]
         """
         :param osd_ids: list of OSD IDs
         :param replace: marks the OSD as being destroyed. See :ref:`orchestrator-osd-replace`
@@ -984,19 +1006,22 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def stop_remove_osds(self, osd_ids: List[str]) -> Completion:
+    def stop_remove_osds(self, osd_ids):
+        # type: (List[str]) -> Completion
         """
         TODO
         """
         raise NotImplementedError()
 
-    def remove_osds_status(self) -> Completion:
+    def remove_osds_status(self):
+        # type: () -> Completion
         """
         Returns a status of the ongoing OSD removal operations.
         """
         raise NotImplementedError()
 
-    def blink_device_light(self, ident_fault: str, on: bool, locations: List['DeviceLightLoc']) -> Completion[List[str]]:
+    def blink_device_light(self, ident_fault, on, locations):
+        # type: (str, bool, List['DeviceLightLoc']) -> Completion[List[str]]
         """
         Instructs the orchestrator to enable or disable either the ident or the fault LED.
 
@@ -1006,122 +1031,153 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-    def zap_device(self, host: str, path: str) -> Completion[str]:
+    def zap_device(self, host, path):
+        # type: (str, str) -> Completion[str]
         """Zap/Erase a device (DESTROYS DATA)"""
         raise NotImplementedError()
 
-    def add_mon(self, spec: ServiceSpec) -> Completion[List[str]]:
+    def add_mon(self, spec):
+        # type: (ServiceSpec) -> Completion[List[str]]
         """Create mon daemon(s)"""
         raise NotImplementedError()
 
-    def apply_mon(self, spec: ServiceSpec) -> Completion[str]:
+    def apply_mon(self, spec):
+        # type: (ServiceSpec) -> Completion[str]
         """Update mon cluster"""
         raise NotImplementedError()
 
-    def add_mgr(self, spec: ServiceSpec) -> Completion[List[str]]:
+    def add_mgr(self, spec):
+        # type: (ServiceSpec) -> Completion[List[str]]
         """Create mgr daemon(s)"""
         raise NotImplementedError()
 
-    def apply_mgr(self, spec: ServiceSpec) -> Completion[str]:
+    def apply_mgr(self, spec):
+        # type: (ServiceSpec) -> Completion[str]
         """Update mgr cluster"""
         raise NotImplementedError()
 
-    def add_mds(self, spec: ServiceSpec) -> Completion[List[str]]:
+    def add_mds(self, spec):
+        # type: (ServiceSpec) -> Completion[List[str]]
         """Create MDS daemon(s)"""
         raise NotImplementedError()
 
-    def apply_mds(self, spec: ServiceSpec) -> Completion[str]:
+    def apply_mds(self, spec):
+        # type: (ServiceSpec) -> Completion[str]
         """Update MDS cluster"""
         raise NotImplementedError()
 
-    def add_rgw(self, spec: RGWSpec) -> Completion[List[str]]:
+    def add_rgw(self, spec):
+        # type: (RGWSpec) -> Completion[List[str]]
         """Create RGW daemon(s)"""
         raise NotImplementedError()
 
-    def apply_rgw(self, spec: RGWSpec) -> Completion[str]:
+    def apply_rgw(self, spec):
+        # type: (RGWSpec) -> Completion[str]
         """Update RGW cluster"""
         raise NotImplementedError()
 
-    def add_rbd_mirror(self, spec: ServiceSpec) -> Completion[List[str]]:
+    def add_rbd_mirror(self, spec):
+        # type: (ServiceSpec) -> Completion[List[str]]
         """Create rbd-mirror daemon(s)"""
         raise NotImplementedError()
 
-    def apply_rbd_mirror(self, spec: ServiceSpec) -> Completion[str]:
+    def apply_rbd_mirror(self, spec):
+        # type: (ServiceSpec) -> Completion[str]
         """Update rbd-mirror cluster"""
         raise NotImplementedError()
 
-    def add_nfs(self, spec: NFSServiceSpec) -> Completion[List[str]]:
+    def add_nfs(self, spec):
+        # type: (NFSServiceSpec) -> Completion[List[str]]
         """Create NFS daemon(s)"""
         raise NotImplementedError()
 
-    def apply_nfs(self, spec: NFSServiceSpec) -> Completion[str]:
+    def apply_nfs(self, spec):
+        # type: (NFSServiceSpec) -> Completion[str]
         """Update NFS cluster"""
         raise NotImplementedError()
 
-    def add_iscsi(self, spec: IscsiServiceSpec) -> Completion[List[str]]:
+    def add_iscsi(self, spec):
+        # type: (IscsiServiceSpec) -> Completion[List[str]]
         """Create iscsi daemon(s)"""
         raise NotImplementedError()
 
-    def apply_iscsi(self, spec: IscsiServiceSpec) -> Completion[str]:
+    def apply_iscsi(self, spec):
+        # type: (IscsiServiceSpec) -> Completion[str]
         """Update iscsi cluster"""
         raise NotImplementedError()
 
-    def add_prometheus(self, spec: ServiceSpec) -> Completion[List[str]]:
+    def add_prometheus(self, spec):
+        # type: (ServiceSpec) -> Completion[List[str]]
         """Create new prometheus daemon"""
         raise NotImplementedError()
 
-    def apply_prometheus(self, spec: ServiceSpec) -> Completion[str]:
+    def apply_prometheus(self, spec):
+        # type: (ServiceSpec) -> Completion[str]
         """Update prometheus cluster"""
         raise NotImplementedError()
 
-    def add_node_exporter(self, spec: ServiceSpec) -> Completion[List[str]]:
+    def add_node_exporter(self, spec):
+        # type: (ServiceSpec) -> Completion[List[str]]
         """Create a new Node-Exporter service"""
         raise NotImplementedError()
 
-    def apply_node_exporter(self, spec: ServiceSpec) -> Completion[str]:
+    def apply_node_exporter(self, spec):
+        # type: (ServiceSpec) -> Completion[str]
         """Update existing a Node-Exporter daemon(s)"""
         raise NotImplementedError()
 
-    def add_crash(self, spec: ServiceSpec) -> Completion[List[str]]:
+    def add_crash(self, spec):
+        # type: (ServiceSpec) -> Completion[List[str]]
         """Create a new crash service"""
         raise NotImplementedError()
 
-    def apply_crash(self, spec: ServiceSpec) -> Completion[str]:
+    def apply_crash(self, spec):
+        # type: (ServiceSpec) -> Completion[str]
         """Update existing a crash daemon(s)"""
         raise NotImplementedError()
 
-    def add_grafana(self, spec: ServiceSpec) -> Completion[List[str]]:
+    def add_grafana(self, spec):
+        # type: (ServiceSpec) -> Completion[List[str]]
         """Create a new Node-Exporter service"""
         raise NotImplementedError()
 
-    def apply_grafana(self, spec: ServiceSpec) -> Completion[str]:
+    def apply_grafana(self, spec):
+        # type: (ServiceSpec) -> Completion[str]
         """Update existing a Node-Exporter daemon(s)"""
         raise NotImplementedError()
 
-    def add_alertmanager(self, spec: ServiceSpec) -> Completion[List[str]]:
+    def add_alertmanager(self, spec):
+        # type: (ServiceSpec) -> Completion[List[str]]
         """Create a new AlertManager service"""
         raise NotImplementedError()
 
-    def apply_alertmanager(self, spec: ServiceSpec) -> Completion[str]:
+    def apply_alertmanager(self, spec):
+        # type: (ServiceSpec) -> Completion[str]
         """Update an existing AlertManager daemon(s)"""
         raise NotImplementedError()
 
-    def upgrade_check(self, image: Optional[str], version: Optional[str]) -> Completion[str]:
+    def upgrade_check(self, image, version):
+        # type: (Optional[str], Optional[str]) -> Completion[str]
         raise NotImplementedError()
 
-    def upgrade_start(self, image: Optional[str], version: Optional[str]) -> Completion[str]:
+    def upgrade_start(self, image, version):
+        # type: (Optional[str], Optional[str]) -> Completion[str]
         raise NotImplementedError()
 
-    def upgrade_pause(self) -> Completion[str]:
+    def upgrade_pause(self):
+        # type: () -> Completion[str]
         raise NotImplementedError()
 
-    def upgrade_resume(self) -> Completion[str]:
+    def upgrade_resume(self):
+        # type: () -> Completion[str]
         raise NotImplementedError()
 
-    def upgrade_stop(self) -> Completion[str]:
+    def upgrade_stop(self):
+        # type: () -> Completion[str]
         raise NotImplementedError()
 
-    def upgrade_status(self) -> Completion['UpgradeStatusSpec']:
+    def upgrade_status(self):
+        # type: () -> Completion['UpgradeStatusSpec']
         """
         If an upgrade is currently underway, report on where
         we are in the process, or if some error has occurred.
@@ -1131,7 +1187,8 @@ class Orchestrator(object):
         raise NotImplementedError()
 
     @_hide_in_features
-    def upgrade_available(self) -> Completion:
+    def upgrade_available(self):
+        # type: () -> Completion
         """
         Report on what versions are available to upgrade to
 
@@ -1143,7 +1200,8 @@ class Orchestrator(object):
 GenericSpec = Union[ServiceSpec, HostSpec]
 
 
-def json_to_generic_spec(spec: dict) -> GenericSpec:
+def json_to_generic_spec(spec):
+    # type: (dict) -> GenericSpec
     if 'service_type' in spec and spec['service_type'] == 'host':
         return HostSpec.from_json(spec)
     else:
@@ -1199,11 +1257,11 @@ class DaemonDescription(object):
                  last_configured=None,
                  osdspec_affinity=None,
                  last_deployed=None,
-                 events: Optional[List['OrchestratorEvent']] = None,
-                 is_active: bool = False):
+                 events = None, # type: Optional[List['OrchestratorEvent']]
+                 is_active = False):
 
         # Host is at the same granularity as InventoryHost
-        self.hostname: str = hostname
+        self.hostname = hostname # type: str
 
         # Not everyone runs in containers, but enough people do to
         # justify having the container_id (runtime id) and container_image
@@ -1219,7 +1277,7 @@ class DaemonDescription(object):
         # typically either based on hostnames or on pod names.
         # This is the <foo> in mds.<foo>, the ID that will appear
         # in the FSMap/ServiceMap.
-        self.daemon_id: str = daemon_id
+        self.daemon_id = daemon_id # type: str
 
         # Service version that was deployed
         self.version = version
@@ -1231,24 +1289,25 @@ class DaemonDescription(object):
         self.status_desc = status_desc
 
         # datetime when this info was last refreshed
-        self.last_refresh: Optional[datetime.datetime] = last_refresh
+        self.last_refresh = last_refresh # type: Optional[datetime.datetime]
 
-        self.created: Optional[datetime.datetime] = created
-        self.started: Optional[datetime.datetime] = started
-        self.last_configured: Optional[datetime.datetime] = last_configured
-        self.last_deployed: Optional[datetime.datetime] = last_deployed
+        self.created = created # type: Optional[datetime.datetime]
+        self.started = started # type: Optional[datetime.datetime]
+        self.last_configured = last_configured # type: Optional[datetime.datetime]
+        self.last_deployed = last_deployed # type: Optional[datetime.datetime]
 
         # Affinity to a certain OSDSpec
-        self.osdspec_affinity: Optional[str] = osdspec_affinity
+        self.osdspec_affinity = osdspec_affinity # type: Optional[str]
 
-        self.events: List[OrchestratorEvent] = events or []
+        self.events = events or [] # type: List[OrchestratorEvent]
 
         self.is_active = is_active
 
     def name(self):
         return '%s.%s' % (self.daemon_type, self.daemon_id)
 
-    def matches_service(self, service_name: Optional[str]) -> bool:
+    def matches_service(self, service_name):
+        # type: (Optional[str]) -> bool
         if service_name:
             return self.name().startswith(service_name + '.')
         return False
@@ -1259,7 +1318,7 @@ class DaemonDescription(object):
 
         def _match():
             err = OrchestratorError("DaemonDescription: Cannot calculate service_id: "
-                                    f"daemon_id='{self.daemon_id}' hostname='{self.hostname}'")
+                                    "daemon_id='%s' hostname='%s'" % (self.daemon_id, self.hostname))
 
             if not self.hostname:
                 # TODO: can a DaemonDescription exist without a hostname?
@@ -1304,7 +1363,7 @@ class DaemonDescription(object):
 
     def service_name(self):
         if self.daemon_type in ServiceSpec.REQUIRES_SERVICE_ID:
-            return f'{self.daemon_type}.{self.service_id()}'
+            return '%s.%s' % (self.daemon_type, self.service_id())
         return self.daemon_type
 
     def __repr__(self):
@@ -1356,7 +1415,8 @@ class DaemonDescription(object):
         return DaemonDescription.from_json(self.to_json())
 
     @staticmethod
-    def yaml_representer(dumper: 'yaml.SafeDumper', data: 'DaemonDescription'):
+    def yaml_representer(dumper, data):
+        # type: ('yaml.SafeDumper', 'DaemonDescription') -> ??
         return dumper.represent_dict(data.to_json().items())
 
 
@@ -1377,7 +1437,7 @@ class ServiceDescription(object):
     """
 
     def __init__(self,
-                 spec: ServiceSpec,
+                 spec, # type: ServiceSpec
                  container_image_id=None,
                  container_image_name=None,
                  rados_config_location=None,
@@ -1386,7 +1446,9 @@ class ServiceDescription(object):
                  created=None,
                  size=0,
                  running=0,
-                 events: Optional[List['OrchestratorEvent']] = None):
+                 events = None # type: Optional[List['OrchestratorEvent']]
+                 ):
+
         # Not everyone runs in containers, but enough people do to
         # justify having the container_image_id (image hash) and container_image
         # (image name)
@@ -1408,20 +1470,21 @@ class ServiceDescription(object):
         self.running = running
 
         # datetime when this info was last refreshed
-        self.last_refresh: Optional[datetime.datetime] = last_refresh
-        self.created: Optional[datetime.datetime] = created
+        self.last_refresh = last_refresh # type: Optional[datetime.datetime]
+        self.created = created # type: Optional[datetime.datetime]
 
-        self.spec: ServiceSpec = spec
+        self.spec = spec # type: ServiceSpec
 
-        self.events: List[OrchestratorEvent] = events or []
+        self.events = events or [] # type: List[OrchestratorEvent]
 
     def service_type(self):
         return self.spec.service_type
 
     def __repr__(self):
-        return f"<ServiceDescription of {self.spec.one_line_str()}>"
+        return "<ServiceDescription of %s>" % self.spec.one_line_str()
 
-    def to_json(self) -> OrderedDict:
+    def to_json(self):
+        # type: () -> OrderedDict
         out = self.spec.to_json()
         status = {
             'container_image_id': self.container_image_id,
@@ -1444,7 +1507,8 @@ class ServiceDescription(object):
 
     @classmethod
     @handle_type_error
-    def from_json(cls, data: dict):
+    def from_json(cls, data):
+        # type: (dict) -> ??
         c = data.copy()
         status = c.pop('status', {})
         event_strs = c.pop('events', [])
@@ -1458,7 +1522,8 @@ class ServiceDescription(object):
         return cls(spec=spec, events=events, **c_status)
 
     @staticmethod
-    def yaml_representer(dumper: 'yaml.SafeDumper', data: 'DaemonDescription'):
+    def yaml_representer(dumper, data):
+        # type: ('yaml.SafeDumper', 'DaemonDescription') -> ??
         return dumper.represent_dict(data.to_json().items())
 
 
@@ -1479,7 +1544,8 @@ class InventoryFilter(object):
 
     """
 
-    def __init__(self, labels: Optional[List[str]] = None, hosts: Optional[List[str]] = None) -> None:
+    def __init__(self, labels = None, hosts = None):
+        # type: (Optional[List[str]], Optional[List[str]]) -> None
 
         #: Optional: get info about hosts matching labels
         self.labels = labels
@@ -1494,7 +1560,8 @@ class InventoryHost(object):
     InventoryHost.
     """
 
-    def __init__(self, name: str, devices: Optional[inventory.Devices] = None, labels: Optional[List[str]] = None, addr: Optional[str] = None) -> None:
+    def __init__(self, name, devices = None, labels = None, addr = None):
+        # type: (str, Optional[inventory.Devices], Optional[List[str]], Optional[str]) -> None
         if devices is None:
             devices = inventory.Devices([])
         if labels is None:
@@ -1541,7 +1608,8 @@ class InventoryHost(object):
         return "<InventoryHost>({name})".format(name=self.name)
 
     @staticmethod
-    def get_host_names(hosts: List['InventoryHost']) -> List[str]:
+    def get_host_names(hosts):
+        # type: (List['InventoryHost']) -> List[str]
         return [host.name for host in hosts]
 
     def __eq__(self, other):
@@ -1571,36 +1639,40 @@ class OrchestratorEvent:
     ERROR = 'ERROR'
     regex_v1 = re.compile(r'^([^ ]+) ([^:]+):([^ ]+) \[([^\]]+)\] "((?:.|\n)*)"$', re.MULTILINE)
 
-    def __init__(self, created: Union[str, datetime.datetime], kind, subject, level, message):
+    # created: Union[str, datetime.datetime]
+    def __init__(self, created, kind, subject, level, message):
         if isinstance(created, str):
             created = str_to_datetime(created)
-        self.created: datetime.datetime = created
+        self.created = created # type: datetime.datetime
 
         assert kind in "service daemon".split()
-        self.kind: str = kind
+        self.kind = kind # type: str
 
         # service name, or daemon danem or something
-        self.subject: str = subject
+        self.subject = subject # type: str
 
         # Events are not meant for debugging. debugs should end in the log.
         assert level in "INFO ERROR".split()
         self.level = level
 
-        self.message: str = message
+        self.message = message # type: str
 
     __slots__ = ('created', 'kind', 'subject', 'level', 'message')
 
-    def kind_subject(self) -> str:
-        return f'{self.kind}:{self.subject}'
+    def kind_subject(self):
+        # type: () -> str
+        return '%s:%s' % (self.kind, self.subject)
 
-    def to_json(self) -> str:
+    def to_json(self):
+        # type: () -> str
         # Make a long list of events readable.
         created = datetime_to_str(self.created)
-        return f'{created} {self.kind_subject()} [{self.level}] "{self.message}"'
+        return '%s %s [%s] "%s"' % (created, self.kind_subject(), self.level, self.message)
 
     @classmethod
     @handle_type_error
-    def from_json(cls, data) -> "OrchestratorEvent":
+    def from_json(cls, data):
+        # type: (str) -> "OrchestratorEvent"
         """
         >>> OrchestratorEvent.from_json('''2020-06-10T10:20:25.691255 daemon:crash.ubuntu [INFO] "Deployed crash.ubuntu on host 'ubuntu'"''').to_json()
         '2020-06-10T10:20:25.691255Z daemon:crash.ubuntu [INFO] "Deployed crash.ubuntu on host \\'ubuntu\\'"'
@@ -1611,7 +1683,7 @@ class OrchestratorEvent:
         match = cls.regex_v1.match(data)
         if match:
             return cls(*match.groups())
-        raise ValueError(f'Unable to match: "{data}"')
+        raise ValueError('Unable to match: "%s"' % data)
 
     def __eq__(self, other):
         if not isinstance(other, OrchestratorEvent):
@@ -1664,7 +1736,8 @@ class OrchestratorClientMixin(Orchestrator):
     ...         self.orch_client.set_mgr(self.mgr))
     """
 
-    def set_mgr(self, mgr: MgrModule) -> None:
+    def set_mgr(self, mgr):
+        # type: (MgrModule) -> None
         """
         Useable in the Dashbord that uses a global ``mgr``
         """
@@ -1703,10 +1776,13 @@ class OrchestratorClientMixin(Orchestrator):
                 raise  # self.get_feature_set() calls self._oremote()
             f_set = self.get_feature_set()
             if meth not in f_set or not f_set[meth]['available']:
-                raise NotImplementedError(f'{o} does not implement {meth}') from e
+                nie = NotImplementedError('%s does not implement %s' % (o, meth))
+                nie.__cause__ = e
+                raise nie
             raise
 
-    def _orchestrator_wait(self, completions: List[Completion]) -> None:
+    def _orchestrator_wait(self, completions):
+        # type: (List[Completion]) -> None
         """
         Wait for completions to complete (reads) or
         become persistent (writes).

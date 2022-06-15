@@ -16,7 +16,7 @@ def wrap_ipv6(address):
     # the ValueError
     try:
         if ipaddress.ip_address(address).version == 6:
-            return f"[{address}]"
+            return "[%s]" % address
     except ValueError:
         pass
 

@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 class NFSService(CephService):
     TYPE = 'nfs'
 
-    def config(self, spec: NFSServiceSpec) -> None:
+    def config(self, spec):
+        # type: (NFSServiceSpec) -> None
         assert self.TYPE == spec.service_type
         assert spec.pool
         self.mgr._check_pool_exists(spec.pool, spec.service_name())
@@ -27,7 +28,8 @@ class NFSService(CephService):
             spec.service_name(), spec.placement.pretty_str()))
         self.mgr.spec_store.save(spec)
 
-    def prepare_create(self, daemon_spec: CephadmDaemonSpec[NFSServiceSpec]) -> CephadmDaemonSpec:
+    def prepare_create(self, daemon_spec):
+        # type: (CephadmDaemonSpec[NFSServiceSpec]) -> CephadmDaemonSpec
         assert self.TYPE == daemon_spec.daemon_type
         assert daemon_spec.spec
 
@@ -39,7 +41,8 @@ class NFSService(CephService):
             daemon_id, host, spec))
         return daemon_spec
 
-    def generate_config(self, daemon_spec: CephadmDaemonSpec[NFSServiceSpec]) -> Tuple[Dict[str, Any], List[str]]:
+    def generate_config(self, daemon_spec):
+        # type: (CephadmDaemonSpec[NFSServiceSpec]) -> Tuple[Dict[str, Any], List[str]]
         assert self.TYPE == daemon_spec.daemon_type
         assert daemon_spec.spec
 
@@ -48,21 +51,22 @@ class NFSService(CephService):
         host = daemon_spec.host
         spec = daemon_spec.spec
 
-        deps: List[str] = []
+        deps = [] # type: List[str]
 
         # create the RADOS recovery pool keyring
-        rados_user = f'{daemon_type}.{daemon_id}'
+        rados_user = '%s.%s' % (daemon_type, daemon_id)
         rados_keyring = self.create_keyring(daemon_spec)
 
         # create the rados config object
         self.create_rados_config_obj(spec)
 
         # create the RGW keyring
-        rgw_user = f'{rados_user}-rgw'
+        rgw_user =  rados_user + '-rgw'
         rgw_keyring = self.create_rgw_keyring(daemon_spec)
 
         # generate the ganesha config
-        def get_ganesha_conf() -> str:
+        def get_ganesha_conf():
+            # type: () -> str
             context = dict(user=rados_user,
                            nodeid=daemon_spec.name(),
                            pool=spec.pool,
@@ -72,8 +76,9 @@ class NFSService(CephService):
             return self.mgr.template.render('services/nfs/ganesha.conf.j2', context)
 
         # generate the cephadm config json
-        def get_cephadm_config() -> Dict[str, Any]:
-            config: Dict[str, Any] = {}
+        def get_cephadm_config():
+            # type: () -> Dict[str, Any]
+            config = {} # type: Dict[str, Any]
             config['pool'] = spec.pool
             if spec.namespace:
                 config['namespace'] = spec.namespace
@@ -99,9 +104,8 @@ class NFSService(CephService):
 
         return get_cephadm_config(), deps
 
-    def create_rados_config_obj(self,
-                                spec: NFSServiceSpec,
-                                clobber: bool = False) -> None:
+    def create_rados_config_obj(self, spec, clobber = False):
+        # type: (NFSServiceSpec, bool) -> None
         with self.mgr.rados.open_ioctx(spec.pool) as ioctx:
             if spec.namespace:
                 ioctx.set_namespace(spec.namespace)
@@ -121,11 +125,12 @@ class NFSService(CephService):
                 logger.info('Creating rados config object: %s' % obj)
                 ioctx.write_full(obj, ''.encode('utf-8'))
 
-    def create_keyring(self, daemon_spec: CephadmDaemonSpec[NFSServiceSpec]) -> str:
+    def create_keyring(self, daemon_spec):
+        # type: (CephadmDaemonSpec[NFSServiceSpec]) -> str
         assert daemon_spec.spec
         daemon_id = daemon_spec.daemon_id
         spec = daemon_spec.spec
-        entity: AuthEntity = self.get_auth_entity(daemon_id)
+        entity = self.get_auth_entity(daemon_id) # type: AuthEntity
 
         osd_caps = 'allow rw pool=%s' % (spec.pool)
         if spec.namespace:
@@ -141,9 +146,10 @@ class NFSService(CephService):
 
         return keyring
 
-    def create_rgw_keyring(self, daemon_spec: CephadmDaemonSpec[NFSServiceSpec]) -> str:
+    def create_rgw_keyring(self, daemon_spec):
+        # type: (CephadmDaemonSpec[NFSServiceSpec]) -> str
         daemon_id = daemon_spec.daemon_id
-        entity: AuthEntity = self.get_auth_entity(f'{daemon_id}-rgw')
+        entity = self.get_auth_entity(daemon_id + '-rgw') # type: AuthEntity
 
         logger.info('Create keyring: %s' % entity)
         ret, keyring, err = self.mgr.check_mon_command({
@@ -155,16 +161,18 @@ class NFSService(CephService):
 
         return keyring
 
-    def remove_rgw_keyring(self, daemon: DaemonDescription) -> None:
-        daemon_id: str = daemon.daemon_id
-        entity: AuthEntity = self.get_auth_entity(f'{daemon_id}-rgw')
+    def remove_rgw_keyring(self, daemon):
+        # type: (DaemonDescription) -> None:
+        daemon_id = daemon.daemon_id # type: str
+        entity = self.get_auth_entity(daemon_id +'-rgw') # type: AuthEntity
 
-        logger.info(f'Remove keyring: {entity}')
+        logger.info('Remove keyring: '+ entity)
         ret, out, err = self.mgr.check_mon_command({
             'prefix': 'auth rm',
             'entity': entity,
         })
 
-    def post_remove(self, daemon: DaemonDescription) -> None:
+    def post_remove(self, daemon):
+        # type: (DaemonDescription) -> None
         super().post_remove(daemon)
         self.remove_rgw_keyring(daemon)

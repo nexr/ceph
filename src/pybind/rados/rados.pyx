@@ -1139,8 +1139,8 @@ Rados object in state %s." % self.state)
         - with default settings: if crush_rule=None and auid=None
         - with a specific CRUSH rule: crush_rule given
         - with a specific auid: auid given
-        - with a specific CRUSH rule and auid: crush_rule and auid given       
- 
+        - with a specific CRUSH rule and auid: crush_rule and auid given
+
         :param pool_name: name of the pool to create
         :type pool_name: str
         :param crush_rule: rule to use for placement in the new pool
@@ -2114,7 +2114,7 @@ cdef class WriteOp(object):
 
     @requires(('xattr_name', str_type))
     def rm_xattr(self, xattr_name):
-        """  
+        """
         Removes an extended attribute on from an object.
         :param xattr_name: name of the xattr to remove
         :type xattr_name: str
@@ -2221,7 +2221,7 @@ cdef class WriteOp(object):
     def execute(self, cls, method, data):
         """
         Execute an OSD class method on an object
-        
+
         :param cls: name of the object class
         :type cls: str
         :param method: name of the method
@@ -2339,8 +2339,8 @@ cdef class Watch(object):
 
         cdef:
             char *_oid = self.oid
-            uint64_t _cookie;
-            uint32_t _timeout = timeout;
+            uint64_t _cookie
+            uint32_t _timeout = timeout
             void *_args = <PyObject*>self
 
         with nogil:
@@ -2380,7 +2380,8 @@ cdef class Watch(object):
             _replay = replay
             _replaylen = len(replay)
 
-        with nogil:
+            # XXX: need a check
+            # with nogil:
             rados_notify_ack(_io, _obj, _notify_id, _cookie, _replay,
                              _replaylen)
 
@@ -2664,7 +2665,7 @@ cdef class Ioctx(object):
               ('offset', int), ('oncomplete', opt(Callable)))
     def aio_writesame(self, object_name, to_write, write_len, offset=0,
                       oncomplete=None):
-        """    
+        """
         Asynchronously write the same buffer multiple times
 
         :param object_name: name of the object
@@ -2675,7 +2676,7 @@ cdef class Ioctx(object):
         :type write_len: int
         :param offset: byte offset in the object to begin writing at
         :type offset: int
-        :param oncomplete: what to do when the writesame is safe and 
+        :param oncomplete: what to do when the writesame is safe and
             complete in memory on all replicas
         :type oncomplete: completion
         :raises: :class:`Error`
@@ -2695,7 +2696,7 @@ cdef class Ioctx(object):
         completion = self.__get_completion(oncomplete, None)
         self.__track_completion(completion)
         with nogil:
-            ret = rados_aio_writesame(self.io, _object_name, completion.rados_comp, 
+            ret = rados_aio_writesame(self.io, _object_name, completion.rados_comp,
                                        _to_write, _data_len, _write_len, _offset)
 
         if ret < 0:

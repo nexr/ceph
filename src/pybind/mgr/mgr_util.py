@@ -128,7 +128,8 @@ class ServerConfigException(Exception):
     pass
 
 
-def create_self_signed_cert(organisation='Ceph', common_name='mgr') -> Tuple[str, str]:
+def create_self_signed_cert(organisation='Ceph', common_name='mgr'):
+    # type: (str, str) -> Tuple[str, str]:
     """Returns self-signed PEM certificates valid for 10 years.
     :return cert, pkey
     """

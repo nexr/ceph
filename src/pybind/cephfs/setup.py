@@ -9,21 +9,19 @@ import tempfile
 import textwrap
 from distutils.ccompiler import new_compiler
 from distutils.errors import CompileError, LinkError
-from itertools import filterfalse, takewhile
+from itertools import takewhile
 import distutils.sysconfig
 
 
 def filter_unsupported_flags(compiler, flags):
     args = takewhile(lambda argv: not argv.startswith('-'), [compiler] + flags)
     if any('clang' in arg for arg in args):
-        return list(filterfalse(lambda f:
-                                f in ('-mcet',
-                                      '-fstack-clash-protection',
-                                      '-fno-var-tracking-assignments',
-                                      '-Wno-deprecated-register',
-                                      '-Wno-gnu-designator') or
-                                f.startswith('-fcf-protection'),
-                                flags))
+        return [f for f in flags if not (f == '-mcet' or
+                                         f == '-fstack-clash-protection' or
+                                         f == '-fno-var-tracking-assignments' or
+                                         f == '-Wno-deprecated-register' or
+                                         f == '-Wno-gnu-designator' or
+                                         f.startswith('-fcf-protection'))]
     else:
         return flags
 

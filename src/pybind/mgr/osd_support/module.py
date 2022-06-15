@@ -11,9 +11,9 @@ class OSDSupport(MgrModule):
 
     COMMANDS = []
 
-    MODULE_OPTIONS: []
+    MODULE_OPTIONS = []
 
-    NATIVE_OPTIONS: []
+    NATIVE_OPTIONS = []
 
     def __init__(self, *args, **kwargs):
         super(OSDSupport, self).__init__(*args, **kwargs)

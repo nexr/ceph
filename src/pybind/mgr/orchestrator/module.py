@@ -30,7 +30,8 @@ def nice_delta(now, t, suffix=''):
         return '-'
 
 
-def to_format(what, format: str, many: bool, cls):
+def to_format(what, format, many, cls):
+    # type: (str, str, bool, Any) -> ???
     def to_json_1(obj):
         if hasattr(obj, 'to_json'):
             return obj.to_json()
@@ -68,7 +69,7 @@ def to_format(what, format: str, many: bool, cls):
             return yaml.dump_all(to_yaml(copy), default_flow_style=False)
         return yaml.dump(to_yaml(copy), default_flow_style=False)
     else:
-        raise OrchestratorError(f'unsupported format type: {format}')
+        raise OrchestratorError('unsupported format type: ' + format)
 
 
 def generate_preview_tables(data, osd_only=False):
@@ -80,29 +81,29 @@ def generate_preview_tables(data, osd_only=False):
     service_table = preview_table_services(data)
 
     if osd_only:
-        tables = f"""
-{''.join(warning)}
+        tables = '''
+%s
 
 ################
 OSDSPEC PREVIEWS
 ################
-{osd_table}
-"""
+%s
+''' % (''.join(warning), osd_table)
         return tables
     else:
-        tables = f"""
-{''.join(warning)}
+        tables = '''
+%s
 
 ####################
 SERVICESPEC PREVIEWS
 ####################
-{service_table}
+%s
 
 ################
 OSDSPEC PREVIEWS
 ################
-{osd_table}
-"""
+%s
+''' % (''.join(warning), service_table, osd_table)
         return tables
 
 
@@ -286,7 +287,8 @@ class OrchestratorCli(OrchestratorClientMixin, MgrModule):
         'name=addr,type=CephString,req=false '
         'name=labels,type=CephString,n=N,req=false',
         'Add a host')
-    def _add_host(self, hostname: str, addr: Optional[str] = None, labels: Optional[List[str]] = None):
+    def _add_host(self, hostname, addr = None, labels = None):
+        # type: (str, Optional[str], Optional[List[str]]) -> HandleCommandResult
         s = HostSpec(hostname=hostname, addr=addr, labels=labels)
         completion = self.add_host(s)
         self._orchestrator_wait([completion])
@@ -362,7 +364,8 @@ class OrchestratorCli(OrchestratorClientMixin, MgrModule):
         'orch host ok-to-stop',
         'name=hostname,type=CephString',
         desc='Check if the specified host can be safely stopped without reducing availability')
-    def _host_ok_to_stop(self, hostname: str):
+    def _host_ok_to_stop(self, hostname):
+        # type: (str) -> HandleCommandResult
         completion = self.host_ok_to_stop(hostname)
         self._orchestrator_wait([completion])
         raise_if_exception(completion)
@@ -501,7 +504,7 @@ class OrchestratorCli(OrchestratorClientMixin, MgrModule):
                                            refresh=refresh)
         self._orchestrator_wait([completion])
         raise_if_exception(completion)
-        services: List[ServiceDescription] = completion.result
+        services = completion.result # type: List[ServiceDescription]
 
         def ukn(s):
             return '<unknown>' if s is None else s
@@ -570,7 +573,7 @@ class OrchestratorCli(OrchestratorClientMixin, MgrModule):
                                        refresh=refresh)
         self._orchestrator_wait([completion])
         raise_if_exception(completion)
-        daemons: List[DaemonDescription] = completion.result
+        daemons = completion.result # type: List[DaemonDescription]
 
         def ukn(s):
             return '<unknown>' if s is None else s
@@ -637,48 +640,49 @@ class OrchestratorCli(OrchestratorClientMixin, MgrModule):
         "name=format,type=CephChoices,strings=plain|json|json-pretty|yaml,req=false",
         'Create OSD daemon(s) using a drive group spec')
     def _apply_osd(self,
-                   all_available_devices: bool = False,
-                   format: str = 'plain',
+                   all_available_devices = False,
+                   format = 'plain',
                    unmanaged=None,
                    dry_run=None,
-                   inbuf: Optional[str] = None) -> HandleCommandResult:
+                   inbuf = None):
+        # type: (bool, str, ???, ???, Optional[str]) -> HandleCommandResult
         """Apply DriveGroupSpecs to create OSDs"""
         usage = """
 usage:
   ceph orch apply osd -i <json_file/yaml_file> [--dry-run]
   ceph orch apply osd --all-available-devices [--dry-run] [--unmanaged]
-  
+
 Restrictions:
-  
+
   Mutexes:
   * -i, --all-available-devices
   * -i, --unmanaged (this would overwrite the osdspec loaded from a file)
-  
+
   Parameters:
-  
+
   * --unmanaged
      Only works with --all-available-devices.
-  
+
 Description:
-  
+
   * -i
     An inbuf object like a file or a json/yaml blob containing a valid OSDSpec
-    
+
   * --all-available-devices
     The most simple OSDSpec there is. Takes all as 'available' marked devices
     and creates standalone OSDs on them.
-    
+
   * --unmanaged
     Set a the unmanaged flag for all--available-devices (default is False)
-    
+
 Examples:
 
    # ceph orch apply osd -i <file.yml|json>
-   
+
    Applies one or more OSDSpecs found in <file>
-   
+
    # ceph orch osd apply --all-available-devices --unmanaged=true
-   
+
    Creates and applies simple OSDSpec with the unmanaged flag set to <true>
 """
 
@@ -697,7 +701,7 @@ Examples:
             try:
                 drivegroups = [_dg for _dg in yaml.safe_load_all(inbuf)]
             except yaml.scanner.ScannerError as e:
-                msg = f"Invalid YAML received : {str(e)}"
+                msg = "Invalid YAML received : " + str(e)
                 self.log.exception(e)
                 return HandleCommandResult(-errno.EINVAL, stderr=msg)
 
@@ -787,10 +791,8 @@ Usage:
         "name=replace,type=CephBool,req=false "
         "name=force,type=CephBool,req=false",
         'Remove OSD services')
-    def _osd_rm_start(self,
-                      svc_id: List[str],
-                      replace: bool = False,
-                      force: bool = False) -> HandleCommandResult:
+    def _osd_rm_start(self, svc_id, replace = False, force = False):
+        # type: (List[str], bool, bool) -> HandleCommandResult
         completion = self.remove_osds(svc_id, replace=replace, force=force)
         self._orchestrator_wait([completion])
         raise_if_exception(completion)
@@ -800,7 +802,8 @@ Usage:
         'orch osd rm stop',
         "name=svc_id,type=CephString,n=N",
         'Remove OSD services')
-    def _osd_rm_stop(self, svc_id: List[str]) -> HandleCommandResult:
+    def _osd_rm_stop(self, svc_id):
+        # type: (List[str]) -> HandleCommandResult
         completion = self.stop_remove_osds(svc_id)
         self._orchestrator_wait([completion])
         raise_if_exception(completion)
@@ -810,7 +813,8 @@ Usage:
         'orch osd rm status',
         "name=format,type=CephChoices,strings=plain|json|json-pretty|yaml,req=false",
         desc='status of OSD removal operation')
-    def _osd_rm_status(self, format='plain') -> HandleCommandResult:
+    def _osd_rm_status(self, format='plain'):
+        # type: (str) -> HandleCommandResult
         completion = self.remove_osds_status()
         self._orchestrator_wait([completion])
         raise_if_exception(completion)
@@ -840,13 +844,11 @@ Usage:
         'name=daemon_type,type=CephChoices,strings=mon|mgr|rbd-mirror|crash|alertmanager|grafana|node-exporter|prometheus,req=false '
         'name=placement,type=CephString,req=false',
         'Add daemon(s)')
-    def _daemon_add_misc(self,
-                         daemon_type: Optional[str] = None,
-                         placement: Optional[str] = None,
-                         inbuf: Optional[str] = None) -> HandleCommandResult:
-        usage = f"""Usage:
-    ceph orch daemon add -i <json_file>
-    ceph orch daemon add {daemon_type or '<daemon_type>'} <placement>"""
+    def _daemon_add_misc(self, daemon_type = None, placement = None, inbuf = None):
+        # type: (Optional[str], Optional[str], Optional[str]) -> HandleCommandResult
+        usage = '''Usage:
+ceph orch daemon add -i <json_file>
+ceph orch daemon add %s <placement>''' % (daemon_type or '<daemon_type>')
         if inbuf:
             if daemon_type or placement:
                 raise OrchestratorValidationError(usage)
@@ -883,7 +885,7 @@ Usage:
         elif daemon_type == 'iscsi':
             completion = self.add_iscsi(spec)
         else:
-            raise OrchestratorValidationError(f'unknown daemon type `{daemon_type}`')
+            raise OrchestratorValidationError('unknown daemon type `%s`' % daemon_type)
 
         self._orchestrator_wait([completion])
         raise_if_exception(completion)
@@ -894,10 +896,8 @@ Usage:
         'name=fs_name,type=CephString '
         'name=placement,type=CephString,req=false',
         'Start MDS daemon(s)')
-    def _mds_add(self,
-                 fs_name: str,
-                 placement: Optional[str] = None,
-                 inbuf: Optional[str] = None) -> HandleCommandResult:
+    def _mds_add(self, fs_name, placement = None, inbuf = None):
+        # type: (str, Optional[str], Optional[str]) -> HandleCommandResult
         if inbuf:
             raise OrchestratorValidationError('unrecognized command -i; -h or --help for usage')
 
@@ -922,13 +922,14 @@ Usage:
         'name=placement,type=CephString,req=false',
         'Start RGW daemon(s)')
     def _rgw_add(self,
-                 realm_name: str,
-                 zone_name: str,
-                 subcluster: Optional[str] = None,
-                 port: Optional[int] = None,
-                 ssl: bool = False,
-                 placement: Optional[str] = None,
-                 inbuf: Optional[str] = None) -> HandleCommandResult:
+                 realm_name,
+                 zone_name,
+                 subcluster = None,
+                 port = None,
+                 ssl = False,
+                 placement = None,
+                 inbuf = None):
+        # type: (str, str, Optional[str], Optional[int], bool, Optional[str], Optional[str]) -> HandleCommandResult
         if inbuf:
             raise OrchestratorValidationError('unrecognized command -i; -h or --help for usage')
 
@@ -954,11 +955,12 @@ Usage:
         'name=placement,type=CephString,req=false',
         'Start NFS daemon(s)')
     def _nfs_add(self,
-                 svc_id: str,
-                 pool: str,
-                 namespace: Optional[str] = None,
-                 placement: Optional[str] = None,
-                 inbuf: Optional[str] = None) -> HandleCommandResult:
+                 svc_id,
+                 pool,
+                 namespace = None,
+                 placement = None,
+                 inbuf = None):
+        # type: (str, str, Optional[str], Optional[str], Optional[str]) -> HandleCommandResult
         if inbuf:
             raise OrchestratorValidationError('unrecognized command -i; -h or --help for usage')
 
@@ -983,12 +985,13 @@ Usage:
         'name=placement,type=CephString,req=false',
         'Start iscsi daemon(s)')
     def _iscsi_add(self,
-                   pool: str,
-                   api_user: str,
-                   api_password: str,
-                   trusted_ip_list: Optional[str] = None,
-                   placement: Optional[str] = None,
-                   inbuf: Optional[str] = None) -> HandleCommandResult:
+                   pool,
+                   api_user,
+                   api_password,
+                   trusted_ip_list = None,
+                   placement = None,
+                   inbuf = None):
+        # type: (str, str, str, Optional[str], Optional[str], Optional[str]) -> HandleCommandResult
         if inbuf:
             raise OrchestratorValidationError('unrecognized command -i; -h or --help for usage')
 
@@ -1035,7 +1038,8 @@ Usage:
         "name=name,type=CephString "
         "name=image,type=CephString,req=false",
         'Redeploy a daemon (with a specifc image)')
-    def _daemon_action_redeploy(self, name: str, image: Optional[str] = None) -> HandleCommandResult:
+    def _daemon_action_redeploy(self, name, image = None):
+        # type: (str, Optional[str]) -> HandleCommandResult
         if '.' not in name:
             raise OrchestratorError('%s is not a valid daemon name' % name)
         completion = self.daemon_action("redeploy", name, image=image)
@@ -1083,12 +1087,13 @@ Usage:
         'name=unmanaged,type=CephBool,req=false',
         'Update the size or placement for a service or apply a large yaml spec')
     def _apply_misc(self,
-                    service_type: Optional[str] = None,
-                    placement: Optional[str] = None,
-                    dry_run: bool = False,
-                    format: str = 'plain',
-                    unmanaged: bool = False,
-                    inbuf: Optional[str] = None) -> HandleCommandResult:
+                    service_type = None,
+                    placement = None,
+                    dry_run = False,
+                    format = 'plain',
+                    unmanaged = False,
+                    inbuf = None):
+        # type: (Optional[str], Optional[str], bool, str, bool, Optional[str]) -> HandleCommandResult
         usage = """Usage:
   ceph orch apply -i <yaml spec> [--dry-run]
   ceph orch apply <service_type> [--placement=<placement_string>] [--unmanaged]
@@ -1096,8 +1101,8 @@ Usage:
         if inbuf:
             if service_type or placement or unmanaged:
                 raise OrchestratorValidationError(usage)
-            content: Iterator = yaml.safe_load_all(inbuf)
-            specs: List[Union[ServiceSpec, HostSpec]] = []
+            content = yaml.safe_load_all(inbuf) # type: Iterator
+            specs = [] # type: List[Union[ServiceSpec, HostSpec]]
             for s in content:
                 spec = json_to_generic_spec(s)
                 if dry_run and not isinstance(spec, HostSpec):
@@ -1133,12 +1138,13 @@ Usage:
         'name=format,type=CephChoices,strings=plain|json|json-pretty|yaml,req=false',
         'Update the number of MDS instances for the given fs_name')
     def _apply_mds(self,
-                   fs_name: str,
-                   placement: Optional[str] = None,
-                   dry_run: bool = False,
-                   unmanaged: bool = False,
-                   format: str = 'plain',
-                   inbuf: Optional[str] = None) -> HandleCommandResult:
+                   fs_name,
+                   placement = None,
+                   dry_run = False,
+                   unmanaged = False,
+                   format = 'plain',
+                   inbuf = None):
+        # type: (str, Optional[str], bool, bool, str, Optional[str]) -> HandleCommandResult
         if inbuf:
             raise OrchestratorValidationError('unrecognized command -i; -h or --help for usage')
 
@@ -1177,16 +1183,17 @@ Usage:
         'name=unmanaged,type=CephBool,req=false',
         'Update the number of RGW instances for the given zone')
     def _apply_rgw(self,
-                   realm_name: str,
-                   zone_name: str,
-                   subcluster: Optional[str] = None,
-                   port: Optional[int] = None,
-                   ssl: bool = False,
-                   placement: Optional[str] = None,
-                   dry_run: bool = False,
-                   format: str = 'plain',
-                   unmanaged: bool = False,
-                   inbuf: Optional[str] = None) -> HandleCommandResult:
+                   realm_name,
+                   zone_name,
+                   subcluster = None,
+                   port = None,
+                   ssl = False,
+                   placement = None,
+                   dry_run = False,
+                   format = 'plain',
+                   unmanaged = False,
+                   inbuf = None):
+        # type: (str, str, Optional[str], Optional[int], bool, Optional[str], bool, str, bool, Optional[str]) -> HandleCommandResult
         if inbuf:
             raise OrchestratorValidationError('unrecognized command -i; -h or --help for usage')
 
@@ -1227,14 +1234,15 @@ Usage:
         'name=unmanaged,type=CephBool,req=false',
         'Scale an NFS service')
     def _apply_nfs(self,
-                   svc_id: str,
-                   pool: str,
-                   namespace: Optional[str] = None,
-                   placement: Optional[str] = None,
-                   format: str = 'plain',
-                   dry_run: bool = False,
-                   unmanaged: bool = False,
-                   inbuf: Optional[str] = None) -> HandleCommandResult:
+                   svc_id,
+                   pool,
+                   namespace = None,
+                   placement = None,
+                   format = 'plain',
+                   dry_run = False,
+                   unmanaged = False,
+                   inbuf = None):
+        # type: (str, str, Optional[str], Optional[str], str, bool, bool, Optional[str]) -> HandleCommandResult
         if inbuf:
             raise OrchestratorValidationError('unrecognized command -i; -h or --help for usage')
 
@@ -1274,15 +1282,16 @@ Usage:
         'name=unmanaged,type=CephBool,req=false',
         'Scale an iSCSI service')
     def _apply_iscsi(self,
-                     pool: str,
-                     api_user: str,
-                     api_password: str,
-                     trusted_ip_list: Optional[str] = None,
-                     placement: Optional[str] = None,
-                     unmanaged: bool = False,
-                     dry_run: bool = False,
-                     format: str = 'plain',
-                     inbuf: Optional[str] = None) -> HandleCommandResult:
+                     pool,
+                     api_user,
+                     api_password,
+                     trusted_ip_list = None,
+                     placement = None,
+                     unmanaged = False,
+                     dry_run = False,
+                     format = 'plain',
+                     inbuf = None):
+        # type: (str, str, str, Optional[str], Optional[str], bool, bool, str, Optional[str]) -> HandleCommandResult
         if inbuf:
             raise OrchestratorValidationError('unrecognized command -i; -h or --help for usage')
 
@@ -1447,8 +1456,8 @@ Usage:
         """
         if image and re.match(r'^v?\d+\.\d+\.\d+$', image) and ceph_version is None:
             ver = image[1:] if image.startswith('v') else image
-            s = f"Error: unable to pull image name `{image}`.\n" \
-                f"  Maybe you meant `--ceph-version {ver}`?"
+            s = "Error: unable to pull image name `%s`.\n" \
+              + "  Maybe you meant `--ceph-version %s`?" % (image, ver)
             raise OrchestratorValidationError(s)
 
     @_cli_write_command(

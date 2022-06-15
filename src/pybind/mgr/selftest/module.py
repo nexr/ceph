@@ -120,7 +120,7 @@ class Module(MgrModule):
             major = sys.version_info.major
             minor = sys.version_info.minor
             micro = sys.version_info.micro
-            return 0, f'{major}.{minor}.{micro}', ''
+            return 0, '%s.%s.%s' % (major, minor, micro), ''
 
         elif command['prefix'] == 'mgr self-test run':
             self._self_test()

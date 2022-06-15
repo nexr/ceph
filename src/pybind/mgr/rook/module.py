@@ -552,7 +552,8 @@ class RookOrchestrator(MgrModule, orchestrator.Orchestrator):
         c = self.get_hosts().then(execute)
         return c
 
-    def blink_device_light(self, ident_fault: str, on: bool, locs: List[orchestrator.DeviceLightLoc]) -> RookCompletion:
+    def blink_device_light(self, ident_fault, on, locs):
+        # type: (str, bool, List[orchestrator.DeviceLightLoc]) -> RookCompletion
         return write_completion(
             on_complete=lambda: self.rook_cluster.blink_light(
                 ident_fault, on, locs),

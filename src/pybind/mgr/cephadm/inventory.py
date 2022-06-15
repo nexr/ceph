@@ -27,12 +27,13 @@ class Inventory:
     The inventory stores a HostSpec for all hosts persistently.
     """
 
-    def __init__(self, mgr: 'CephadmOrchestrator'):
+    def __init__(self, mgr):
+        # type: (CephadmOrchestrator) -> None
         self.mgr = mgr
         # load inventory
         i = self.mgr.get_store('inventory')
         if i:
-            self._inventory: Dict[str, dict] = json.loads(i)
+            self._inventory = json.loads(i) # type: Dict[str, dict]
             # handle old clusters missing 'hostname' key from hostspec
             for k, v in self._inventory.items():
                 if 'hostname' not in v:
@@ -41,31 +42,38 @@ class Inventory:
             self._inventory = dict()
         logger.debug('Loaded inventory %s' % self._inventory)
 
-    def keys(self) -> List[str]:
+    def keys(self):
+        # type: () -> List[str]
         return list(self._inventory.keys())
 
-    def __contains__(self, host: str) -> bool:
+    def __contains__(self, host):
+        # type: (str) -> bool
         return host in self._inventory
 
-    def assert_host(self, host: str) -> None:
+    def assert_host(self, host):
+        # type: (str) -> None
         if host not in self._inventory:
             raise OrchestratorError('host %s does not exist' % host)
 
-    def add_host(self, spec: HostSpec) -> None:
+    def add_host(self, spec):
+        # type: (HostSpec) -> None
         self._inventory[spec.hostname] = spec.to_json()
         self.save()
 
-    def rm_host(self, host: str) -> None:
+    def rm_host(self, host):
+        # type: (str) -> None
         self.assert_host(host)
         del self._inventory[host]
         self.save()
 
-    def set_addr(self, host: str, addr: str) -> None:
+    def set_addr(self, host, addr):
+        # type: (str, str) -> None
         self.assert_host(host)
         self._inventory[host]['addr'] = addr
         self.save()
 
-    def add_label(self, host: str, label: str) -> None:
+    def add_label(self, host, label):
+        # type: (str, str) -> None
         self.assert_host(host)
 
         if 'labels' not in self._inventory[host]:
@@ -74,7 +82,8 @@ class Inventory:
             self._inventory[host]['labels'].append(label)
         self.save()
 
-    def rm_label(self, host: str, label: str) -> None:
+    def rm_label(self, host, label):
+        # type: (str, str) -> None
         self.assert_host(host)
 
         if 'labels' not in self._inventory[host]:
@@ -83,11 +92,13 @@ class Inventory:
             self._inventory[host]['labels'].remove(label)
         self.save()
 
-    def get_addr(self, host: str) -> str:
+    def get_addr(self, host):
+        # type: (str) -> str
         self.assert_host(host)
         return self._inventory[host].get('addr', host)
 
-    def filter_by_label(self, label: Optional[str] = '', as_hostspec: bool = False) -> Iterator:
+    def filter_by_label(self, label = '', as_hostspec = False):
+        # type: (Optional[str], bool) -> Iterator
         for h, hostspec in self._inventory.items():
             if not label or label in hostspec.get('labels', []):
                 if as_hostspec:
@@ -95,7 +106,8 @@ class Inventory:
                 else:
                     yield h
 
-    def spec_from_dict(self, info: dict) -> HostSpec:
+    def spec_from_dict(self, info):
+        # type: (dict) -> HostSpec
         hostname = info['hostname']
         return HostSpec(
             hostname,
@@ -104,10 +116,12 @@ class Inventory:
             status='Offline' if hostname in self.mgr.offline_hosts else info.get('status', ''),
         )
 
-    def all_specs(self) -> List[HostSpec]:
+    def all_specs(self):
+        # type: () -> List[HostSpec]
         return list(map(self.spec_from_dict, self._inventory.values()))
 
-    def save(self) -> None:
+    def save(self):
+        # type: () -> None
         self.mgr.set_store('inventory', json.dumps(self._inventory))
 
 
@@ -161,7 +175,8 @@ class SpecStore():
             self.mgr.set_store(SPEC_STORE_PREFIX + service_name, None)
         return found
 
-    def find(self, service_name: Optional[str] = None) -> List[ServiceSpec]:
+    def find(self, service_name = None):
+        # type: (Optional[str]) -> List[ServiceSpec]
         specs = []
         for sn, spec in self.specs.items():
             if not service_name or \
@@ -194,19 +209,19 @@ class HostCache():
 
     4. `last_etc_ceph_ceph_conf` O(hosts)
 
-    Stores the last refresh time for the /etc/ceph/ceph.conf. Used 
+    Stores the last refresh time for the /etc/ceph/ceph.conf. Used
     to avoid deploying new configs when failing over to a new mgr.
 
     5. `scheduled_daemon_actions`: O(daemons)
 
     Used to run daemon actions after deploying a daemon. We need to
     store it persistently, in order to stay consistent across
-    MGR failovers.   
+    MGR failovers.
     """
 
     def __init__(self, mgr):
         # type: (CephadmOrchestrator) -> None
-        self.mgr: CephadmOrchestrator = mgr
+        self.mgr = mgr # type: CephadmOrchestrator
         self.daemons = {}   # type: Dict[str, Dict[str, orchestrator.DaemonDescription]]
         self.last_daemon_update = {}   # type: Dict[str, datetime.datetime]
         self.devices = {}              # type: Dict[str, List[inventory.Device]]
@@ -223,10 +238,10 @@ class HostCache():
         self.daemon_config_deps = {}   # type: Dict[str, Dict[str, Dict[str,Any]]]
         self.last_host_check = {}      # type: Dict[str, datetime.datetime]
         self.loading_osdspec_preview = set()  # type: Set[str]
-        self.last_etc_ceph_ceph_conf: Dict[str, datetime.datetime] = {}
-        self.registry_login_queue: Set[str] = set()
+        self.last_etc_ceph_ceph_conf = {} # type: Dict[str, datetime.datetime]
+        self.registry_login_queue = set() # type: Set[str]
 
-        self.scheduled_daemon_actions: Dict[str, Dict[str, str]] = {}
+        self.scheduled_daemon_actions = {} # type: Dict[str, Dict[str, str]]
 
     def load(self):
         # type: () -> None
@@ -297,7 +312,8 @@ class HostCache():
         self.networks[host] = nets
         self.last_device_update[host] = datetime_now()
 
-    def update_daemon_config_deps(self, host: str, name: str, deps: List[str], stamp: datetime.datetime) -> None:
+    def update_daemon_config_deps(self, host, name, deps, stamp):
+        # type: (str, str, List[str], datetime.datetime) -> None
         self.daemon_config_deps[host][name] = {
             'deps': deps,
             'last_config': stamp,
@@ -336,16 +352,18 @@ class HostCache():
             del self.last_device_update[host]
         self.mgr.event.set()
 
-    def distribute_new_registry_login_info(self) -> None:
+    def distribute_new_registry_login_info(self):
+        # type: () -> None
         self.registry_login_queue = set(self.mgr.inventory.keys())
 
-    def save_host(self, host: str) -> None:
-        j: Dict[str, Any] = {
+    def save_host(self, host):
+        # type: (str) -> None
+        j = {
             'daemons': {},
             'devices': [],
             'osdspec_previews': [],
             'daemon_config_deps': {},
-        }
+        } # type: Dict[str, Any]
         if host in self.last_daemon_update:
             j['last_daemon_update'] = datetime_to_str(self.last_daemon_update[host])
         if host in self.last_device_update:
@@ -418,15 +436,18 @@ class HostCache():
                 r.append(dd)
         return r
 
-    def get_daemon(self, daemon_name: str) -> orchestrator.DaemonDescription:
+    def get_daemon(self, daemon_name):
+        # type: (str) -> orchestrator.DaemonDescription
         for _, dm in self.daemons.items():
             for _, dd in dm.items():
                 if dd.name() == daemon_name:
                     return dd
-        raise orchestrator.OrchestratorError(f'Unable to find {daemon_name} daemon(s)')
+        raise orchestrator.OrchestratorError('Unable to find %s daemon(s)' % daemon_name)
 
-    def get_daemons_with_volatile_status(self) -> Iterator[Tuple[str, Dict[str, orchestrator.DaemonDescription]]]:
-        def alter(host: str, dd_orig: orchestrator.DaemonDescription) -> orchestrator.DaemonDescription:
+    def get_daemons_with_volatile_status(self):
+        # type: () -> Iterator[Tuple[str, Dict[str, orchestrator.DaemonDescription]]]
+        def alter(host, dd_orig):
+            # type: (str, orchestrator.DaemonDescription) -> orchestrator.DaemonDescription
             dd = copy(dd_orig)
             if host in self.mgr.offline_hosts:
                 dd.status = -1
@@ -463,7 +484,8 @@ class HostCache():
                 r.append(name)
         return r
 
-    def get_daemon_last_config_deps(self, host: str, name: str) -> Tuple[Optional[List[str]], Optional[datetime.datetime]]:
+    def get_daemon_last_config_deps(self, host, name):
+        # type: (str, str) -> Tuple[Optional[List[str]], Optional[datetime.datetime]]
         if host in self.daemon_config_deps:
             if name in self.daemon_config_deps[host]:
                 return self.daemon_config_deps[host][name].get('deps', []), \
@@ -473,7 +495,7 @@ class HostCache():
     def host_needs_daemon_refresh(self, host):
         # type: (str) -> bool
         if host in self.mgr.offline_hosts:
-            logger.debug(f'Host "{host}" marked as offline. Skipping daemon refresh')
+            logger.debug('Host "%s" marked as offline. Skipping daemon refresh' % host)
             return False
         if host in self.daemon_refresh_queue:
             self.daemon_refresh_queue.remove(host)
@@ -487,7 +509,7 @@ class HostCache():
     def host_needs_facts_refresh(self, host):
         # type: (str) -> bool
         if host in self.mgr.offline_hosts:
-            logger.debug(f'Host "{host}" marked as offline. Skipping gather facts refresh')
+            logger.debug('Host "%s" marked as offline. Skipping gather facts refresh' % host)
             return False
         cutoff = datetime.datetime.utcnow() - datetime.timedelta(
             seconds=self.mgr.facts_cache_timeout)
@@ -495,7 +517,8 @@ class HostCache():
             return True
         return False
 
-    def host_had_daemon_refresh(self, host: str) -> bool:
+    def host_had_daemon_refresh(self, host):
+        # type: (str) -> bool
         """
         ... at least once.
         """
@@ -508,7 +531,7 @@ class HostCache():
     def host_needs_device_refresh(self, host):
         # type: (str) -> bool
         if host in self.mgr.offline_hosts:
-            logger.debug(f'Host "{host}" marked as offline. Skipping device refresh')
+            logger.debug('Host "%s" marked as offline. Skipping device refresh' % host)
             return False
         if host in self.device_refresh_queue:
             self.device_refresh_queue.remove(host)
@@ -519,9 +542,10 @@ class HostCache():
             return True
         return False
 
-    def host_needs_osdspec_preview_refresh(self, host: str) -> bool:
+    def host_needs_osdspec_preview_refresh(self, host):
+        # type: (str) -> bool
         if host in self.mgr.offline_hosts:
-            logger.debug(f'Host "{host}" marked as offline. Skipping osdspec preview refresh')
+            logger.debug('Host "%s" marked as offline. Skipping osdspec preview refresh' % host)
             return False
         if host in self.osdspec_previews_refresh_queue:
             self.osdspec_previews_refresh_queue.remove(host)
@@ -536,7 +560,8 @@ class HostCache():
             seconds=self.mgr.host_check_interval)
         return host not in self.last_host_check or self.last_host_check[host] < cutoff
 
-    def host_needs_new_etc_ceph_ceph_conf(self, host: str) -> bool:
+    def host_needs_new_etc_ceph_ceph_conf(self, host):
+        # type: (str) -> bool
         if not self.mgr.manage_etc_ceph_ceph_conf:
             return False
         if self.mgr.paused:
@@ -554,12 +579,14 @@ class HostCache():
         # already up to date:
         return False
 
-    def update_last_etc_ceph_ceph_conf(self, host: str) -> None:
+    def update_last_etc_ceph_ceph_conf(self, host):
+        # type: (str) -> None
         if not self.mgr.last_monmap:
             return
         self.last_etc_ceph_ceph_conf[host] = datetime_now()
 
-    def host_needs_registry_login(self, host: str) -> bool:
+    def host_needs_registry_login(self, host):
+        # type: (str) -> bool
         if host in self.mgr.offline_hosts:
             return False
         if host in self.registry_login_queue:
@@ -572,12 +599,14 @@ class HostCache():
         assert host in self.daemons
         self.daemons[host][dd.name()] = dd
 
-    def rm_daemon(self, host: str, name: str) -> None:
+    def rm_daemon(self, host, name):
+        # type: (str, str) -> None
         if host in self.daemons:
             if name in self.daemons[host]:
                 del self.daemons[host][name]
 
-    def daemon_cache_filled(self) -> bool:
+    def daemon_cache_filled(self):
+        # type: () -> bool
         """
         i.e. we have checked the daemons for each hosts at least once.
         excluding offline hosts.
@@ -588,7 +617,8 @@ class HostCache():
         return all((self.host_had_daemon_refresh(h) or h in self.mgr.offline_hosts)
                    for h in self.get_hosts())
 
-    def schedule_daemon_action(self, host: str, daemon_name: str, action: str) -> None:
+    def schedule_daemon_action(self, host, daemon_name, action):
+        # type: (str, str, str) -> None
         priorities = {
             'start': 1,
             'restart': 2,
@@ -599,31 +629,34 @@ class HostCache():
         existing_action = self.scheduled_daemon_actions.get(host, {}).get(daemon_name, None)
         if existing_action and priorities[existing_action] > priorities[action]:
             logger.debug(
-                f'skipping {action}ing {daemon_name}, cause {existing_action} already scheduled.')
+                'skipping %{s}ing %s, cause %s already scheduled.' % (action, daemon_name, existing_action))
             return
 
         if host not in self.scheduled_daemon_actions:
             self.scheduled_daemon_actions[host] = {}
         self.scheduled_daemon_actions[host][daemon_name] = action
 
-    def rm_scheduled_daemon_action(self, host: str, daemon_name: str) -> None:
+    def rm_scheduled_daemon_action(self, host, daemon_name):
+        # type: (str, str) -> None
         if host in self.scheduled_daemon_actions:
             if daemon_name in self.scheduled_daemon_actions[host]:
                 del self.scheduled_daemon_actions[host][daemon_name]
             if not self.scheduled_daemon_actions[host]:
                 del self.scheduled_daemon_actions[host]
 
-    def get_scheduled_daemon_action(self, host: str, daemon: str) -> Optional[str]:
+    def get_scheduled_daemon_action(self, host, daemon):
+        # type: (str, str) -> Optional[str]
         return self.scheduled_daemon_actions.get(host, {}).get(daemon)
 
 
 class EventStore():
     def __init__(self, mgr):
         # type: (CephadmOrchestrator) -> None
-        self.mgr: CephadmOrchestrator = mgr
+        self.mgr = mgr # type: CephadmOrchestrator
         self.events = {}  # type: Dict[str, List[OrchestratorEvent]]
 
-    def add(self, event: OrchestratorEvent) -> None:
+    def add(self, event):
+        # type: (OrchestratorEvent) -> None
 
         if event.kind_subject() not in self.events:
             self.events[event.kind_subject()] = [event]
@@ -637,12 +670,14 @@ class EventStore():
         # limit to five events for now.
         self.events[event.kind_subject()] = self.events[event.kind_subject()][-5:]
 
-    def for_service(self, spec: ServiceSpec, level: str, message: str) -> None:
+    def for_service(self, spec, level, message):
+        # type: (ServiceSpec, str, str) -> None
         e = OrchestratorEvent(datetime_now(), 'service',
                               spec.service_name(), level, message)
         self.add(e)
 
-    def from_orch_error(self, e: OrchestratorError) -> None:
+    def from_orch_error(self, e):
+        # type: (OrchestratorError) -> None
         if e.event_subject is not None:
             self.add(OrchestratorEvent(
                 datetime_now(),
@@ -652,21 +687,24 @@ class EventStore():
                 str(e)
             ))
 
-    def for_daemon(self, daemon_name: str, level: str, message: str) -> None:
+    def for_daemon(self, daemon_name, level, message):
+        # type: (str, str, str) -> None
         e = OrchestratorEvent(datetime_now(), 'daemon', daemon_name, level, message)
         self.add(e)
 
-    def for_daemon_from_exception(self, daemon_name: str, e: Exception) -> None:
+    def for_daemon_from_exception(self, daemon_name, e):
+        # type: (str, Exception) -> None
         self.for_daemon(
             daemon_name,
             "ERROR",
             str(e)
         )
 
-    def cleanup(self) -> None:
+    def cleanup(self):
+        # type: () -> None
         # Needs to be properly done, in case events are persistently stored.
 
-        unknowns: List[str] = []
+        unknowns = [] # type: List[str]
         daemons = self.mgr.cache.get_daemon_names()
         specs = self.mgr.spec_store.specs.keys()
         for k_s, v in self.events.items():
@@ -681,8 +719,10 @@ class EventStore():
         for k_s in unknowns:
             del self.events[k_s]
 
-    def get_for_service(self, name: str) -> List[OrchestratorEvent]:
+    def get_for_service(self, name):
+        # type: (str) -> List[OrchestratorEvent]
         return self.events.get('service:' + name, [])
 
-    def get_for_daemon(self, name: str) -> List[OrchestratorEvent]:
+    def get_for_daemon(self, name):
+        # type: (str) -> List[OrchestratorEvent]
         return self.events.get('daemon:' + name, [])

@@ -26,7 +26,7 @@ def pin(fs, path, pin_type, pin_setting):
     try:
         pin_setting = _pin_value[pin_type](pin_setting)
     except ValueError as e:
-        raise VolumeException(-errno.EINVAL, f"pin value wrong type: {pin_setting}")
+        raise VolumeException(-errno.EINVAL, "pin value wrong type: %s" % pin_setting)
 
     try:
         fs.setxattr(path, _pin_xattr[pin_type], str(pin_setting).encode('utf-8'), 0)

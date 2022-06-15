@@ -4,7 +4,8 @@ import re
 from typing import Optional
 
 
-def datetime_now() -> datetime.datetime:
+def datetime_now():
+    # type: () -> datetime.datetime
     """
     Return the current local date and time.
     :return: Returns an aware datetime object of the current date
@@ -13,7 +14,8 @@ def datetime_now() -> datetime.datetime:
     return datetime.datetime.now(tz=datetime.timezone.utc)
 
 
-def datetime_to_str(dt: datetime.datetime) -> str:
+def datetime_to_str(dt):
+    # type: (datetime.datetime) -> str
     """
     Convert a datetime object into a ISO 8601 string, e.g.
     '2019-04-24T17:06:53.039991Z'.
@@ -25,7 +27,8 @@ def datetime_to_str(dt: datetime.datetime) -> str:
         '%Y-%m-%dT%H:%M:%S.%fZ')
 
 
-def str_to_datetime(string: str) -> datetime.datetime:
+def str_to_datetime(string):
+    # type: (str) -> datetime.datetime
     """
     Convert an ISO 8601 string into a datetime object.
     The following formats are supported:
@@ -70,7 +73,8 @@ def str_to_datetime(string: str) -> datetime.datetime:
         string, str(fmts)))
 
 
-def parse_timedelta(delta: str) -> Optional[datetime.timedelta]:
+def parse_timedelta(delta):
+    # type: (str) -> Optional[datetime.timedelta]
     """
     Returns a timedelta object represents a duration, the difference
     between two dates or times.

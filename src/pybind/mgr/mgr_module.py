@@ -688,7 +688,8 @@ class MgrStandbyModule(ceph_module.BaseMgrStandbyModule, MgrModuleLoggingMixin):
         """
         return self._ceph_get_store(key)
 
-    def get_localized_store(self, key: str, default: Optional[str] = None) -> Optional[str]:
+    def get_localized_store(self, key, default = None):
+        # type: (str, Optional[str]) -> Optional[str]
         r = self._ceph_get_store(_get_localized_key(self.get_mgr_id(), key))
         if r is None:
             r = self._ceph_get_store(key)
@@ -1118,7 +1119,8 @@ class MgrModule(ceph_module.BaseMgrModule, MgrModuleLoggingMixin):
         """
         return self._ceph_get_daemon_status(svc_type, svc_id)
 
-    def check_mon_command(self, cmd_dict: dict, inbuf: Optional[str]=None) -> HandleCommandResult:
+    def check_mon_command(self, cmd_dict, inbuf=None):
+        # type: (dict, Optional[str]) -> HandleCommandResult
         """
         Wrapper around :func:`~mgr_module.MgrModule.mon_command`, but raises,
         if ``retval != 0``.
@@ -1126,10 +1128,11 @@ class MgrModule(ceph_module.BaseMgrModule, MgrModuleLoggingMixin):
 
         r = HandleCommandResult(*self.mon_command(cmd_dict, inbuf))
         if r.retval:
-            raise MonCommandFailed(f'{cmd_dict["prefix"]} failed: {r.stderr} retval: {r.retval}')
+            raise MonCommandFailed('{cmd_dict["prefix"]} failed: %s retval: %s' % (r.stderr, r.retval))
         return r
 
-    def mon_command(self, cmd_dict: dict, inbuf: Optional[str]=None):
+    def mon_command(self, cmd_dict, inbuf=None):
+        # type: (dict, Optional[str]) -> HandleCommandResult
         """
         Helper for modules that do simple, synchronous mon command
         execution.
@@ -1153,12 +1156,13 @@ class MgrModule(ceph_module.BaseMgrModule, MgrModuleLoggingMixin):
 
     def send_command(
             self,
-            result: CommandResult,
-            svc_type: str,
-            svc_id: str,
-            command: str,
-            tag: str,
-            inbuf: Optional[str]=None):
+            result, # type: CommandResult
+            svc_type, # type: str
+            svc_id, # type: str
+            command, # type: str
+            tag, # type: str
+            inbuf # type: Optional[str]=None
+            ):
         """
         Called by the plugin to send a command to the mon
         cluster.

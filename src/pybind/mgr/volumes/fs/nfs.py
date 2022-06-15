@@ -315,13 +315,13 @@ class NFSRados:
                 # Return after creating empty common config object
                 return
             log.debug("write configuration into rados object "
-                      f"{self.pool}/{self.namespace}/{obj}:\n{conf_block}")
+                      "%s/%s/%s:\n%s" % (self.pool, self.namespace, obj, conf_block))
 
             # Add created obj url to common config obj
             ioctx.append(config_obj, GaneshaConfParser.write_block(
                          self._create_url_block(obj)).encode('utf-8'))
             FSExport._check_rados_notify(ioctx, config_obj)
-            log.debug(f"Added {obj} url to {config_obj}")
+            log.debug("Added %s url to %s" % (obj, config_obj))
 
     def remove_obj(self, obj, config_obj):
         with self.mgr.rados.open_ioctx(self.pool) as ioctx:
@@ -442,7 +442,7 @@ class FSExport(object):
         try:
             ioctx.notify(obj)
         except TimedOut:
-            log.exception(f"Ganesha timed out")
+            log.exception("Ganesha timed out")
 
     @property
     def exports(self):
@@ -453,7 +453,7 @@ class FSExport(object):
                 self.export_conf_objs = []  # type: List[Export]
                 self._read_raw_config(cluster_id)
                 self.exports[cluster_id] = self.export_conf_objs
-                log.info(f"Exports parsed successfully {self.exports.items()}")
+                log.info("Exports parsed successfully " + self.exports.items())
         return self._exports
 
     def _fetch_export(self, pseudo_path):
@@ -484,7 +484,7 @@ class FSExport(object):
             'prefix': 'auth rm',
             'entity': 'client.{}'.format(entity),
             })
-        log.info(f"Export user deleted is {entity}")
+        log.info("Export user deleted is " + entity)
 
     def _gen_export_id(self):
         exports = sorted([ex.export_id for ex in self.exports[self.rados_namespace]])
@@ -513,7 +513,7 @@ class FSExport(object):
     def _save_export(self, export):
         self.exports[self.rados_namespace].append(export)
         NFSRados(self.mgr, self.rados_namespace).write_obj(export.to_export_block(),
-                 f'export-{export.export_id}', f'conf-nfs.ganesha-{export.cluster_id}')
+                 'export-' + export.export_id, 'conf-nfs.ganesha-' + export.cluster_id)
 
     def _delete_export(self, cluster_id, pseudo_path, export_obj=None):
         try:
@@ -525,7 +525,7 @@ class FSExport(object):
             if export:
                 if pseudo_path:
                     NFSRados(self.mgr, self.rados_namespace).remove_obj(
-                             f'export-{export.export_id}', f'conf-nfs.ganesha-{cluster_id}')
+                             'export-' + export.export_id, 'conf-nfs.ganesha-' + cluster_id)
                 self.exports[cluster_id].remove(export)
                 self._delete_user(export.fsal.user_id)
                 if not self.exports[cluster_id]:
@@ -533,7 +533,7 @@ class FSExport(object):
                 return 0, "Successfully deleted export", ""
             return 0, "", "Export does not exist"
         except Exception as e:
-            log.exception(f"Failed to delete {pseudo_path} export for {cluster_id}")
+            log.exception("Failed to delete %s export for %s" % (pseudo_path, cluster_id))
             return getattr(e, 'errno', -1), "", str(e)
 
     def format_path(self, path):
@@ -551,11 +551,11 @@ class FSExport(object):
     def create_export(self, fs_name, cluster_id, pseudo_path, read_only, path):
         try:
             if not self.check_fs(fs_name):
-                return -errno.ENOENT, "", f"filesystem {fs_name} not found"
+                return -errno.ENOENT, "", "filesystem %s not found" % fs_name
 
             pseudo_path = self.format_path(pseudo_path)
             if not isabs(pseudo_path) or pseudo_path == "/":
-                return -errno.EINVAL, "", f"pseudo path {pseudo_path} is invalid. "\
+                return -errno.EINVAL, "", "pseudo path %s is invalid. " % pseudo_path + \
                         "It should be an absolute path and it cannot be just '/'."
 
             if cluster_id not in self.exports:
@@ -563,7 +563,7 @@ class FSExport(object):
 
             if not self._fetch_export(pseudo_path):
                 ex_id = self._gen_export_id()
-                user_id = f"{cluster_id}{ex_id}"
+                user_id = "%s%s" % (cluster_id, ex_id)
                 user_out, key = self._create_user_key(user_id, path, fs_name)
                 access_type = "RW"
                 if read_only:
@@ -590,7 +590,7 @@ class FSExport(object):
                 return (0, json.dumps(result, indent=4), '')
             return 0, "", "Export already exists"
         except Exception as e:
-            log.exception(f"Failed to create {pseudo_path} export for {cluster_id}")
+            log.exception("Failed to create %s export for %s" % (pseudo_path, cluster_id))
             return -errno.EINVAL, "", str(e)
 
     @export_cluster_checker
@@ -608,8 +608,8 @@ class FSExport(object):
             ret, out, err = self._delete_export(cluster_id=cluster_id, pseudo_path=None,
                                                 export_obj=export)
             if ret != 0:
-                raise Exception(f"Failed to delete exports: {err} and {ret}")
-        log.info(f"All exports successfully deleted for cluster id: {cluster_id}")
+                raise Exception("Failed to delete exports: %s and %s" % (err, ret))
+        log.info("All exports successfully deleted for cluster id: %s" % cluster_id)
 
     @export_cluster_checker
     def list_exports(self, cluster_id, detailed):
@@ -620,10 +620,10 @@ class FSExport(object):
                 result = [export.pseudo for export in self.exports[cluster_id]]
             return 0, json.dumps(result, indent=2), ''
         except KeyError:
-            log.warning(f"No exports to list for {cluster_id}")
+            log.warning("No exports to list for %s" % cluster_id)
             return 0, '', ''
         except Exception as e:
-            log.exception(f"Failed to list exports for {cluster_id}")
+            log.exception("Failed to list exports for %s" % cluster_id)
             return getattr(e, 'errno', -1), "", str(e)
 
     @export_cluster_checker
@@ -632,10 +632,10 @@ class FSExport(object):
             export = self._fetch_export(pseudo_path)
             if export:
                 return 0, json.dumps(export.to_dict(), indent=2), ''
-            log.warning(f"No {pseudo_path} export to show for {cluster_id}")
+            log.warning("No %s export to show for %s" % cluster_id)
             return 0, '', ''
         except Exception as e:
-            log.exception(f"Failed to get {pseudo_path} export for {cluster_id}")
+            log.exception("Failed to get %s export for %s" % (pseudo_path, cluster_id))
             return getattr(e, 'errno', -1), "", str(e)
 
 
@@ -646,16 +646,16 @@ class NFSCluster:
         self.mgr = mgr
 
     def _set_cluster_id(self, cluster_id):
-        self.cluster_id = f"ganesha-{cluster_id}"
+        self.cluster_id = "ganesha-%s" % cluster_id
 
     def _set_pool_namespace(self, cluster_id):
         self.pool_ns = cluster_id
 
     def _get_common_conf_obj_name(self):
-        return f'conf-nfs.{self.cluster_id}'
+        return 'conf-nfs.%s' % self.cluster_id
 
     def _get_user_conf_obj_name(self):
-        return f'userconf-nfs.{self.cluster_id}'
+        return 'userconf-nfs.%s' % self.cluster_id
 
     def _call_orch_apply_nfs(self, placement):
         spec = NFSServiceSpec(service_type='nfs', service_id=self.cluster_id,
@@ -668,12 +668,11 @@ class NFSCluster:
     def create_empty_rados_obj(self):
         common_conf = self._get_common_conf_obj_name()
         NFSRados(self.mgr, self.pool_ns).write_obj('', self._get_common_conf_obj_name())
-        log.info(f"Created empty object:{common_conf}")
+        log.info("Created empty object:%s" % common_conf)
 
     def delete_config_obj(self):
         NFSRados(self.mgr, self.pool_ns).remove_all_obj()
-        log.info(f"Deleted {self._get_common_conf_obj_name()} object and all objects in "
-                 f"{self.pool_ns}")
+        log.info("Deleted %s object and all objects in %s" % (self._get_common_conf_obj_name(), self.pool_ns))
 
     def _restart_nfs_service(self):
         completion = self.mgr.service_action(action='restart',
@@ -684,7 +683,7 @@ class NFSCluster:
     @cluster_setter
     def create_nfs_cluster(self, export_type, cluster_id, placement):
         if export_type != 'cephfs':
-            return -errno.EINVAL, "", f"Invalid export type: {export_type}"
+            return -errno.EINVAL, "", "Invalid export type: %s" % export_type
         try:
             pool_list = [p['pool_name'] for p in self.mgr.get_osdmap().dump().get('pools', [])]
 
@@ -692,7 +691,7 @@ class NFSCluster:
                 r, out, err = create_pool(self.mgr, self.pool_name)
                 if r != 0:
                     return r, out, err
-                log.info(f"Pool Status: {out}")
+                log.info("Pool Status: " +out)
 
                 self.mgr.check_mon_command({'prefix': 'osd pool application enable',
                                             'pool': self.pool_name, 'app': 'nfs'})
@@ -702,9 +701,9 @@ class NFSCluster:
             if cluster_id not in available_clusters(self.mgr):
                 self._call_orch_apply_nfs(placement)
                 return 0, "NFS Cluster Created Successfully", ""
-            return 0, "", f"{cluster_id} cluster already exists"
+            return 0, "", "%s cluster already exists" % cluster_id
         except Exception as e:
-            log.exception(f"NFS Cluster {cluster_id} could not be created")
+            log.exception("NFS Cluster %s could not be created" % cluster_id)
             return getattr(e, 'errno', -1), "", str(e)
 
     @cluster_setter
@@ -715,7 +714,7 @@ class NFSCluster:
                 return 0, "NFS Cluster Updated Successfully", ""
             return -errno.ENOENT, "", "Cluster does not exist"
         except Exception as e:
-            log.exception(f"NFS Cluster {cluster_id} could not be updated")
+            log.exception("NFS Cluster %s could not be updated" % cluster_id)
             return getattr(e, 'errno', -1), "", str(e)
 
     @cluster_setter
@@ -731,7 +730,7 @@ class NFSCluster:
                 return 0, "NFS Cluster Deleted Successfully", ""
             return 0, "", "Cluster does not exist"
         except Exception as e:
-            log.exception(f"Failed to delete NFS Cluster {cluster_id}")
+            log.exception("Failed to delete NFS Cluster %s" % cluster_id)
             return getattr(e, 'errno', -1), "", str(e)
 
     def list_nfs_cluster(self):
@@ -783,7 +782,7 @@ class NFSCluster:
                     info_res[cluster_id] = res
             return (0, json.dumps(info_res, indent=4), '')
         except Exception as e:
-            log.exception(f"Failed to show info for cluster")
+            log.exception("Failed to show info for cluster")
             return getattr(e, 'errno', -1), "", str(e)
 
     @cluster_setter
@@ -801,7 +800,7 @@ class NFSCluster:
                 return 0, "NFS-Ganesha Config Set Successfully", ""
             return -errno.ENOENT, "", "Cluster does not exist"
         except Exception as e:
-            log.exception(f"Setting NFS-Ganesha Config failed for {cluster_id}")
+            log.exception("Setting NFS-Ganesha Config failed for %s" % cluster_id)
             return getattr(e, 'errno', -1), "", str(e)
 
     @cluster_setter
@@ -817,5 +816,5 @@ class NFSCluster:
                 return 0, "NFS-Ganesha Config Reset Successfully", ""
             return -errno.ENOENT, "", "Cluster does not exist"
         except Exception as e:
-            log.exception(f"Resetting NFS-Ganesha Config failed for {cluster_id}")
+            log.exception("Resetting NFS-Ganesha Config failed for %s" % cluster_id)
             return getattr(e, 'errno', -1), "", str(e)

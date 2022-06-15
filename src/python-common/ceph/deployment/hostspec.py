@@ -56,7 +56,7 @@ class HostSpec(object):
 
     def __str__(self):
         if self.hostname != self.addr:
-            return f'{self.hostname} ({self.addr})'
+            return '%s (%s)' % (self.hostname, self.addr)
         return self.hostname
 
     def __eq__(self, other):
