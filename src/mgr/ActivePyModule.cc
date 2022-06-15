@@ -16,6 +16,7 @@
 #include "common/debug.h"
 #include "mon/MonCommand.h"
 
+#include "PythonCompat.h"
 #include "ActivePyModule.h"
 #include "MgrSession.h"
 

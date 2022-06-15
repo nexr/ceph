@@ -3,6 +3,7 @@
 
 #include <Python.h>
 
+#include "PythonCompat.h"
 #include "PyUtil.h"
 
 PyObject *get_python_typed_option_value(
@@ -18,7 +19,7 @@ PyObject *get_python_typed_option_value(
   case Option::TYPE_FLOAT:
     {
       PyObject *s = PyUnicode_FromString(value.c_str());
-      PyObject *f = PyFloat_FromString(s);
+      PyObject *f = PyFloat_FromString(s, NULL);
       Py_DECREF(s);
       return f;
     }
@@ -39,3 +40,4 @@ PyObject *get_python_typed_option_value(
   }
   return PyUnicode_FromString(value.c_str());
 }
+

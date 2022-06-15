@@ -17,6 +17,7 @@
 #include "MgrContext.h"
 #include "PyUtil.h"
 
+#include "PythonCompat.h"
 #include "PyModule.h"
 
 #include "common/debug.h"
@@ -132,7 +133,7 @@ namespace {
 #endif
 }
 
-PyModuleConfig::PyModuleConfig() = default;  
+PyModuleConfig::PyModuleConfig() = default;
 
 PyModuleConfig::PyModuleConfig(PyModuleConfig &mconfig)
   : config(mconfig.config)

@@ -8,6 +8,7 @@
 #include "common/version.h"
 #include "include/stringify.h"
 
+#include "PythonCompat.h"
 #include "PyOSDMap.h"
 #include "PyFormatter.h"
 #include "Gil.h"

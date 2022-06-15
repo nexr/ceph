@@ -27,6 +27,7 @@
 #include "common/version.h"
 #include "mgr/Types.h"
 
+#include "PythonCompat.h"
 #include "PyUtil.h"
 #include "BaseMgrModule.h"
 #include "Gil.h"
