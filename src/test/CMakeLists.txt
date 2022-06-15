@@ -1,6 +1,6 @@
 include(AddCephTest)
 
-set(UNITTEST_LIBS GMock::Main GMock::GMock GTest::GTest ${CMAKE_THREAD_LIBS_INIT} 
+set(UNITTEST_LIBS GMock::Main GMock::GMock GTest::GTest ${CMAKE_THREAD_LIBS_INIT}
     ${GSSAPI_LIBRARIES} ${OPENLDAP_LIBRARIES} ${CMAKE_DL_LIBS})
 
 add_library(unit-main OBJECT unit.cc)
@@ -129,7 +129,7 @@ target_link_libraries(ceph_bench_log global pthread rt ${BLKID_LIBRARIES} ${CMAK
 add_executable(ceph_test_mutate
   test_mutate.cc
   )
-target_link_libraries(ceph_test_mutate global librados ${BLKID_LIBRARIES} 
+target_link_libraries(ceph_test_mutate global librados ${BLKID_LIBRARIES}
   ${CMAKE_DL_LIBS})
 
 # test_trans
@@ -487,7 +487,7 @@ add_dependencies(tests
   cls_lock
   ceph_test_objectstore
   ceph_erasure_code_non_regression
-  cython_modules)
+  cython${PY_BINDING_INFIX}_modules)
 if (WITH_CEPHFS)
   add_dependencies(tests ceph-mds)
 endif()

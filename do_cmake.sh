@@ -45,7 +45,7 @@ else
 fi
 
 if [[ "$PYBUILD" =~ ^3(\..*)?$ ]] ; then
-    ARGS+=" -DWITH_PYTHON3=${PYBUILD}"
+    ARGS+=" -DWITH_PYTHON2=OFF -DWITH_PYTHON3=${PYBUILD} -DMGR_PYTHON_VERSION=3"
 fi
 
 if type ccache > /dev/null 2>&1 ; then

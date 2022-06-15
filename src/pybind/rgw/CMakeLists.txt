@@ -1,5 +1,5 @@
 distutils_add_cython_module(cython${PYTHON_VERSION}_rgw
-  rgw
+  rgw${PYTHON_VERSION}
   ${CMAKE_CURRENT_SOURCE_DIR}/rgw.pyx
   ${PYTHON_VERSION})
 add_dependencies(cython${PYTHON_VERSION}_rgw rgw)

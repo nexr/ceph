@@ -212,7 +212,8 @@ list(APPEND rgw_a_srcs rgw_ranger.h
 install(DIRECTORY
   ranger
   DESTINATION ${CEPH_INSTALL_DATADIR}/rgw
-  REGEX "\\..+\\.sw*" EXCLUDE)
+  REGEX "\\..+\\.sw*" EXCLUDE
+  REGEX "engine/java/target" EXCLUDE)
 
 list(APPEND rgw_a_srcs rgw_lineage_interfaces.h
   rgw_lineage.cc

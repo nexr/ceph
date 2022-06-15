@@ -247,10 +247,12 @@ if(WITH_CEPHFS_JAVA)
   add_subdirectory(java)
 endif()
 
-# Python stuff
-option(WITH_PYTHON2 "build python2 bindings" OFF)
+# the major version of the python bindings as a dependency of other
+# targets
 if(WITH_PYTHON2)
-  message(FATAL_ERROR "Python 2 is not supported anymore")
+  set(PY_BINDING_INFIX 2)
+else()
+  set(PY_BINDING_INFIX 3)
 endif()
 
 # sort out which allocator to use
@@ -802,17 +804,17 @@ add_custom_target(vstart-base DEPENDS
     monmaptool
     crushtool
     rados
-    cython_rados)
+    cython${PY_BINDING_INFIX}_rados)
 if (WITH_MGR)
   add_dependencies(vstart-base ceph-mgr)
 endif()
 
 add_custom_target(vstart DEPENDS vstart-base)
 if(WITH_RBD)
-  add_dependencies(vstart cython_rbd)
+  add_dependencies(vstart cython${PY_BINDING_INFIX}_rbd)
 endif()
 if (WITH_CEPHFS)
-  add_dependencies(vstart ceph-mds cephfs cython_cephfs)
+  add_dependencies(vstart ceph-mds cephfs cython${PY_BINDING_INFIX}_cephfs)
 endif()
 if(WITH_RADOSGW)
   add_dependencies(vstart radosgwd radosgw-admin)
@@ -830,11 +832,13 @@ if(WITH_MGR)
   add_dependencies(vstart ceph-volume-venv-setup)
 endif()
 
+add_dependencies(vstart python${PY_BINDING_INFIX}-common-venv-setup)
+
 # Everything you need to run CephFS tests
 add_custom_target(cephfs_testing DEPENDS
     vstart
     rados
-    cython_modules
+    cython${PY_BINDING_INFIX}_modules
     cephfs
     cls_cephfs
     ceph-fuse
