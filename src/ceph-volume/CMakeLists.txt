@@ -1,4 +1,10 @@
 
+if(WITH_PYTHON2)
+  set(PYTHON_VERSION "2")
+elseif(WITH_PYTHON3)
+  set(PYTHON_VERSION "3")
+endif()
+
 include(Distutils)
 
 distutils_install_module(ceph_volume
