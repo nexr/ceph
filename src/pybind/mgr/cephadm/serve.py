@@ -2,7 +2,12 @@ import datetime
 import json
 import logging
 from collections import defaultdict
-from typing import TYPE_CHECKING, Optional, List, Callable, cast, Set, Dict, Union, Any
+
+try:
+    from typing import TYPE_CHECKING, Optional, List, Callable, cast, Set, Dict, Union, Any
+except ImportError:
+    pass
+
 
 try:
     import remoto

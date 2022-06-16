@@ -1,7 +1,10 @@
 import datetime
 import re
 
-from typing import Optional
+try:
+    from typing import Optional
+except ImportError:
+    pass
 
 
 def datetime_now():

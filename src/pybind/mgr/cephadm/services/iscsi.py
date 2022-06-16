@@ -1,6 +1,10 @@
 import json
 import logging
-from typing import List, cast
+
+try:
+    from typing import List, cast
+except ImportError:
+    pass
 
 from mgr_module import MonCommandFailed
 from ceph.deployment.service_spec import IscsiServiceSpec

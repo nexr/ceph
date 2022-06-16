@@ -1,6 +1,10 @@
 import errno
 
-from typing import Dict
+try:
+    from typing import Dict
+except ImportError:
+    pass
+
 
 from ...exception import OpSmException
 from .subvolume_attrs import SubvolumeTypes, SubvolumeStates, SubvolumeActions

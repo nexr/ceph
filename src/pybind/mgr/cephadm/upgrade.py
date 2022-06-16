@@ -2,7 +2,11 @@ import json
 import logging
 import time
 import uuid
-from typing import TYPE_CHECKING, Optional, Dict, NamedTuple
+
+try:
+    from typing import TYPE_CHECKING, Optional, Dict, NamedTuple
+except ImportError:
+    pass
 
 import orchestrator
 from cephadm.utils import name_to_config_section

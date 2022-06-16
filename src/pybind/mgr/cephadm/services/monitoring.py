@@ -1,6 +1,10 @@
 import logging
 import os
-from typing import List, Any, Tuple, Dict
+
+try:
+    from typing import List, Any, Tuple, Dict
+except ImportError:
+    pass
 
 from orchestrator import DaemonDescription
 from ceph.deployment.service_spec import AlertManagerSpec

@@ -4,7 +4,10 @@ import uuid
 import errno
 import logging
 from hashlib import md5
-from typing import Dict, Union
+try:
+    from typing import Dict, Union
+except ImportError:
+    pass
 
 import cephfs
 

@@ -1,5 +1,9 @@
 import logging
-from typing import List, Any, Tuple, Dict
+
+try:
+    from typing import List, Any, Tuple, Dict
+except ImportError:
+    pass
 
 from ceph.deployment.service_spec import CustomContainerSpec
 

@@ -3,8 +3,12 @@ import json
 import socket
 from enum import Enum
 from functools import wraps
-from typing import Callable, TypeVar, List, NewType, TYPE_CHECKING, Any
 from orchestrator import OrchestratorError
+try:
+    from typing import Callable, TypeVar, List, NewType, TYPE_CHECKING, Any
+except ImportError:
+    pass
+
 
 if TYPE_CHECKING:
     from cephadm import CephadmOrchestrator

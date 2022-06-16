@@ -1,6 +1,10 @@
 import errno
 import json
-from typing import List
+try:
+    from typing import List
+except ImportError:
+    pass
+
 
 def prepare_updated_caps_list(existing_caps, mds_cap_str, osd_cap_str, authorize=True):
     caps_list = [] # type: List[str]

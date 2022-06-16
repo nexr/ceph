@@ -1,7 +1,11 @@
 import errno
 import json
 import logging
-from typing import List
+try:
+    from typing import List
+except ImportError:
+    pass
+
 import socket
 from os.path import isabs, normpath
 

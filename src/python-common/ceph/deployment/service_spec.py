@@ -3,10 +3,13 @@ import fnmatch
 import re
 from collections import namedtuple, OrderedDict
 from functools import wraps
-from typing import Optional, Dict, Any, List, Union, Callable, Iterable
-
 import six
 import yaml
+
+try:
+    from typing import Optional, Dict, Any, List, Union, Callable, Iterable
+except ImportError:
+    pass
 
 from ceph.deployment.hostspec import HostSpec
 from ceph.deployment.utils import unwrap_ipv6

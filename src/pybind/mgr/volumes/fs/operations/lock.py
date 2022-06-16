@@ -1,7 +1,10 @@
 from contextlib import contextmanager
 import logging
 from threading import Lock
-from typing import Dict
+try:
+    from typing import Dict
+except ImportError:
+    pass
 
 log = logging.getLogger(__name__)
 

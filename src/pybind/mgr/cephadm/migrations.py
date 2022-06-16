@@ -1,5 +1,8 @@
 import logging
-from typing import TYPE_CHECKING, Iterator
+try:
+    from typing import TYPE_CHECKING, Iterator
+except ImportError:
+    pass
 
 from ceph.deployment.service_spec import PlacementSpec, ServiceSpec, HostPlacementSpec
 from cephadm.schedule import HostAssignment

@@ -11,8 +11,12 @@ from tempfile import TemporaryDirectory
 from threading import Event
 
 import string
-from typing import List, Dict, Optional, Callable, Tuple, TypeVar, \
-    Any, Set, TYPE_CHECKING, cast, Iterator, Union, NamedTuple
+try:
+    from typing import List, Dict, Optional, Callable, Tuple, TypeVar, \
+        Any, Set, TYPE_CHECKING, cast, Iterator, Union, NamedTuple
+except ImportError:
+    pass
+
 
 import datetime
 import six

@@ -3,11 +3,17 @@ import errno
 import logging
 import sys
 
-from typing import List
+try:
+    from typing import List
+except ImportError:
+    pass
 
 from contextlib import contextmanager
 from threading import Lock, Condition
-from typing import no_type_check
+try:
+    from typing import no_type_check
+except ImportError:
+    pass
 
 if sys.version_info >= (3, 3):
     from threading import Timer

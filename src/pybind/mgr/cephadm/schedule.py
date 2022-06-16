@@ -1,6 +1,9 @@
 import logging
 import random
-from typing import List, Optional, Callable, Iterable, TypeVar, Set
+try:
+    from typing import List, Optional, Callable, Iterable, TypeVar, Set
+except ImportError:
+    pass
 
 import orchestrator
 from ceph.deployment.service_spec import PlacementSpec, HostPlacementSpec, ServiceSpec

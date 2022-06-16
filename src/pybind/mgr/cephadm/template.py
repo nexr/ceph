@@ -1,5 +1,8 @@
 import copy
-from typing import Optional, TYPE_CHECKING
+try:
+    from typing import Optional, TYPE_CHECKING
+except ImportError:
+    pass
 
 from jinja2 import Environment, PackageLoader, select_autoescape, StrictUndefined, Template
 from jinja2 import exceptions as j2_exceptions

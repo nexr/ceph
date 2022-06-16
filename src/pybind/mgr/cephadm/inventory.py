@@ -2,7 +2,11 @@ import datetime
 from copy import copy
 import json
 import logging
-from typing import TYPE_CHECKING, Dict, List, Iterator, Optional, Any, Tuple, Set
+
+try:
+    from typing import TYPE_CHECKING, Dict, List, Iterator, Optional, Any, Tuple, Set
+except ImportError:
+    pass
 
 import six
 

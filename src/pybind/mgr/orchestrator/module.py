@@ -1,6 +1,10 @@
 import errno
 import json
-from typing import List, Set, Optional, Iterator, cast, Dict, Any, Union
+try:
+    from typing import List, Set, Optional, Iterator, cast, Dict, Any, Union
+except ImportError:
+    pass
+
 import re
 import ast
 

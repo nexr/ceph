@@ -2,7 +2,11 @@
 
 # fmt: off
 
-from typing import NamedTuple, List
+try:
+    from typing import NamedTuple, List
+except ImportError:
+    pass
+
 import pytest
 
 from ceph.deployment.hostspec import HostSpec

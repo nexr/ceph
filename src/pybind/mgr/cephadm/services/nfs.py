@@ -1,5 +1,9 @@
 import logging
-from typing import TYPE_CHECKING, Dict, Tuple, Any, List
+
+try:
+    from typing import TYPE_CHECKING, Dict, Tuple, Any, List
+except ImportError:
+    pass
 
 from ceph.deployment.service_spec import NFSServiceSpec
 import rados

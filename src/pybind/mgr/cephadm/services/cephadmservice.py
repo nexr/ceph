@@ -3,8 +3,12 @@ import re
 import logging
 import subprocess
 from abc import ABCMeta, abstractmethod
-from typing import TYPE_CHECKING, List, Callable, Any, TypeVar, Generic, \
-    Optional, Dict, Any, Tuple, NewType
+
+try:
+    from typing import TYPE_CHECKING, List, Callable, Any, TypeVar, Generic, \
+        Optional, Dict, Any, Tuple, NewType
+except ImportError:
+    pass
 
 from mgr_module import HandleCommandResult, MonCommandFailed
 
