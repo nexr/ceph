@@ -350,7 +350,7 @@ int PyModule::load(PyThreadState *pMainThreadState)
       dout(10) << "Computed sys.path '"
 	       << string(begin(sys_path), end(sys_path)) << "'" << dendl;
 #else
-      string sys_path(Py_GetPath() + ':' + paths);
+      string sys_path(paths + Py_GetPath());
       PySys_SetPath(const_cast<char*>(sys_path.c_str()));
       dout(10) << "Computed sys.path '" << sys_path << "'" << dendl;
 #endif
