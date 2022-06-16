@@ -22,8 +22,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-ServiceSpecs = TypeVar('ServiceSpecs', bound=ServiceSpec)
-AuthEntity = NewType('AuthEntity', str)
+# Python 3:
+# >>> ServiceSpecs = TypeVar('ServiceSpecs', bound=ServiceSpec)
+# >>> AuthEntity = NewType('AuthEntity', str)
 
 
 class CephadmDaemonSpec(Generic[ServiceSpecs]):

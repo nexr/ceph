@@ -13,10 +13,12 @@ except ImportError:
 if TYPE_CHECKING:
     from cephadm import CephadmOrchestrator
 
-T = TypeVar('T')
+# Python 3:
+# >>> T = TypeVar('T')
+# >>> ConfEntity = NewType('ConfEntity', str)
+
 logger = logging.getLogger(__name__)
 
-ConfEntity = NewType('ConfEntity', str)
 
 
 class CephadmNoImage(Enum):

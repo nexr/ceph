@@ -37,7 +37,8 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-T = TypeVar('T')
+# Python 3:
+# >>> T = TypeVar('T')
 
 
 class OrchestratorError(Exception):
