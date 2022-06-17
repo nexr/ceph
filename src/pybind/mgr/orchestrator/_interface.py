@@ -646,7 +646,7 @@ def raise_if_exception(c):
         raise e
 
 
-class TrivialReadCompletion(Completion[T]):
+class TrivialReadCompletion(Completion):
     """
     This is the trivial completion simply wrapping a result.
     """

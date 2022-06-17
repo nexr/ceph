@@ -105,7 +105,7 @@ DEFAULT_GRAFANA_IMAGE = 'quay.io/ceph/ceph-grafana:6.7.4'
 # ------------------------------------------------------------------------------
 
 
-class CephadmCompletion(orchestrator.Completion[T]):
+class CephadmCompletion(orchestrator.Completion):
     def evaluate(self):
         # type: () -> None
         self.finalize(None)
