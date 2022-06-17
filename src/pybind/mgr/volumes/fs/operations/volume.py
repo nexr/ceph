@@ -120,7 +120,7 @@ class ConnectionPool(object):
         """
         recurring timer variant of Timer
         """
-        @no_type_check
+        #@no_type_check
         def run(self):
             try:
                 while not self.finished.is_set():

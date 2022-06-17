@@ -1198,8 +1198,8 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-
-GenericSpec = Union[ServiceSpec, HostSpec]
+# python 3:
+# >>> GenericSpec = Union[ServiceSpec, HostSpec]
 
 
 def json_to_generic_spec(spec):

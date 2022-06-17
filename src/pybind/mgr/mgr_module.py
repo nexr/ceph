@@ -446,7 +446,7 @@ class CPlusPlusHandler(logging.Handler):
 
 class ClusterLogHandler(logging.Handler):
     def __init__(self, module_inst):
-        super().__init__()
+        super(ClusterLogHandler, self).__init__()
         self._module = module_inst
         self.setFormatter(logging.Formatter("%(message)s"))
 
