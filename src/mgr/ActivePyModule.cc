@@ -235,7 +235,7 @@ int ActivePyModule::handle_command(
               "returned wrong type!" << dendl;
       r = -EINVAL;
     } else {
-      r = PyInt_FromLong(PyTuple_GetItem(pResult, 0));
+      r = PyInt_AsLong(PyTuple_GetItem(pResult, 0));
       *ds << PyString_AsString(PyTuple_GetItem(pResult, 1));
       *ss << PyString_AsString(PyTuple_GetItem(pResult, 2));
     }

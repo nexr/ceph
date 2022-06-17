@@ -316,7 +316,7 @@ ceph_set_health_checks(BaseMgrModule *self, PyObject *args)
         }
       } else if (ks == "count") {
         if (PyLong_Check(v)) {
-          count = PyInt_FromLong(v);
+          count = PyInt_AsLong(v);
         } else {
           derr << __func__ << " check " << check_name
                << " count value not int" << dendl;
@@ -970,7 +970,7 @@ ceph_add_osd_perf_query(BaseMgrModule *self, PyObject *args)
                  << dendl;
             Py_RETURN_NONE;
           }
-          limit->max_count = PyInt_FromLong(limit_param_val);
+          limit->max_count = PyInt_AsLong(limit_param_val);
         } else {
           derr << __func__ << " unknown limit param: " << limit_param_name
                << dendl;
