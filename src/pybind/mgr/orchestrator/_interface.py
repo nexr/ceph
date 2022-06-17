@@ -450,7 +450,8 @@ class ProgressReference(object):
         self.progress = 1
 
 
-class Completion(_Promise, Generic[T]):
+# Generic[T]
+class Completion(_Promise):
     """
     Combines multiple promises into one overall operation.
 

@@ -27,7 +27,8 @@ logger = logging.getLogger(__name__)
 # >>> AuthEntity = NewType('AuthEntity', str)
 
 
-class CephadmDaemonSpec(Generic[ServiceSpecs]):
+# Generic[ServiceSpecs]
+class CephadmDaemonSpec():
     # typing.NamedTuple + Generic is broken in py36
     def __init__(self, host, daemon_id,
                  spec = None,
