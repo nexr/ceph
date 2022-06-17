@@ -14,7 +14,7 @@ PyObject *get_python_typed_option_value(
   case Option::TYPE_INT:
   case Option::TYPE_UINT:
   case Option::TYPE_SIZE:
-    return PyLong_FromString((char *)value.c_str(), nullptr, 0);
+    return PyInt_FromString((char *)value.c_str(), nullptr, 0);
   case Option::TYPE_SECS:
   case Option::TYPE_FLOAT:
     {

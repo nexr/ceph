@@ -129,7 +129,7 @@ static PyObject *osdmap_calc_pg_upmaps(BasePyOSDMap* self, PyObject *args)
   set<int64_t> pools;
   for (auto i = 0; i < PyList_Size(pool_list); ++i) {
     PyObject *pool_name = PyList_GET_ITEM(pool_list, i);
-    if (!PyUnicode_Check(pool_name)) {
+    if (!PyString_Check(pool_name)) {
       derr << __func__ << " " << pool_name << " not a string" << dendl;
       return nullptr;
     }

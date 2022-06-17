@@ -92,7 +92,7 @@ public:
       auto set_fn = PyObject_GetAttrString(python_completion, "complete");
       ceph_assert(set_fn != nullptr);
 
-      auto pyR = PyLong_FromLong(r);
+      auto pyR = PyInt_FromLong(r);
       auto pyOutBl = PyUnicode_FromString(outbl.to_str().c_str());
       auto pyOutS = PyUnicode_FromString(outs.c_str());
       auto args = PyTuple_Pack(3, pyR, pyOutBl, pyOutS);
@@ -296,7 +296,7 @@ ceph_set_health_checks(BaseMgrModule *self, PyObject *args)
       }
       string ks(k);
       if (ks == "severity") {
-        if (!PyUnicode_Check(v)) {
+        if (!PyString_Check(v)) {
           derr << __func__ << " check " << check_name
                << " severity value not string" << dendl;
           continue;
@@ -307,7 +307,7 @@ ceph_set_health_checks(BaseMgrModule *self, PyObject *args)
           severity = HEALTH_ERR;
         }
       } else if (ks == "summary") {
-        if (!PyUnicode_Check(v)) {
+        if (!PyString_Check(v)) {
           derr << __func__ << " check " << check_name
                << " summary value not [unicode] string" << dendl;
           continue;
@@ -316,7 +316,7 @@ ceph_set_health_checks(BaseMgrModule *self, PyObject *args)
         }
       } else if (ks == "count") {
         if (PyLong_Check(v)) {
-          count = PyLong_AsLong(v);
+          count = PyInt_FromLong(v);
         } else {
           derr << __func__ << " check " << check_name
                << " count value not int" << dendl;
@@ -330,7 +330,7 @@ ceph_set_health_checks(BaseMgrModule *self, PyObject *args)
         }
         for (int k = 0; k < PyList_Size(v); ++k) {
           PyObject *di = PyList_GET_ITEM(v, k);
-          if (!PyUnicode_Check(di)) {
+          if (!PyString_Check(di)) {
             derr << __func__ << " check " << check_name
                  << " detail item " << k << " not a [unicode] string" << dendl;
             continue;
@@ -861,7 +861,7 @@ ceph_add_osd_perf_query(BaseMgrModule *self, PyObject *args)
             Py_RETURN_NONE;
           }
           if (param_name == NAME_SUB_KEY_TYPE) {
-            if (!PyUnicode_Check(param_value)) {
+            if (!PyString_Check(param_value)) {
               derr << __func__ << " query " << query_param_name << " item " << j
                    << " contains invalid param " << param_name << dendl;
               Py_RETURN_NONE;
@@ -875,7 +875,7 @@ ceph_add_osd_perf_query(BaseMgrModule *self, PyObject *args)
             }
             d.type = it->second;
           } else if (param_name == NAME_SUB_KEY_REGEX) {
-            if (!PyUnicode_Check(param_value)) {
+            if (!PyString_Check(param_value)) {
               derr << __func__ << " query " << query_param_name << " item " << j
                    << " contains invalid param " << param_name << dendl;
               Py_RETURN_NONE;
@@ -915,7 +915,7 @@ ceph_add_osd_perf_query(BaseMgrModule *self, PyObject *args)
       }
       for (int j = 0; j < PyList_Size(query_param_val); j++) {
         PyObject *py_type = PyList_GET_ITEM(query_param_val, j);
-        if (!PyUnicode_Check(py_type)) {
+        if (!PyString_Check(py_type)) {
           derr << __func__ << " query " << query_param_name << " item " << j
                << " not a string" << dendl;
           Py_RETURN_NONE;
@@ -951,7 +951,7 @@ ceph_add_osd_perf_query(BaseMgrModule *self, PyObject *args)
         }
 
         if (limit_param_name == NAME_LIMIT_ORDER_BY) {
-          if (!PyUnicode_Check(limit_param_val)) {
+          if (!PyString_Check(limit_param_val)) {
             derr << __func__ << " " << limit_param_name << " not a string"
                  << dendl;
             Py_RETURN_NONE;
@@ -970,7 +970,7 @@ ceph_add_osd_perf_query(BaseMgrModule *self, PyObject *args)
                  << dendl;
             Py_RETURN_NONE;
           }
-          limit->max_count = PyLong_AsLong(limit_param_val);
+          limit->max_count = PyInt_FromLong(limit_param_val);
         } else {
           derr << __func__ << " unknown limit param: " << limit_param_name
                << dendl;
@@ -999,7 +999,7 @@ ceph_add_osd_perf_query(BaseMgrModule *self, PyObject *args)
   }
 
   auto query_id = self->py_modules->add_osd_perf_query(query, limit);
-  return PyLong_FromLong(query_id);
+  return PyInt_FromLong(query_id);
 }
 
 static PyObject*

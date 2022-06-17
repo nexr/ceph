@@ -407,7 +407,7 @@ int PyModule::load(PyThreadState *pMainThreadState)
       if (PyTuple_Check(pCanRunTuple) && PyTuple_Size(pCanRunTuple) == 2) {
         PyObject *pCanRun = PyTuple_GetItem(pCanRunTuple, 0);
         PyObject *can_run_str = PyTuple_GetItem(pCanRunTuple, 1);
-        if (!PyBool_Check(pCanRun) || !PyUnicode_Check(can_run_str)) {
+        if (!PyBool_Check(pCanRun) || !PyString_Check(can_run_str)) {
           derr << "Module " << get_name()
                << " returned wrong type in can_run" << dendl;
           error_string = "wrong type returned from can_run";
