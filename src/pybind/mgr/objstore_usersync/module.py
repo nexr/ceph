@@ -180,7 +180,7 @@ class ObjstoreUsersync(MgrModule):
 
 
     def _exec_radosgw_admin(self, cmd):
-        timeout_sec = int(self.interval / 2)
+        timeout_sec = int(int(self.interval) / 2)
         if timeout_sec < 15: timeout_sec = 15
 
         full_cmd  = "timeout %d " % timeout_sec
@@ -809,8 +809,8 @@ class ObjstoreUsersync(MgrModule):
             if is_first:
                 is_first = False
             else:
-                self.log.debug('Sleeping for %d seconds', self.interval)
-                ret = self.event.wait(self.interval)
+                self.log.debug('Sleeping for %d seconds', int(self.interval))
+                ret = self.event.wait(float(self.interval))
                 self.event.clear()
                 cycle_after_emap_update += 1
 

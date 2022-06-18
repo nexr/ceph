@@ -114,7 +114,7 @@ class CherryPyConfig(object):
                 'try "ceph config set mgr mgr/{}/{}/server_addr <ip>"'
                 .format(self.module_name, self.get_mgr_id()))
         self.log.info('server: ssl=%s host=%s port=%d', 'yes' if ssl else 'no',
-                      server_addr, server_port)
+                      server_addr, int(server_port))
 
         # Initialize custom handlers.
         cherrypy.tools.authenticate = AuthManagerTool()
