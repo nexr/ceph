@@ -216,10 +216,6 @@ int ActivePyModule::handle_command(
   m_command_perms = module_command.perm;
   m_session = &session;
 
-  ceph_assert(m_session == nullptr);
-  m_command_perms = module_command.perm;
-  m_session = &session;
-
   auto pResult = PyObject_CallMethod(pClassInstance,
       const_cast<char*>("_handle_command"), const_cast<char*>("s#O"),
       instr.c_str(), instr.length(), py_cmd);
