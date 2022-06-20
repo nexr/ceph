@@ -1161,7 +1161,7 @@ class MgrModule(ceph_module.BaseMgrModule, MgrModuleLoggingMixin):
             svc_id, # type: str
             command, # type: str
             tag, # type: str
-            inbuf # type: Optional[str]=None
+            inbuf = None # type: Optional[str]
             ):
         """
         Called by the plugin to send a command to the mon
