@@ -6,8 +6,14 @@ import platform
 import tempfile
 import uuid
 import subprocess
-from ceph_volume import process, terminal
+from ceph_volume import terminal
 from . import as_string
+
+# escape circular import
+if 'ceph_volume.process' in sys.modules:
+    process = sys.modules['ceph_volume.process']
+else:
+    from ceph_volume import process
 
 # python2 has no FileNotFoundError
 try:
