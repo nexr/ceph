@@ -102,7 +102,7 @@ class CherryPyConfig(object):
         """
         server_addr = self.get_localized_module_option(
             'server_addr', get_default_addr())
-        ssl = self.get_localized_module_option('ssl', True)
+        ssl = str_to_bool(self.get_localized_module_option('ssl', True))
         if not ssl:
             server_port = self.get_localized_module_option('server_port', 8080)
         else:
