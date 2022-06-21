@@ -677,7 +677,7 @@ class MgrStandbyModule(ceph_module.BaseMgrStandbyModule, MgrModuleLoggingMixin):
 
         return parsed_value
 
-    def get_module_option(self, key, default=None, value_parsing = True):
+    def get_module_option(self, key, default=None, value_parsing=True):
         """
         Retrieve the value of a persistent configuration setting
 
@@ -694,7 +694,7 @@ class MgrStandbyModule(ceph_module.BaseMgrStandbyModule, MgrModuleLoggingMixin):
             else:
                 return r
 
-    def get_ceph_option(self, key, value_parsing = True):
+    def get_ceph_option(self, key, value_parsing=True):
         raw_value = self._ceph_get_option(key)
         if value_parsing:
             return self._parse_opt_value(raw_value)
@@ -722,12 +722,15 @@ class MgrStandbyModule(ceph_module.BaseMgrStandbyModule, MgrModuleLoggingMixin):
     def get_active_uri(self):
         return self._ceph_get_active_uri()
 
-    def get_localized_module_option(self, key, default=None):
+    def get_localized_module_option(self, key, default=None, value_parsing=True):
         r = self._ceph_get_module_option(key, self.get_mgr_id())
         if r is None:
             return self.MODULE_OPTION_DEFAULTS.get(key, default)
         else:
-            return r
+            if value_parsing:
+                return self._parse_opt_value(r)
+            else:
+                return r
 
 
 class MgrModule(ceph_module.BaseMgrModule, MgrModuleLoggingMixin):
@@ -1284,7 +1287,7 @@ class MgrModule(ceph_module.BaseMgrModule, MgrModuleLoggingMixin):
 
         return parsed_value
 
-    def get_ceph_option(self, key, value_parsing = True):
+    def get_ceph_option(self, key, value_parsing=True):
         raw_value = self._ceph_get_option(key)
         if value_parsing:
             return self._parse_opt_value(raw_value)
@@ -1301,7 +1304,7 @@ class MgrModule(ceph_module.BaseMgrModule, MgrModuleLoggingMixin):
             raise RuntimeError("Config option '{0}' is not in {1}.MODULE_OPTIONS".
                                format(key, self.__class__.__name__))
 
-    def _get_module_option(self, key, default, localized_prefix="", value_parsing = True):
+    def _get_module_option(self, key, default, localized_prefix="", value_parsing=True):
         r = self._ceph_get_module_option(self.module_name, key,
                                          localized_prefix)
         if r is None:
@@ -1312,7 +1315,7 @@ class MgrModule(ceph_module.BaseMgrModule, MgrModuleLoggingMixin):
             else:
                 return r
 
-    def get_module_option(self, key, default=None, value_parsing = True):
+    def get_module_option(self, key, default=None, value_parsing=True):
         """
         Retrieve the value of a persistent configuration setting
 
@@ -1353,7 +1356,7 @@ class MgrModule(ceph_module.BaseMgrModule, MgrModuleLoggingMixin):
     def _set_localized(self, key, val, setter):
         return setter(_get_localized_key(self.get_mgr_id(), key), val)
 
-    def get_localized_module_option(self, key, default=None,value_parsing = True):
+    def get_localized_module_option(self, key, default=None, value_parsing=True):
         """
         Retrieve localized configuration for this ceph-mgr instance
         :param str key:
