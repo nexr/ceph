@@ -828,14 +828,7 @@ int RGWRangerNativeManager::get_related_policies_from_cache(vector<ranger_policy
 
 int RGWRangerNativeManager::is_access_allowed(RGWUserEndpoint endpoint, RGWOp *& op, req_state * const s)
 {
-  // check wheter ranger authorize is needed or not
   const string bucket_owner = s->bucket_owner.get_id().to_str();
-  if (bucket_owner == "") {
-    ldpp_dout(op, 5) << __func__ << "(): The ranger authorizing is not needed. Skip the steps." << dendl;
-    return 0;
-  }
-
-  ldpp_dout(op, 5) << __func__ << "(): authorizing request using Ranger" << dendl;
 
   vector<ranger_policy> related_policies;
   int ret = get_related_policies(related_policies, endpoint, s, bucket_owner);
