@@ -410,10 +410,6 @@ int radosgw_Main(int argc, const char **argv)
   }
 
 
-  if (cct->_conf->rgw_use_ranger_authz)
-  {
-    destroy_global_ranger_manager();
-  }
   if (apis_map.count("swift") > 0) {
     RGWRESTMgr_SWIFT* const swift_resource = new RGWRESTMgr_SWIFT;
 
