@@ -28,6 +28,7 @@ void destroy_global_ranger_manager() {
   if (rgw_rm == nullptr) { return; }
 
   delete rgw_rm;
+  rgw_rm = nullptr;
 };
 
 bool get_ranger_endpoint(RGWUserEndpoint& out, rgw::sal::RGWRadosStore *store, req_state * const s) {
@@ -82,7 +83,7 @@ int rgw_ranger_authorize(rgw::sal::RGWRadosStore* store, RGWOp *& op, req_state 
     return -ERR_INVALID_REQUEST;
   }
 
-  if (rgw_rm == NULL) {
+  if (rgw_rm == nullptr) {
     return -ERR_INTERNAL_ERROR;
   }
 
