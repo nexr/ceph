@@ -13,7 +13,7 @@ set(PYTHON_COMMON_VIRTUALENV ${CEPH_BUILD_VIRTUALENV}/python-common-virtualenv)
 
 add_custom_command(
   OUTPUT ${PYTHON_COMMON_VIRTUALENV}/bin/python
-  COMMAND ${CMAKE_SOURCE_DIR}/src/tools/setup-virtualenv.sh --python=${Python${PY_BINDING_INFIX}_EXECUTABLE} ${PYTHON_COMMON_VIRTUALENV}
+  COMMAND ${CMAKE_SOURCE_DIR}/src/tools/setup-virtualenv.sh --python=${PYTHON_EXECUTABLE} ${PYTHON_COMMON_VIRTUALENV}
   WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/python-common
   COMMENT "python-common venv is being created")
 

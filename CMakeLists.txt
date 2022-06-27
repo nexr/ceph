@@ -440,6 +440,8 @@ if(WITH_PYTHON2)
   find_package(Python2 ${WITH_PYTHON2} ${find_python2_exact} REQUIRED
     COMPONENTS Interpreter Development)
   unset(find_python2_exact)
+
+  set(PYTHON_EXECUTABLE ${Python2_EXECUTABLE})
 endif()
 
 set(WITH_PYTHON3 "OFF" CACHE STRING "build python3 bindings with specified python3 version")
@@ -454,6 +456,8 @@ if(WITH_PYTHON3)
   find_package(Python3 ${WITH_PYTHON3} ${find_python3_exact} REQUIRED
     COMPONENTS Interpreter Development)
   unset(find_python3_exact)
+
+  set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
 endif()
 
 option(WITH_MGR "ceph-mgr is enabled" ON)
