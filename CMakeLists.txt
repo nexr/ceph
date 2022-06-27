@@ -428,22 +428,6 @@ endif (WITH_RADOSGW)
 option(WITH_CEPHFS "CephFS is enabled" ON)
 
 # Python stuff
-option(WITH_PYTHON2 "build python2 bindings" ON)
-if(WITH_PYTHON2)
-  if(WITH_PYTHON2 MATCHES "^(1|ON|YES|TRUE|Y)$")
-    set(WITH_PYTHON2 "2")
-    message(NOTICE "Please specify a Python2 version instead of a BOOLEAN")
-  elseif(NOT WITH_PYTHON2 STREQUAL "2")
-    set(find_python2_exact "EXACT")
-  endif()
-
-  find_package(Python2 ${WITH_PYTHON2} ${find_python2_exact} REQUIRED
-    COMPONENTS Interpreter Development)
-  unset(find_python2_exact)
-
-  set(PYTHON_EXECUTABLE ${Python2_EXECUTABLE})
-endif()
-
 set(WITH_PYTHON3 "OFF" CACHE STRING "build python3 bindings with specified python3 version")
 if(WITH_PYTHON3)
   if(WITH_PYTHON3 MATCHES "^(1|ON|YES|TRUE|Y)$")
@@ -458,6 +442,22 @@ if(WITH_PYTHON3)
   unset(find_python3_exact)
 
   set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+endif()
+
+option(WITH_PYTHON2 "build python2 bindings" ON)
+if(WITH_PYTHON2)
+  if(WITH_PYTHON2 MATCHES "^(1|ON|YES|TRUE|Y)$")
+    set(WITH_PYTHON2 "2")
+    message(NOTICE "Please specify a Python2 version instead of a BOOLEAN")
+  elseif(NOT WITH_PYTHON2 STREQUAL "2")
+    set(find_python2_exact "EXACT")
+  endif()
+
+  find_package(Python2 ${WITH_PYTHON2} ${find_python2_exact} REQUIRED
+    COMPONENTS Interpreter Development)
+  unset(find_python2_exact)
+
+  set(PYTHON_EXECUTABLE ${Python2_EXECUTABLE})
 endif()
 
 option(WITH_MGR "ceph-mgr is enabled" ON)
