@@ -32,7 +32,7 @@ static ostream& _prefix(std::ostream *_dout, Monitor *mon, Paxos *paxos, string 
 bool PaxosService::dispatch(MonOpRequestRef op)
 {
   ceph_assert(op->is_type_service() || op->is_type_command());
-  PaxosServiceMessage *m = static_cast<PaxosServiceMessage*>(op->get_req());
+  auto m = op->get_req<PaxosServiceMessage>();
   op->mark_event("psvc:dispatch");
 
   dout(10) << __func__ << " " << m << " " << *m
@@ -117,7 +117,7 @@ bool PaxosService::dispatch(MonOpRequestRef op)
        * Callback class used to propose the pending value once the proposal_timer
        * fires up.
        */
-    auto do_propose = new C_MonContext(mon, [this](int r) {
+    auto do_propose = new C_MonContext{mon, [this](int r) {
         proposal_timer = 0;
         if (r >= 0) {
           propose_pending();
@@ -126,7 +126,7 @@ bool PaxosService::dispatch(MonOpRequestRef op)
         } else {
           ceph_abort_msg("bad return value for proposal_timer");
         }
-    });
+    }};
     dout(10) << " setting proposal_timer " << do_propose
              << " with delay of " << delay << dendl;
     proposal_timer = mon->timer.add_event_after(delay, do_propose);
@@ -372,30 +372,49 @@ void PaxosService::maybe_trim()
   if (!is_writeable())
     return;
 
+  const version_t first_committed = get_first_committed();
   version_t trim_to = get_trim_to();
-  if (trim_to < get_first_committed())
-    return;
+  dout(20) << __func__ << " " << first_committed << "~" << trim_to << dendl;
 
-  version_t to_remove = trim_to - get_first_committed();
-  if (g_conf()->paxos_service_trim_min > 0 &&
-      to_remove < (version_t)g_conf()->paxos_service_trim_min) {
-    dout(10) << __func__ << " trim_to " << trim_to << " would only trim " << to_remove
-	     << " < paxos_service_trim_min " << g_conf()->paxos_service_trim_min << dendl;
+  if (trim_to < first_committed) {
+    dout(10) << __func__ << " trim_to " << trim_to << " < first_committed "
+	     << first_committed << dendl;
     return;
   }
 
-  if (g_conf()->paxos_service_trim_max > 0 &&
-      to_remove > (version_t)g_conf()->paxos_service_trim_max) {
+  version_t to_remove = trim_to - first_committed;
+  const version_t trim_min = g_conf().get_val<version_t>("paxos_service_trim_min");
+  if (trim_min > 0 &&
+      to_remove < trim_min) {
     dout(10) << __func__ << " trim_to " << trim_to << " would only trim " << to_remove
-	     << " > paxos_service_trim_max, limiting to " << g_conf()->paxos_service_trim_max
-	     << dendl;
-    trim_to = get_first_committed() + g_conf()->paxos_service_trim_max;
-    to_remove = g_conf()->paxos_service_trim_max;
+	     << " < paxos_service_trim_min " << trim_min << dendl;
+    return;
   }
+
+  to_remove = [to_remove, trim_to, this] {
+    const version_t trim_max = g_conf().get_val<version_t>("paxos_service_trim_max");
+    if (trim_max == 0 || to_remove < trim_max) {
+      return to_remove;
+    }
+    if (to_remove < trim_max * 1.5) {
+      dout(10) << __func__ << " trim to " << trim_to << " would only trim " << to_remove
+             << " > paxos_service_trim_max, limiting to " << trim_max
+             << dendl;
+      return trim_max;
+    }
+    const version_t new_trim_max = (trim_max + to_remove) / 2;
+    const uint64_t trim_max_multiplier = g_conf().get_val<uint64_t>("paxos_service_trim_max_multiplier");
+    if (trim_max_multiplier) {
+      return std::min(new_trim_max, trim_max * trim_max_multiplier);
+    } else {
+      return new_trim_max;
+    }
+  }();
+  trim_to = first_committed + to_remove;
 
   dout(10) << __func__ << " trimming to " << trim_to << ", " << to_remove << " states" << dendl;
   MonitorDBStore::TransactionRef t = paxos->get_pending_transaction();
-  trim(t, get_first_committed(), trim_to);
+  trim(t, first_committed, trim_to);
   put_first_committed(t, trim_to);
   cached_first_committed = trim_to;
 

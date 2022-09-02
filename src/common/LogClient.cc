@@ -128,21 +128,12 @@ LogClient::LogClient(CephContext *cct, Messenger *m, MonMap *mm,
 {
 }
 
-LogClientTemp::LogClientTemp(clog_type type_, LogChannel &parent_)
-  : type(type_), parent(parent_)
+void LogChannel::set_log_to_monitors(bool v)
 {
-}
-
-LogClientTemp::LogClientTemp(const LogClientTemp &rhs)
-  : type(rhs.type), parent(rhs.parent)
-{
-  // don't want to-- nor can we-- copy the ostringstream
-}
-
-LogClientTemp::~LogClientTemp()
-{
-  if (ss.peek() != EOF)
-    parent.do_log(type, ss);
+  if (log_to_monitors != v) {
+    parent->reset();
+    log_to_monitors = v;
+  }
 }
 
 void LogChannel::update_config(map<string,string> &log_to_monitors,
@@ -255,7 +246,7 @@ void LogChannel::do_log(clog_type prio, const std::string& s)
   }
 }
 
-Message *LogClient::get_mon_log_message(bool flush)
+ceph::ref_t<Message> LogClient::get_mon_log_message(bool flush)
 {
   std::lock_guard l(log_lock);
   if (flush) {
@@ -273,18 +264,18 @@ bool LogClient::are_pending()
   return last_log > last_log_sent;
 }
 
-Message *LogClient::_get_mon_log_message()
+ceph::ref_t<Message> LogClient::_get_mon_log_message()
 {
   ceph_assert(ceph_mutex_is_locked(log_lock));
   if (log_queue.empty())
-    return NULL;
+    return {};
 
   // only send entries that haven't been sent yet during this mon
   // session!  monclient needs to call reset_session() on mon session
   // reset for this to work right.
 
   if (last_log_sent == last_log)
-    return NULL;
+    return {};
 
   // limit entries per message
   unsigned num_unsent = last_log - last_log_sent;
@@ -313,10 +304,8 @@ Message *LogClient::_get_mon_log_message()
     ++p;
   }
   
-  MLog *log = new MLog(monmap->get_fsid());
-  log->entries.swap(o);
-
-  return log;
+  return ceph::make_message<MLog>(monmap->get_fsid(),
+				  std::move(o));
 }
 
 void LogClient::_send_to_mon()
@@ -325,8 +314,8 @@ void LogClient::_send_to_mon()
   ceph_assert(is_mon);
   ceph_assert(messenger->get_myname().is_mon());
   ldout(cct,10) << __func__ << " log to self" << dendl;
-  Message *log = _get_mon_log_message();
-  messenger->get_loopback_connection()->send_message(log);
+  auto log = _get_mon_log_message();
+  messenger->get_loopback_connection()->send_message2(std::move(log));
 }
 
 version_t LogClient::queue(LogEntry &entry)
@@ -340,6 +329,15 @@ version_t LogClient::queue(LogEntry &entry)
   }
 
   return entry.seq;
+}
+
+void LogClient::reset()
+{
+  std::lock_guard l(log_lock);
+  if (log_queue.size()) {
+    log_queue.clear();
+  }
+  last_log_sent = last_log;
 }
 
 uint64_t LogClient::get_next_seq()

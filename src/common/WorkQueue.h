@@ -1,4 +1,4 @@
-// -*- mode:C++; tab-width:8; c-basic-offset:2; indent-tabs-mode:t -*- 
+// -*- mode:C++; tab-width:8; c-basic-offset:2; indent-tabs-mode:t -*-
 // vim: ts=8 sw=2 smarttab
 /*
  * Ceph - scalable distributed file system
@@ -7,15 +7,15 @@
  *
  * This is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
- * License version 2.1, as published by the Free Software 
+ * License version 2.1, as published by the Free Software
  * Foundation.  See file COPYING.
- * 
+ *
  */
 
 #ifndef CEPH_WORKQUEUE_H
 #define CEPH_WORKQUEUE_H
 
-#ifdef WITH_SEASTAR
+#if defined(WITH_SEASTAR) && !defined(WITH_ALIEN)
 // for ObjectStore.h
 struct ThreadPool {
   struct TPHandle {
@@ -35,9 +35,10 @@ struct ThreadPool {
 #include "common/config_obs.h"
 #include "common/HeartbeatMap.h"
 #include "common/Thread.h"
+#include "include/common_fwd.h"
 #include "include/Context.h"
+#include "common/HBHandle.h"
 
-class CephContext;
 
 /// Pool of threads that share work submitted to multiple work queues.
 class ThreadPool : public md_config_obs_t {
@@ -54,21 +55,21 @@ protected:
   ceph::condition_variable _wait_cond;
 
 public:
-  class TPHandle {
+  class TPHandle : public HBHandle {
     friend class ThreadPool;
     CephContext *cct;
-    heartbeat_handle_d *hb;
+    ceph::heartbeat_handle_d *hb;
     ceph::coarse_mono_clock::rep grace;
     ceph::coarse_mono_clock::rep suicide_grace;
   public:
     TPHandle(
       CephContext *cct,
-      heartbeat_handle_d *hb,
+      ceph::heartbeat_handle_d *hb,
       time_t grace,
       time_t suicide_grace)
       : cct(cct), hb(hb), grace(grace), suicide_grace(suicide_grace) {}
-    void reset_tp_timeout();
-    void suspend_tp_timeout();
+    void reset_tp_timeout() override final;
+    void suspend_tp_timeout() override final;
   };
 protected:
 
@@ -280,7 +281,7 @@ public:
   template<class T>
   class WorkQueue : public WorkQueue_ {
     ThreadPool *pool;
-    
+
     /// Add a work item to the queue.
     virtual bool _enqueue(T *) = 0;
     /// Dequeue a previously submitted work item.
@@ -312,7 +313,7 @@ public:
     ~WorkQueue() override {
       pool->remove_work_queue(this);
     }
-    
+
     bool queue(T *item) {
       pool->_lock.lock();
       bool r = _enqueue(item);
@@ -431,16 +432,25 @@ public:
     }
     void requeue_front(T *item) {
       std::lock_guard pool_locker(m_pool->_lock);
+      requeue_front(pool_locker, item);
+    }
+    void requeue_front(const std::lock_guard<ceph::mutex>&, T *item) {
       _void_process_finish(nullptr);
       m_items.push_front(item);
     }
     void requeue_back(T *item) {
       std::lock_guard pool_locker(m_pool->_lock);
+      requeue_back(pool_locker, item);
+    }
+    void requeue_back(const std::lock_guard<ceph::mutex>&, T *item) {
       _void_process_finish(nullptr);
       m_items.push_back(item);
     }
     void signal() {
       std::lock_guard pool_locker(m_pool->_lock);
+      signal(pool_locker);
+    }
+    void signal(const std::lock_guard<ceph::mutex>&) {
       m_pool->_cond.notify_one();
     }
     ceph::mutex &get_pool_lock() {
@@ -454,7 +464,7 @@ public:
 protected:
   std::vector<WorkQueue_*> work_queues;
   int next_work_queue = 0;
- 
+
 
   // threads
   struct WorkThread : public Thread {
@@ -466,7 +476,7 @@ protected:
       return 0;
     }
   };
-  
+
   std::set<WorkThread*> _threads;
   std::list<WorkThread*> _old_threads;  ///< need to be joined
   int processing;
@@ -484,7 +494,7 @@ public:
     std::lock_guard l(_lock);
     return _num_threads;
   }
-  
+
   /// assign a work queue to this thread pool
   void add_work_queue(WorkQueue_* wq) {
     std::lock_guard l(_lock);
@@ -496,7 +506,7 @@ public:
     unsigned i = 0;
     while (work_queues[i] != wq)
       i++;
-    for (i++; i < work_queues.size(); i++) 
+    for (i++; i < work_queues.size(); i++)
       work_queues[i-1] = work_queues[i];
     ceph_assert(i == work_queues.size());
     work_queues.resize(i-1);
@@ -555,7 +565,7 @@ public:
   GenContextWQ(const std::string &name, time_t ti, ThreadPool *tp)
     : ThreadPool::WorkQueueVal<
       GenContext<ThreadPool::TPHandle&>*>(name, ti, ti*10, tp) {}
-  
+
   void _enqueue(GenContext<ThreadPool::TPHandle&> *c) override {
     _queue.push_back(c);
   }
@@ -651,21 +661,21 @@ class ShardedThreadPool {
 public:
 
   class BaseShardedWQ {
-  
+
   public:
     time_t timeout_interval, suicide_interval;
     BaseShardedWQ(time_t ti, time_t sti):timeout_interval(ti), suicide_interval(sti) {}
     virtual ~BaseShardedWQ() {}
 
-    virtual void _process(uint32_t thread_index, heartbeat_handle_d *hb ) = 0;
+    virtual void _process(uint32_t thread_index, ceph::heartbeat_handle_d *hb ) = 0;
     virtual void return_waiting_threads() = 0;
     virtual void stop_return_waiting_threads() = 0;
     virtual bool is_shard_empty(uint32_t thread_index) = 0;
-  };      
+  };
 
   template <typename T>
   class ShardedWQ: public BaseShardedWQ {
-  
+
     ShardedThreadPool* sharded_pool;
 
   protected:
@@ -674,7 +684,7 @@ public:
 
 
   public:
-    ShardedWQ(time_t ti, time_t sti, ShardedThreadPool* tp): BaseShardedWQ(ti, sti), 
+    ShardedWQ(time_t ti, time_t sti, ShardedThreadPool* tp): BaseShardedWQ(ti, sti),
                                                                  sharded_pool(tp) {
       tp->set_wq(this);
     }
@@ -689,7 +699,7 @@ public:
     void drain() {
       sharded_pool->drain();
     }
-    
+
   };
 
 private:

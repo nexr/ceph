@@ -7,7 +7,7 @@ daemon.
 
 Copyright (C) 2013 Inktank Storage, Inc.
 
-LGPL2.1.  See file COPYING.
+LGPL-2.1 or LGPL-3.0.  See file COPYING.
 """
 from __future__ import print_function
 import copy
@@ -694,9 +694,9 @@ class argdesc(object):
         else:
             s = '{0}({1})'.format(self.name, str(self.instance))
             if self.N:
-                s += ' [' + str(self.instance) + '...]'
+                s += '...'
         if not self.req:
-            s = '{' + s + '}'
+            s = '[' + s + ']'
         return s
 
     def helpstr(self):
@@ -704,17 +704,29 @@ class argdesc(object):
         like str(), but omit parameter names (except for CephString,
         which really needs them)
         """
-        if self.t == CephString:
-            chunk = '<{0}>'.format(self.name)
-        elif self.t == CephBool:
+        if self.t == CephBool:
             chunk = "--{0}".format(self.name.replace("_", "-"))
-        else:
+        elif self.t == CephPrefix or self.t == CephChoices:
             chunk = str(self.instance)
+        elif self.t == CephOsdName:
+            # it just so happens all CephOsdName commands are named 'id' anyway,
+            # so <id|osd.id> is perfect.
+            chunk = '<id|osd.id>'
+        elif self.t == CephName:
+            # CephName commands similarly only have one arg of the
+            # type, so <type.id> is good.
+            chunk = '<type.id>'
+        elif self.t == CephInt:
+            chunk = '<{0}:int>'.format(self.name)
+        elif self.t == CephFloat:
+            chunk = '<{0}:float>'.format(self.name)
+        else:
+            chunk = '<{0}>'.format(self.name)
         s = chunk
         if self.N:
-            s += ' [' + chunk + '...]'
+            s += '...'
         if not self.req:
-            s = '{' + s + '}'
+            s = '[' + s + ']'
         return s
 
     def complete(self, s):
@@ -1098,7 +1110,7 @@ def validate(args, signature, flags=0, partial=False):
         raise ArgumentError("unused arguments: " + str(myargs))
 
     if flags & Flag.MGR:
-        d['target'] = ('mgr','')
+        d['target'] = ('mon-mgr','')
 
     if flags & Flag.POLL:
         d['poll'] = True
@@ -1155,10 +1167,15 @@ def validate_command(sigdict, args, verbose=False):
         else:
             bestcmds.append(cmd)
 
-    # Sort bestcmds by number of args so we can try shortest first
+    # Sort bestcmds by number of req args so we can try shortest first
     # (relies on a cmdsig being key,val where val is a list of len 1)
-    bestcmds_sorted = sorted(bestcmds, key=lambda c: len(c['sig']))
 
+    def grade(cmd):
+      # prefer optional arguments over required ones
+      sigs = cmd['sig']
+      return sum(map(lambda sig: sig.req, sigs))
+
+    bestcmds_sorted = sorted(bestcmds, key=grade)
     if verbose:
         print("bestcmds_sorted: ", file=sys.stderr)
         pprint.PrettyPrinter(stream=sys.stderr).pprint(bestcmds_sorted)
@@ -1300,7 +1317,11 @@ def run_in_thread(func, *args, **kwargs):
     if timeout == 0 or timeout == None:
         # python threading module will just get blocked if timeout is `None`,
         # otherwise it will keep polling until timeout or thread stops.
-        timeout = 2 ** 32
+        # timeout in integer when converting it to nanoseconds, but since
+        # python3 uses `int64_t` for the deadline before timeout expires,
+        # we have to use a safe value which does not overflow after being
+        # added to current time in microseconds.
+        timeout = 24 * 60 * 60
     t = RadosThread(func, *args, **kwargs)
 
     # allow the main thread to exit (presumably, avoid a join() on this
@@ -1362,6 +1383,19 @@ def send_command(cluster, target=('mon', ''), cmd=None, inbuf=b'', timeout=0,
                 cluster.osd_command, osdid, cmd, inbuf, timeout=timeout)
 
         elif target[0] == 'mgr':
+            name = ''     # non-None empty string means "current active mgr"
+            if len(target) > 1 and target[1] is not None:
+                name = target[1]
+            if verbose:
+                print('submit {0} to {1} name {2}'.format(cmd, target[0], name),
+                      file=sys.stderr)
+            ret, outbuf, outs = run_in_thread(
+                cluster.mgr_command, cmd, inbuf, timeout=timeout, target=name)
+
+        elif target[0] == 'mon-mgr':
+            if verbose:
+                print('submit {0} to {1}'.format(cmd, target[0]),
+                      file=sys.stderr)
             ret, outbuf, outs = run_in_thread(
                 cluster.mgr_command, cmd, inbuf, timeout=timeout)
 

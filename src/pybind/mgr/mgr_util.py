@@ -1,7 +1,15 @@
 import contextlib
+import datetime
 import os
 import socket
 import logging
+import time
+from functools import wraps
+
+try:
+    from typing import Tuple, Any, Callable
+except ImportError:
+    TYPE_CHECKING = False  # just for type checking
 
 (
     BLACK,
@@ -82,9 +90,13 @@ def format_bytes(n, width, colored=False):
 def merge_dicts(*args):
     # type: (dict) -> dict
     """
-    >>> assert merge_dicts({1:2}, {3:4}) == {1:2, 3:4}
-        You can also overwrite keys:
-    >>> assert merge_dicts({1:2}, {1:4}) == {1:4}
+    >>> merge_dicts({1:2}, {3:4})
+    {1: 2, 3: 4}
+
+    You can also overwrite keys:
+    >>> merge_dicts({1:2}, {1:4})
+    {1: 4}
+
     :rtype: dict[str, Any]
     """
     ret = {}
@@ -94,6 +106,7 @@ def merge_dicts(*args):
 
 
 def get_default_addr():
+    # type: () -> str
     def is_ipv6_enabled():
         try:
             sock = socket.socket(socket.AF_INET6)
@@ -104,17 +117,61 @@ def get_default_addr():
            return False
 
     try:
-        return get_default_addr.result
+        return get_default_addr.result  # type: ignore
     except AttributeError:
         result = '::' if is_ipv6_enabled() else '0.0.0.0'
-        get_default_addr.result = result
+        get_default_addr.result = result  # type: ignore
         return result
 
 
 class ServerConfigException(Exception):
     pass
 
+
+def create_self_signed_cert(organisation='Ceph', common_name='mgr'):
+    # type: (str, str) -> Tuple[str, str]:
+    """Returns self-signed PEM certificates valid for 10 years.
+    :return cert, pkey
+    """
+
+    from OpenSSL import crypto
+    from uuid import uuid4
+
+    # create a key pair
+    pkey = crypto.PKey()
+    pkey.generate_key(crypto.TYPE_RSA, 2048)
+
+    # create a self-signed cert
+    cert = crypto.X509()
+    cert.get_subject().O = organisation
+    cert.get_subject().CN = common_name
+    cert.set_serial_number(int(uuid4()))
+    cert.gmtime_adj_notBefore(0)
+    cert.gmtime_adj_notAfter(10 * 365 * 24 * 60 * 60)  # 10 years
+    cert.set_issuer(cert.get_subject())
+    cert.set_pubkey(pkey)
+    cert.sign(pkey, 'sha512')
+
+    cert = crypto.dump_certificate(crypto.FILETYPE_PEM, cert)
+    pkey = crypto.dump_privatekey(crypto.FILETYPE_PEM, pkey)
+
+    return cert.decode('utf-8'), pkey.decode('utf-8')
+
+
+def verify_cacrt_content(crt):
+    # type: (str) -> None
+    from OpenSSL import crypto
+    try:
+        x509 = crypto.load_certificate(crypto.FILETYPE_PEM, crt)
+        if x509.has_expired():
+            logger.warning('Certificate has expired: {}'.format(crt))
+    except (ValueError, crypto.Error) as e:
+        raise ServerConfigException(
+            'Invalid certificate: {}'.format(str(e)))
+
+
 def verify_cacrt(cert_fname):
+    # type: (str) -> None
     """Basic validation of a ca cert"""
 
     if not cert_fname:
@@ -122,19 +179,44 @@ def verify_cacrt(cert_fname):
     if not os.path.isfile(cert_fname):
         raise ServerConfigException("Certificate {} does not exist".format(cert_fname))
 
-    from OpenSSL import crypto
     try:
         with open(cert_fname) as f:
-            x509 = crypto.load_certificate(crypto.FILETYPE_PEM, f.read())
-            if x509.has_expired():
-                logger.warning(
-                    'Certificate {} has expired'.format(cert_fname))
-    except (ValueError, crypto.Error) as e:
+            verify_cacrt_content(f.read())
+    except ValueError as e:
         raise ServerConfigException(
             'Invalid certificate {}: {}'.format(cert_fname, str(e)))
 
 
+def verify_tls(crt, key):
+    # type: (str, str) -> None
+    verify_cacrt_content(crt)
+
+    from OpenSSL import crypto, SSL
+    try:
+        _key = crypto.load_privatekey(crypto.FILETYPE_PEM, key)
+        _key.check()
+    except (ValueError, crypto.Error) as e:
+        raise ServerConfigException(
+            'Invalid private key: {}'.format(str(e)))
+    try:
+        _crt = crypto.load_certificate(crypto.FILETYPE_PEM, crt)
+    except ValueError as e:
+        raise ServerConfigException(
+            'Invalid certificate key: {}'.format(str(e))
+        )
+
+    try:
+        context = SSL.Context(SSL.TLSv1_METHOD)
+        context.use_certificate(_crt)
+        context.use_privatekey(_key)
+        context.check_privatekey()
+    except crypto.Error as e:
+        logger.warning(
+            'Private key and certificate do not match up: {}'.format(str(e)))
+
+
 def verify_tls_files(cert_fname, pkey_fname):
+    # type: (str, str) -> None
     """Basic checks for TLS certificate and key files
 
     Do some validations to the private key and certificate:
@@ -298,3 +380,39 @@ def _pairwise(iterable):
     for b in it:
         yield (a, b)
         a = b
+
+def to_pretty_timedelta(n):
+    if n < datetime.timedelta(seconds=120):
+        return str(n.seconds) + 's'
+    if n < datetime.timedelta(minutes=120):
+        return str(n.seconds // 60) + 'm'
+    if n < datetime.timedelta(hours=48):
+        return str(n.seconds // 3600) + 'h'
+    if n < datetime.timedelta(days=14):
+        return str(n.days) + 'd'
+    if n < datetime.timedelta(days=7*12):
+        return str(n.days // 7) + 'w'
+    if n < datetime.timedelta(days=365*2):
+        return str(n.days // 30) + 'M'
+    return str(n.days // 365) + 'y'
+
+
+def profile_method(skip_attribute=False):
+    """
+    Decorator for methods of the Module class. Logs the name of the given
+    function f with the time it takes to execute it.
+    """
+    def outer(f):
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            self = args[0]
+            t = time.time()
+            self.log.debug('Starting method {}.'.format(f.__name__))
+            result = f(*args, **kwargs)
+            duration = time.time() - t
+            if not skip_attribute:
+                wrapper._execution_duration = duration  # type: ignore
+            self.log.debug('Method {} ran {:.3f} seconds.'.format(f.__name__, duration))
+            return result
+        return wrapper
+    return outer

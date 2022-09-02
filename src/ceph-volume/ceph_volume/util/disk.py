@@ -24,7 +24,7 @@ def get_partuuid(device):
     device
     """
     out, err, rc = process.call(
-        ['blkid', '-s', 'PARTUUID', '-o', 'value', device]
+        ['blkid', '-c', '/dev/null', '-s', 'PARTUUID', '-o', 'value', device]
     )
     return ' '.join(out).strip()
 
@@ -98,7 +98,7 @@ def blkid(device):
     PART_ENTRY_UUID                 PARTUUID
     """
     out, err, rc = process.call(
-        ['blkid', '-p', device]
+        ['blkid', '-c', '/dev/null', '-p', device]
     )
     return _blkid_parser(' '.join(out))
 
@@ -110,7 +110,7 @@ def get_part_entry_type(device):
     used for udev rules, but it is useful in this case as it is the only
     consistent way to retrieve the GUID used by ceph-disk to identify devices.
     """
-    out, err, rc = process.call(['blkid', '-p', '-o', 'udev', device])
+    out, err, rc = process.call(['blkid', '-c', '/dev/null', '-p', '-o', 'udev', device])
     for line in out:
         if 'ID_PART_ENTRY_TYPE=' in line:
             return line.split('=')[-1].strip()
@@ -123,7 +123,7 @@ def get_device_from_partuuid(partuuid):
     device is
     """
     out, err, rc = process.call(
-        ['blkid', '-t', 'PARTUUID="%s"' % partuuid, '-o', 'device']
+        ['blkid', '-c', '/dev/null', '-t', 'PARTUUID="%s"' % partuuid, '-o', 'device']
     )
     return ' '.join(out).strip()
 
@@ -134,14 +134,13 @@ def remove_partition(device):
 
     :param device: A ``Device()`` object
     """
-    parent_device = '/dev/%s' % device.disk_api['PKNAME']
     udev_info = udevadm_property(device.abspath)
     partition_number = udev_info.get('ID_PART_ENTRY_NUMBER')
     if not partition_number:
         raise RuntimeError('Unable to detect the partition number for device: %s' % device.abspath)
 
     process.run(
-        ['parted', parent_device, '--script', '--', 'rm', partition_number]
+        ['parted', device.parent_device, '--script', '--', 'rm', partition_number]
     )
 
 
@@ -330,7 +329,7 @@ def is_device(dev):
     # use lsblk first, fall back to using stat
     TYPE = lsblk(dev).get('TYPE')
     if TYPE:
-        return TYPE == 'disk'
+        return TYPE in ['disk', 'mpath']
 
     # fallback to stat
     return _stat_is_device(os.lstat(dev).st_mode)
@@ -360,6 +359,13 @@ def is_partition(dev):
     if os.path.exists('/sys/dev/block/%d:%d/partition' % (major, minor)):
         return True
     return False
+
+
+def is_ceph_rbd(dev):
+    """
+    Boolean to determine if a given device is a ceph RBD device, like /dev/rbd0
+    """
+    return dev.startswith(('/dev/rbd'))
 
 
 class BaseFloatUnit(float):
@@ -403,6 +409,8 @@ class FloatKB(BaseFloatUnit):
 class FloatTB(BaseFloatUnit):
     pass
 
+class FloatPB(BaseFloatUnit):
+    pass
 
 class Size(object):
     """
@@ -448,19 +456,19 @@ class Size(object):
         <Size(2.16 GB)>
         >>> s.mb
         <FloatMB(2211.0)>
-        >>> print "Total size: %s" % s.mb
+        >>> print("Total size: %s" % s.mb)
         Total size: 2211.00 MB
-        >>> print "Total size: %s" % s
+        >>> print("Total size: %s" % s)
         Total size: 2.16 GB
     """
 
     @classmethod
     def parse(cls, size):
         if (len(size) > 2 and
-            size[-2].lower() in ['k', 'm', 'g', 't'] and
+            size[-2].lower() in ['k', 'm', 'g', 't', 'p'] and
             size[-1].lower() == 'b'):
             return cls(**{size[-2:].lower(): float(size[0:-2])})
-        elif size[-1].lower() in ['b', 'k', 'm', 'g', 't']:
+        elif size[-1].lower() in ['b', 'k', 'm', 'g', 't', 'p']:
             return cls(**{size[-1].lower(): float(size[0:-1])})
         else:
             return cls(b=float(size))
@@ -475,6 +483,7 @@ class Size(object):
             [('m', 'mb', 'megabytes'), self._multiplier ** 2],
             [('g', 'gb', 'gigabytes'), self._multiplier ** 3],
             [('t', 'tb', 'terabytes'), self._multiplier ** 4],
+            [('p', 'pb', 'petabytes'), self._multiplier ** 5]
         ]
         # and mappings for units-to-formatters, including bytes and aliases for
         # each
@@ -484,6 +493,7 @@ class Size(object):
             [('mb', 'megabytes'), FloatMB],
             [('gb', 'gigabytes'), FloatGB],
             [('tb', 'terabytes'), FloatTB],
+            [('pb', 'petabytes'), FloatPB],
         ]
         self._formatters = {}
         for key, value in format_aliases:
@@ -517,7 +527,7 @@ class Size(object):
         than 1024. This allows to represent size in the most readable format
         available
         """
-        for unit in ['b', 'kb', 'mb', 'gb', 'tb']:
+        for unit in ['b', 'kb', 'mb', 'gb', 'tb', 'pb']:
             if getattr(self, unit) > 1024:
                 continue
             return getattr(self, unit)
@@ -603,6 +613,12 @@ class Size(object):
         _b = self._b / other
         return Size(b=_b)
 
+    def __bool__(self):
+        return self.b != 0
+
+    def __nonzero__(self):
+        return self.__bool__()
+
     def __getattr__(self, unit):
         """
         Calculate units on the fly, relies on the fact that ``bytes`` has been
@@ -627,14 +643,15 @@ def human_readable_size(size):
     Take a size in bytes, and transform it into a human readable size with up
     to two decimals of precision.
     """
-    suffixes = ['B', 'KB', 'MB', 'GB', 'TB']
-    suffix_index = 0
-    while size > 1024:
-        suffix_index += 1
-        size = size / 1024.0
+    suffixes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+    for suffix in suffixes:
+        if size >= 1024:
+            size = size / 1024
+        else:
+            break
     return "{size:.2f} {suffix}".format(
         size=size,
-        suffix=suffixes[suffix_index])
+        suffix=suffix)
 
 
 def size_from_human_readable(s):
@@ -646,6 +663,8 @@ def size_from_human_readable(s):
     if s[-1].isdigit():
         return Size(b=float(s))
     n = float(s[:-1])
+    if s[-1].lower() == 'p':
+        return Size(pb=n)
     if s[-1].lower() == 't':
         return Size(tb=n)
     if s[-1].lower() == 'g':
@@ -747,14 +766,18 @@ def get_devices(_sys_block_path='/sys/block'):
     for block in block_devs:
         devname = os.path.basename(block[0])
         diskname = block[1]
-        if block[2] != 'disk':
+        if block[2] not in ['disk', 'mpath']:
             continue
         sysdir = os.path.join(_sys_block_path, devname)
         metadata = {}
 
+        # If the device is ceph rbd it gets excluded
+        if is_ceph_rbd(diskname):
+            continue
+
         # If the mapper device is a logical volume it gets excluded
         if is_mapper_device(diskname):
-            if lvm.is_lv(diskname):
+            if lvm.get_device_lvs(diskname):
                 continue
 
         # all facts that have no defaults
@@ -796,3 +819,17 @@ def get_devices(_sys_block_path='/sys/block'):
 
         device_facts[diskname] = metadata
     return device_facts
+
+def has_bluestore_label(device_path):
+    isBluestore = False
+    bluestoreDiskSignature = 'bluestore block device' # 22 bytes long
+
+    # throws OSError on failure
+    logger.info("opening device {} to check for BlueStore label".format(device_path))
+    with open(device_path, "rb") as fd:
+        # read first 22 bytes looking for bluestore disk signature
+        signature = fd.read(22)
+        if signature.decode('ascii', 'replace') == bluestoreDiskSignature:
+            isBluestore = True
+
+    return isBluestore

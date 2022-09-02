@@ -249,7 +249,7 @@ bool OSDCapGrant::is_capable(
   const string& object,
   bool op_may_read,
   bool op_may_write,
-  const std::vector<OpRequest::ClassInfo>& classes,
+  const std::vector<OpInfo::ClassInfo>& classes,
   const entity_addr_t& addr,
   std::vector<bool>* class_allowed) const
 {
@@ -332,6 +332,8 @@ void OSDCapGrant::expand_profile()
 
   if (profile.name == "rbd") {
     // RBD read-write grant
+    profile_grants.emplace_back(OSDCapMatch(string(), "rbd_info"),
+                                OSDCapSpec(osd_rwxa_t(OSD_CAP_R)));
     profile_grants.emplace_back(OSDCapMatch(string(), "rbd_children"),
                                 OSDCapSpec(osd_rwxa_t(OSD_CAP_CLS_R)));
     profile_grants.emplace_back(OSDCapMatch(string(), "rbd_mirroring"),
@@ -377,7 +379,7 @@ bool OSDCap::is_capable(const string& pool_name, const string& ns,
 			const OSDCapPoolTag::app_map_t& application_metadata,
 			const string& object,
                         bool op_may_read, bool op_may_write,
-			const std::vector<OpRequest::ClassInfo>& classes,
+			const std::vector<OpInfo::ClassInfo>& classes,
 			const entity_addr_t& addr) const
 {
   std::vector<bool> class_allowed(classes.size(), false);

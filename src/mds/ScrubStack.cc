@@ -85,7 +85,7 @@ void ScrubStack::_enqueue_inode(CInode *in, CDentry *parent,
 {
   dout(10) << __func__ << " with {" << *in << "}"
            << ", on_finish=" << on_finish << ", top=" << top << dendl;
-  ceph_assert(mdcache->mds->mds_lock.is_locked_by_me());
+  ceph_assert(ceph_mutex_is_locked_by_me(mdcache->mds->mds_lock));
   in->scrub_initialize(parent, header, on_finish);
   if (top)
     push_inode(in);
@@ -108,7 +108,7 @@ void ScrubStack::enqueue_inode(CInode *in, ScrubHeaderRef& header,
 
 void ScrubStack::kick_off_scrubs()
 {
-  ceph_assert(mdcache->mds->mds_lock.is_locked());
+  ceph_assert(ceph_mutex_is_locked(mdcache->mds->mds_lock));
   dout(20) << __func__ << ": state=" << state << dendl;
 
   if (clear_inode_stack || state == STATE_PAUSING || state == STATE_PAUSED) {
@@ -201,7 +201,7 @@ void ScrubStack::scrub_dir_inode(CInode *in,
 
   if (header->get_recursive()) {
     frag_vec_t scrubbing_frags;
-    list<CDir*> scrubbing_cdirs;
+    std::queue<CDir*> scrubbing_cdirs;
     in->scrub_dirfrags_scrubbing(&scrubbing_frags);
     dout(20) << __func__ << " iterating over " << scrubbing_frags.size()
       << " scrubbing frags" << dendl;
@@ -209,7 +209,7 @@ void ScrubStack::scrub_dir_inode(CInode *in,
       // turn frags into CDir *
       CDir *dir = in->get_dirfrag(fg);
       if (dir) {
-	scrubbing_cdirs.push_back(dir);
+	scrubbing_cdirs.push(dir);
 	dout(25) << __func__ << " got CDir " << *dir << " presently scrubbing" << dendl;
       } else {
 	in->scrub_dirfrag_finished(fg);
@@ -220,20 +220,19 @@ void ScrubStack::scrub_dir_inode(CInode *in,
     dout(20) << __func__ << " consuming from " << scrubbing_cdirs.size()
 	     << " scrubbing cdirs" << dendl;
 
-    list<CDir*>::iterator i = scrubbing_cdirs.begin();
     while (g_conf()->mds_max_scrub_ops_in_progress > scrubs_in_progress) {
       // select next CDir
       CDir *cur_dir = NULL;
-      if (i != scrubbing_cdirs.end()) {
-	cur_dir = *i;
-	++i;
+      if (!scrubbing_cdirs.empty()) {
+	cur_dir = scrubbing_cdirs.front();
+        scrubbing_cdirs.pop();
 	dout(20) << __func__ << " got cur_dir = " << *cur_dir << dendl;
       } else {
 	bool ready = get_next_cdir(in, &cur_dir);
 	dout(20) << __func__ << " get_next_cdir ready=" << ready << dendl;
 
 	if (ready && cur_dir) {
-	  scrubbing_cdirs.push_back(cur_dir);
+	  scrubbing_cdirs.push(cur_dir);
 	} else if (!ready) {
 	  // We are waiting for load of a frag
 	  all_frags_done = false;
@@ -392,8 +391,7 @@ void ScrubStack::scrub_dirfrag(CDir *dir,
 
     if (r == ENOENT) {
       // Nothing left to scrub, are we done?
-      std::list<CDentry*> scrubbing;
-      dir->scrub_dentries_scrubbing(&scrubbing);
+      auto&& scrubbing = dir->scrub_dentries_scrubbing();
       if (scrubbing.empty()) {
         dout(20) << __func__ << " dirfrag done: " << *dir << dendl;
         // FIXME: greg: What's the diff meant to be between done and terminal
@@ -502,7 +500,7 @@ ScrubStack::C_KickOffScrubs::C_KickOffScrubs(MDCache *mdcache, ScrubStack *s)
   : MDSInternalContext(mdcache->mds), stack(s) { }
 
 void ScrubStack::complete_control_contexts(int r) {
-  ceph_assert(mdcache->mds->mds_lock.is_locked_by_me());
+  ceph_assert(ceph_mutex_is_locked_by_me(mdcache->mds->mds_lock));
 
   for (auto &ctx : control_ctxs) {
     ctx->complete(r);
@@ -520,7 +518,7 @@ void ScrubStack::set_state(State next_state) {
 }
 
 bool ScrubStack::scrub_in_transition_state() {
-  ceph_assert(mdcache->mds->mds_lock.is_locked_by_me());
+  ceph_assert(ceph_mutex_is_locked_by_me(mdcache->mds->mds_lock));
   dout(20) << __func__ << ": state=" << state << dendl;
 
   // STATE_RUNNING is considered as a transition state so as to
@@ -581,7 +579,7 @@ std::string_view ScrubStack::scrub_summary() {
 }
 
 void ScrubStack::scrub_status(Formatter *f) {
-  ceph_assert(mdcache->mds->mds_lock.is_locked_by_me());
+  ceph_assert(ceph_mutex_is_locked_by_me(mdcache->mds->mds_lock));
 
   f->open_object_section("result");
 
@@ -650,7 +648,7 @@ void ScrubStack::scrub_status(Formatter *f) {
 }
 
 void ScrubStack::abort_pending_scrubs() {
-  ceph_assert(mdcache->mds->mds_lock.is_locked_by_me());
+  ceph_assert(ceph_mutex_is_locked_by_me(mdcache->mds->mds_lock));
   ceph_assert(clear_inode_stack);
 
   for (auto inode = inode_stack.begin(); !inode.end(); ++inode) {
@@ -673,7 +671,7 @@ void ScrubStack::abort_pending_scrubs() {
 }
 
 void ScrubStack::scrub_abort(Context *on_finish) {
-  ceph_assert(mdcache->mds->mds_lock.is_locked_by_me());
+  ceph_assert(ceph_mutex_is_locked_by_me(mdcache->mds->mds_lock));
   ceph_assert(on_finish != nullptr);
 
   dout(10) << __func__ << ": aborting with " << scrubs_in_progress
@@ -694,7 +692,7 @@ void ScrubStack::scrub_abort(Context *on_finish) {
 }
 
 void ScrubStack::scrub_pause(Context *on_finish) {
-  ceph_assert(mdcache->mds->mds_lock.is_locked_by_me());
+  ceph_assert(ceph_mutex_is_locked_by_me(mdcache->mds->mds_lock));
   ceph_assert(on_finish != nullptr);
 
   dout(10) << __func__ << ": pausing with " << scrubs_in_progress
@@ -719,7 +717,7 @@ void ScrubStack::scrub_pause(Context *on_finish) {
 }
 
 bool ScrubStack::scrub_resume() {
-  ceph_assert(mdcache->mds->mds_lock.is_locked_by_me());
+  ceph_assert(ceph_mutex_is_locked_by_me(mdcache->mds->mds_lock));
   dout(20) << __func__ << ": state=" << state << dendl;
 
   int r = 0;

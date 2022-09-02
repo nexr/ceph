@@ -3,8 +3,17 @@ import errno
 import logging
 import sys
 
+try:
+    from typing import List
+except ImportError:
+    pass
+
 from contextlib import contextmanager
 from threading import Lock, Condition
+try:
+    from typing import no_type_check
+except ImportError:
+    pass
 
 if sys.version_info >= (3, 3):
     from threading import Timer
@@ -84,13 +93,16 @@ class ConnectionPool(object):
             log.debug("CephFS mounting...")
             self.fs.mount(filesystem_name=self.fs_name.encode('utf-8'))
             log.debug("Connection to cephfs '{0}' complete".format(self.fs_name))
+            self.mgr._ceph_register_client(self.fs.get_addrs())
 
         def disconnect(self):
             try:
                 assert self.fs
                 assert self.ops_in_progress == 0
                 log.info("disconnecting from cephfs '{0}'".format(self.fs_name))
+                addrs = self.fs.get_addrs()
                 self.fs.shutdown()
+                self.mgr._ceph_unregister_client(addrs)
                 self.fs = None
             except Exception as e:
                 log.debug("disconnect: ({0})".format(e))
@@ -108,6 +120,7 @@ class ConnectionPool(object):
         """
         recurring timer variant of Timer
         """
+        #@no_type_check
         def run(self):
             try:
                 while not self.finished.is_set():
@@ -196,16 +209,48 @@ def gen_pool_names(volname):
     """
     return "cephfs.{}.meta".format(volname), "cephfs.{}.data".format(volname)
 
-def create_volume(mgr, volname):
+def get_mds_map(mgr, volname):
+    """
+    return mdsmap for a volname
+    """
+    mds_map = None
+    fs_map = mgr.get("fs_map")
+    for f in fs_map['filesystems']:
+        if volname == f['mdsmap']['fs_name']:
+            return f['mdsmap']
+    return mds_map
+
+def get_pool_names(mgr, volname):
+    """
+    return metadata and data pools (list) names of volume as a tuple
+    """
+    fs_map = mgr.get("fs_map")
+    metadata_pool_id = None
+    data_pool_ids = [] # type: List[int]
+    for f in fs_map['filesystems']:
+        if volname == f['mdsmap']['fs_name']:
+            metadata_pool_id = f['mdsmap']['metadata_pool']
+            data_pool_ids = f['mdsmap']['data_pools']
+            break
+    if metadata_pool_id is None:
+        return None, None
+
+    osdmap = mgr.get("osd_map")
+    pools = dict([(p['pool'], p['pool_name']) for p in osdmap['pools']])
+    metadata_pool = pools[metadata_pool_id]
+    data_pools = [pools[id] for id in data_pool_ids]
+    return metadata_pool, data_pools
+
+def create_volume(mgr, volname, placement):
     """
     create volume  (pool, filesystem and mds)
     """
     metadata_pool, data_pool = gen_pool_names(volname)
     # create pools
-    r, outs, outb = create_pool(mgr, metadata_pool, 16)
+    r, outs, outb = create_pool(mgr, metadata_pool)
     if r != 0:
         return r, outb, outs
-    r, outb, outs = create_pool(mgr, data_pool, 8)
+    r, outb, outs = create_pool(mgr, data_pool)
     if r != 0:
         #cleanup
         remove_pool(mgr, metadata_pool)
@@ -219,15 +264,15 @@ def create_volume(mgr, volname):
         remove_pool(mgr, metadata_pool)
         return r, outb, outs
     # create mds
-    return create_mds(mgr, volname)
+    return create_mds(mgr, volname, placement)
 
-def delete_volume(mgr, volname):
+def delete_volume(mgr, volname, metadata_pool, data_pools):
     """
-    delete the given module (tear down mds, remove filesystem)
+    delete the given module (tear down mds, remove filesystem, remove pools)
     """
     # Tear down MDS daemons
     try:
-        completion = mgr.remove_stateless_service("mds", volname)
+        completion = mgr.remove_service('mds.' + volname)
         mgr._orchestrator_wait([completion])
         orchestrator.raise_if_exception(completion)
     except (ImportError, orchestrator.OrchestratorError):
@@ -248,11 +293,16 @@ def delete_volume(mgr, volname):
         err = "Filesystem not found for volume '{0}'".format(volname)
         log.warning(err)
         return -errno.ENOENT, "", err
-    metadata_pool, data_pool = gen_pool_names(volname)
     r, outb, outs = remove_pool(mgr, metadata_pool)
     if r != 0:
         return r, outb, outs
-    return remove_pool(mgr, data_pool)
+
+    for data_pool in data_pools:
+        r, outb, outs = remove_pool(mgr, data_pool)
+        if r != 0:
+            return r, outb, outs
+    result_str = "metadata pool: {0} data pool: {1} removed".format(metadata_pool, str(data_pools))
+    return r, result_str, ""
 
 def list_volumes(mgr):
     """

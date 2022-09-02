@@ -71,6 +71,10 @@ def task(ctx, config):
         cleanup = []
         if not config.get('cleanup', True):
             cleanup = ['--no-cleanup']
+        write_to_omap = []
+        if config.get('write-omap', False):
+            write_to_omap = ['--write-omap']
+            log.info('omap writes')
 
         pool = config.get('pool', 'data')
         if create_pool:
@@ -96,9 +100,9 @@ def task(ctx, config):
                               '{tdir}/archive/coverage',
                               'rados',
                               '--no-log-to-stderr',
-                              '--name', role]
+                              '--name', role] +
+                              ['-t', str(concurrency)]
                               + size + objectsize +
-                              ['-t', str(concurrency)] +
                               ['-p' , pool,
                           'bench', str(60), "write", "--no-cleanup"
                           ]).format(tdir=testdir),
@@ -121,7 +125,7 @@ def task(ctx, config):
                           + size + objectsize +
                           ['-p' , pool,
                           'bench', str(config.get('time', 360)), runtype,
-                          ] + cleanup).format(tdir=testdir),
+                          ] + write_to_omap + cleanup).format(tdir=testdir),
                 ],
             logger=log.getChild('radosbench.{id}'.format(id=id_)),
             stdin=run.PIPE,

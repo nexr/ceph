@@ -1,5 +1,5 @@
 // -*- mode:C++; tab-width:8; c-basic-offset:2; indent-tabs-mode:t -*-
-// vim: ts=8 sw=2 smarttab
+// vim: ts=8 sw=2 smarttab ft=cpp
 
 #include "rgw_common.h"
 #include "rgw_rest_client.h"
@@ -7,7 +7,6 @@
 #include "rgw_http_errors.h"
 #include "rgw_rados.h"
 
-#include "common/ceph_crypto_cms.h"
 #include "common/armor.h"
 #include "common/strtol.h"
 #include "include/str_list.h"
@@ -157,7 +156,7 @@ int RGWRESTSimpleRequest::execute(RGWAccessKey& key, const char *_method, const 
   ldout(cct, 15) << "generated auth header: " << auth_hdr << dendl;
 
   headers.push_back(pair<string, string>("AUTHORIZATION", auth_hdr));
-  int r = process();
+  int r = process(null_yield);
   if (r < 0)
     return r;
 
@@ -280,9 +279,21 @@ int RGWRESTSimpleRequest::forward_request(RGWAccessKey& key, req_info& info, siz
   RGWEnv new_env;
   req_info new_info(cct, &new_env);
   new_info.rebuild_from(info);
-
+  string bucket_encode;
+  string request_uri_encode;
+  size_t pos = new_info.request_uri.substr(1, new_info.request_uri.size() - 1).find("/");
+  string bucket = new_info.request_uri.substr(1, pos);
+  url_encode(bucket, bucket_encode);
+  if (std::string::npos != pos)
+    request_uri_encode = string("/") + bucket_encode + new_info.request_uri.substr(pos + 1);
+  else
+    request_uri_encode = string("/") + bucket_encode;
+  new_info.request_uri = request_uri_encode;
   new_env.set("HTTP_DATE", date_str.c_str());
-
+  const char* const content_md5 = info.env->get("HTTP_CONTENT_MD5");
+  if (content_md5) {
+    new_env.set("HTTP_CONTENT_MD5", content_md5);
+  }
   int ret = sign_request(cct, key, new_env, new_info);
   if (ret < 0) {
     ldout(cct, 0) << "ERROR: failed to sign request" << dendl;
@@ -324,7 +335,7 @@ int RGWRESTSimpleRequest::forward_request(RGWAccessKey& key, req_info& info, siz
   method = new_info.method;
   url = new_url;
 
-  int r = process();
+  int r = process(null_yield);
   if (r < 0){
     if (r == -EINVAL){
       // curl_easy has errored, generally means the service is not available
@@ -703,7 +714,7 @@ int RGWRESTStreamRWRequest::do_send_prepare(RGWAccessKey *key, map<string, strin
                                          bufferlist *send_data)
 {
   string new_url = url;
-  if (new_url[new_url.size() - 1] != '/')
+  if (!new_url.empty() && new_url.back() != '/')
     new_url.append("/");
   
   RGWEnv new_env;
@@ -802,7 +813,7 @@ int RGWRESTStreamRWRequest::complete_request(string *etag,
                                              map<string, string> *pattrs,
                                              map<string, string> *pheaders)
 {
-  int ret = wait();
+  int ret = wait(null_yield);
   if (ret < 0) {
     return ret;
   }
@@ -909,13 +920,13 @@ int RGWHTTPStreamRWRequest::receive_data(void *ptr, size_t len, bool *pause)
 }
 
 void RGWHTTPStreamRWRequest::set_stream_write(bool s) {
-  Mutex::Locker wl(write_lock);
+  std::lock_guard wl{write_lock};
   stream_writes = s;
 }
 
 void RGWHTTPStreamRWRequest::unpause_receive()
 {
-  Mutex::Locker req_locker(get_req_lock());
+  std::lock_guard req_locker{get_req_lock()};
   if (!read_paused) {
     _set_read_paused(false);
   }
@@ -923,22 +934,20 @@ void RGWHTTPStreamRWRequest::unpause_receive()
 
 void RGWHTTPStreamRWRequest::add_send_data(bufferlist& bl)
 {
-  Mutex::Locker req_locker(get_req_lock());
-  Mutex::Locker wl(write_lock);
+  std::scoped_lock locker{get_req_lock(), write_lock};
   outbl.claim_append(bl);
   _set_write_paused(false);
 }
 
 uint64_t RGWHTTPStreamRWRequest::get_pending_send_size()
 {
-  Mutex::Locker wl(write_lock);
+  std::lock_guard wl{write_lock};
   return outbl.length();
 }
 
 void RGWHTTPStreamRWRequest::finish_write()
 {
-  Mutex::Locker req_locker(get_req_lock());
-  Mutex::Locker wl(write_lock);
+  std::scoped_lock locker{get_req_lock(), write_lock};
   write_stream_complete = true;
   _set_write_paused(false);
 }
@@ -948,7 +957,7 @@ int RGWHTTPStreamRWRequest::send_data(void *ptr, size_t len, bool *pause)
   uint64_t out_len;
   uint64_t send_size;
   {
-    Mutex::Locker wl(write_lock);
+    std::lock_guard wl{write_lock};
 
     if (outbl.length() == 0) {
       if ((stream_writes && !write_stream_complete) ||

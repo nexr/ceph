@@ -11,9 +11,21 @@
  * Foundation.  See file COPYING.
  */
 
+#include "PyModuleRegistry.h"
+
+#if __has_include(<filesystem>)
+#include <filesystem>
+namespace fs = std::filesystem;
+#elif __has_include(<experimental/filesystem>)
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#else
+#error std::filesystem not available!
+#endif
 
 #include "include/stringify.h"
 #include "common/errno.h"
+#include "common/split.h"
 
 #include "BaseMgrModule.h"
 #include "PyOSDMap.h"
@@ -23,8 +35,6 @@
 #include "mgr/mgr_commands.h"
 
 #include "ActivePyModules.h"
-
-#include "PyModuleRegistry.h"
 
 #define dout_context g_ceph_context
 #define dout_subsys ceph_subsys_mgr
@@ -260,29 +270,25 @@ void PyModuleRegistry::shutdown()
 
 std::set<std::string> PyModuleRegistry::probe_modules(const std::string &path) const
 {
-  DIR *dir = opendir(path.c_str());
-  if (!dir) {
-    return {};
-  }
+  const auto opt = g_conf().get_val<std::string>("mgr_disabled_modules");
+  const auto disabled_modules = ceph::split(opt);
 
-  std::set<std::string> modules_out;
-  struct dirent *entry = NULL;
-  while ((entry = readdir(dir)) != NULL) {
-    string n(entry->d_name);
-    string fn = path + "/" + n;
-    struct stat st;
-    int r = ::stat(fn.c_str(), &st);
-    if (r == 0 && S_ISDIR(st.st_mode)) {
-      string initfn = fn + "/module.py";
-      r = ::stat(initfn.c_str(), &st);
-      if (r == 0) {
-	modules_out.insert(n);
-      }
+  std::set<std::string> modules;
+  for (const auto& entry: fs::directory_iterator(path)) {
+    if (!fs::is_directory(entry)) {
+      continue;
+    }
+    const std::string name = entry.path().filename();
+    if (std::count(disabled_modules.begin(), disabled_modules.end(), name)) {
+      dout(10) << "ignoring disabled module " << name << dendl;
+      continue;
+    }
+    auto module_path = entry.path() / "module.py";
+    if (fs::exists(module_path)) {
+      modules.emplace(name);
     }
   }
-  closedir(dir);
-
-  return modules_out;
+  return modules;
 }
 
 int PyModuleRegistry::handle_command(
@@ -370,6 +376,9 @@ void PyModuleRegistry::get_health_checks(health_check_map_t *checks)
 
     // report failed always_on modules as health errors
     for (const auto& name : mgr_map.get_always_on_modules()) {
+      if (active_modules->is_pending(name)) {
+	continue;
+      }
       if (!active_modules->module_exists(name)) {
         if (failed_modules.find(name) == failed_modules.end() &&
             dependency_modules.find(name) == dependency_modules.end()) {
@@ -388,7 +397,8 @@ void PyModuleRegistry::get_health_checks(health_check_map_t *checks)
         ss << dependency_modules.size()
 	   << " mgr modules have failed dependencies";
       }
-      auto& d = checks->add("MGR_MODULE_DEPENDENCY", HEALTH_WARN, ss.str());
+      auto& d = checks->add("MGR_MODULE_DEPENDENCY", HEALTH_WARN, ss.str(),
+			    dependency_modules.size());
       for (auto& i : dependency_modules) {
 	std::ostringstream ss;
         ss << "Module '" << i.first << "' has failed dependency: " << i.second;
@@ -404,7 +414,8 @@ void PyModuleRegistry::get_health_checks(health_check_map_t *checks)
       } else if (failed_modules.size() > 1) {
         ss << failed_modules.size() << " mgr modules have failed";
       }
-      auto& d = checks->add("MGR_MODULE_ERROR", HEALTH_ERR, ss.str());
+      auto& d = checks->add("MGR_MODULE_ERROR", HEALTH_ERR, ss.str(),
+			    failed_modules.size());
       for (auto& i : failed_modules) {
 	std::ostringstream ss;
         ss << "Module '" << i.first << "' has failed: " << i.second;
@@ -419,7 +430,10 @@ void PyModuleRegistry::handle_config(const std::string &k, const std::string &v)
   std::lock_guard l(module_config.lock);
 
   if (!v.empty()) {
-    dout(4) << "Loaded module_config entry " << k << ":" << v << dendl;
+    // removing value to hide sensitive data going into mgr logs
+    // leaving this for debugging purposes
+    // dout(10) << "Loaded module_config entry " << k << ":" << v << dendl;
+    dout(10) << "Loaded module_config entry " << k << ":" << dendl;
     module_config.config[k] = v;
   } else {
     module_config.config.erase(k);

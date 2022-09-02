@@ -108,15 +108,22 @@ function(do_build_boost version)
     " : "
     " : ${CMAKE_CXX_COMPILER}"
     " ;\n")
+
+  if(WITH_PYTHON2)
+    set(PYTHON_VERSION 2)
+  elseif(WITH_PYTHON3)
+    set(PYTHON_VERSION 3)
+  endif()
+
   if(with_python_version)
-    find_package(PythonLibs ${with_python_version} QUIET REQUIRED)
-    string(REPLACE ";" " " python_includes "${PYTHON_INCLUDE_DIRS}")
+    find_package(Python${PYTHON_VERSION} ${with_python_version} QUIET REQUIRED)
+    string(REPLACE ";" " " python${PYTHON_VERSION}_includes "${Python${PYTHON_VERSION}_INCLUDE_DIRS}")
     file(APPEND ${user_config}
       "using python"
       " : ${with_python_version}"
-      " : ${PYTHON_EXECUTABLE}"
-      " : ${python_includes}"
-      " : ${PYTHON_LIBRARIES}"
+      " : ${Python${PYTHON_VERSION}_EXECUTABLE}"
+      " : ${python${PYTHON_VERSION}_includes}"
+      " : ${Python${PYTHON_VERSION}_LIBRARIES}"
       " ;\n")
   endif()
   list(APPEND b2 --user-config=${user_config})
@@ -124,6 +131,11 @@ function(do_build_boost version)
   list(APPEND b2 toolset=${toolset})
   if(with_python_version)
     list(APPEND b2 python=${with_python_version})
+  endif()
+  if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm|ARM")
+    list(APPEND b2 abi=aapcs)
+    list(APPEND b2 architecture=arm)
+    list(APPEND b2 binary-format=elf)
   endif()
 
   set(build_command
@@ -146,7 +158,7 @@ function(do_build_boost version)
     set(boost_version 1.72.0)
     set(boost_sha256 59c9b274bc451cf91a9ba1dd2c7fdcaf5d60b1b3aa83f2c9fa143417cc660722)
     string(REPLACE "." "_" boost_version_underscore ${boost_version} )
-    set(boost_url 
+    set(boost_url
       https://boostorg.jfrog.io/artifactory/main/release/${boost_version}/source/boost_${boost_version_underscore}.tar.bz2)
     if(CMAKE_VERSION VERSION_GREATER 3.7)
       set(boost_url
@@ -205,7 +217,11 @@ macro(build_boost version)
     endif()
     add_dependencies(Boost::${c} Boost)
     if(c MATCHES "^python")
-      set(c "python${PYTHON_VERSION_MAJOR}${PYTHON_VERSION_MINOR}")
+      if(WITH_PYTHON2)
+        set(c "python${Python2_VERSION_MAJOR}${Python2_VERSION_MINOR}")
+      else(WITH_PYTHON2)
+        set(c "python${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}")
+      endif()
     endif()
     if(Boost_USE_STATIC_LIBS)
       set(Boost_${upper_c}_LIBRARY
@@ -230,6 +246,7 @@ macro(build_boost version)
         INTERFACE_LINK_LIBRARIES "${dependencies}")
       unset(dependencies)
     endif()
+    set(Boost_${c}_FOUND "TRUE")
   endforeach()
 
   # for header-only libraries

@@ -150,9 +150,10 @@ private:
   uint64_t m_incompatible_features = 0;
   uint64_t m_flags = 0;
   uint64_t m_op_features = 0;
+  uint32_t m_read_only_flags = 0U;
+  bool m_read_only = false;
 
   librados::IoCtx m_pool_metadata_io_ctx;
-  std::string m_last_metadata_key;
   std::map<std::string, bufferlist> m_metadata;
 
   std::string m_object_prefix;
@@ -257,8 +258,9 @@ private:
   void apply();
   int get_parent_info(uint64_t snap_id, ParentImageInfo *parent_md,
                       MigrationInfo *migration_info);
-  bool get_migration_info(ParentImageInfo *parent_md,
-                          MigrationInfo *migration_info);
+  int get_migration_info(ParentImageInfo *parent_md,
+                         MigrationInfo *migration_info,
+                         bool* migration_info_valid);
 };
 
 } // namespace image

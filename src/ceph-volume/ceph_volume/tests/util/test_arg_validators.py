@@ -1,5 +1,6 @@
 import argparse
 import pytest
+import os
 from ceph_volume import exceptions
 from ceph_volume.util import arg_validators
 
@@ -9,7 +10,8 @@ class TestOSDPath(object):
     def setup(self):
         self.validator = arg_validators.OSDPath()
 
-    def test_is_not_root(self):
+    def test_is_not_root(self, monkeypatch):
+        monkeypatch.setattr(os, 'getuid', lambda: 100)
         with pytest.raises(exceptions.SuperUserError):
             self.validator('')
 
@@ -78,10 +80,10 @@ class TestValidDevice(object):
     def setup(self):
         self.validator = arg_validators.ValidDevice()
 
-    def test_path_is_valid(self, fake_call):
+    def test_path_is_valid(self, fake_call, patch_bluestore_label):
         result = self.validator('/')
         assert result.abspath == '/'
 
-    def test_path_is_invalid(self, fake_call):
+    def test_path_is_invalid(self, fake_call, patch_bluestore_label):
         with pytest.raises(argparse.ArgumentError):
             self.validator('/device/does/not/exist')

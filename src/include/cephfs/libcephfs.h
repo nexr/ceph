@@ -30,6 +30,10 @@
 #include "ceph_ll_client.h"
 
 #ifdef __cplusplus
+namespace ceph::common {
+  class CephContext;
+}
+using CephContext = ceph::common::CephContext;
 extern "C" {
 #endif
 
@@ -74,6 +78,7 @@ struct ceph_file_layout {
 	uint32_t fl_pg_pool;      /* namespace, crush ruleset, rep level */
 } __attribute__ ((packed));
 
+struct CephContext;
 #endif /* ! __cplusplus */
 
 struct UserPerm;
@@ -84,7 +89,6 @@ typedef struct Inode Inode;
 
 struct ceph_mount_info;
 struct ceph_dir_result;
-struct CephContext;
 
 /* setattr mask bits */
 #ifndef CEPH_SETATTR_MODE
@@ -200,8 +204,11 @@ int ceph_create(struct ceph_mount_info **cmount, const char * const id);
  * @param conf reuse this pre-existing CephContext config
  * @returns 0 on success, negative error code on failure
  */
+#ifdef __cplusplus
+int ceph_create_with_context(struct ceph_mount_info **cmount, CephContext *conf);
+#else
 int ceph_create_with_context(struct ceph_mount_info **cmount, struct CephContext *conf);
-
+#endif
 
 #ifndef VOIDPTR_RADOS_T
 #define VOIDPTR_RADOS_T
@@ -230,8 +237,8 @@ int ceph_init(struct ceph_mount_info *cmount);
  *
  * An error will be returned if this libcephfs instance is already
  * mounted. This function is an alternative to setting the global
- * client_mds_namespace setting.  Using this function enables multiple
- * libcephfs instances in the same process to mount different filesystems.
+ * client_fs setting.  Using this function enables multiple libcephfs
+ * instances in the same process to mount different filesystems.
  *
  * The filesystem name is *not* validated in this function.  That happens
  * during mount(), where an ENOENT error will result if a non-existent
@@ -335,6 +342,16 @@ int ceph_release(struct ceph_mount_info *cmount);
 void ceph_shutdown(struct ceph_mount_info *cmount);
 
 /**
+ * Return associated client addresses
+ *
+ * @param cmount the mount handle
+ * @param addrs the output addresses
+ * @returns 0 on success, a negative error code on failure
+ * @note the returned addrs should be free by the caller
+ */
+int ceph_getaddrs(struct ceph_mount_info *cmount, char** addrs);
+
+/**
  * Get a global id for current instance
  *
  * The handle should not be mounted. This should be called on completion of
@@ -351,8 +368,11 @@ uint64_t ceph_get_instance_id(struct ceph_mount_info *cmount);
  * @param cmount the ceph mount handle to get the context from.
  * @returns the CephContext associated with the mount handle.
  */
+#ifdef __cplusplus
+CephContext *ceph_get_mount_context(struct ceph_mount_info *cmount);
+#else
 struct CephContext *ceph_get_mount_context(struct ceph_mount_info *cmount);
-
+#endif
 /*
  * Check mount status.
  *
@@ -594,7 +614,7 @@ int64_t ceph_telldir(struct ceph_mount_info *cmount, struct ceph_dir_result *dir
  * @param cmount the ceph mount handle to use for performing the seekdir.
  * @param dirp the directory stream pointer to move.
  * @param offset the position to move the directory stream to.  This offset should be
- *        a value returned by seekdir.  Note that this value does not refer to the nth
+ *        a value returned by telldir.  Note that this value does not refer to the nth
  *        entry in a directory, and can not be manipulated with plus or minus.
  */
 void ceph_seekdir(struct ceph_mount_info *cmount, struct ceph_dir_result *dirp, int64_t offset);
@@ -788,6 +808,17 @@ int ceph_fsetattrx(struct ceph_mount_info *cmount, int fd, struct ceph_statx *st
  * @returns 0 on success or a negative error code on failure.
  */
 int ceph_chmod(struct ceph_mount_info *cmount, const char *path, mode_t mode);
+
+/**
+ * Change the mode bits (permissions) of a file/directory. If the path is a
+ * symbolic link, it's not de-referenced.
+ *
+ * @param cmount the ceph mount handle to use for performing the chmod.
+ * @param path the path of file/directory to change the mode bits on.
+ * @param mode the new permissions to set.
+ * @returns 0 on success or a negative error code on failure.
+ */
+int ceph_lchmod(struct ceph_mount_info *cmount, const char *path, mode_t mode);
 
 /**
  * Change the mode bits (permissions) of an open file.
@@ -1590,6 +1621,10 @@ int ceph_debug_get_file_caps(struct ceph_mount_info *cmount, const char *path);
 /* Low Level */
 struct Inode *ceph_ll_get_inode(struct ceph_mount_info *cmount,
 				vinodeno_t vino);
+
+int ceph_ll_lookup_vino(struct ceph_mount_info *cmount, vinodeno_t vino,
+			Inode **inode);
+
 int ceph_ll_lookup_inode(
     struct ceph_mount_info *cmount,
     struct inodeno_t ino,

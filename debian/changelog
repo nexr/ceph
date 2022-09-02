@@ -1,62 +1,116 @@
-ceph (14.2.10-1) stable; urgency=medium
+ceph (15.2.16-1) stable; urgency=medium
 
   * New upstream release
 
- -- Ceph Release Team <ceph-maintainers@ceph.com>  Thu, 25 Jun 2020 17:32:29 +0000
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Tue, 01 Mar 2022 06:44:27 +0000
 
-ceph (14.2.9-1) stable; urgency=medium
-
-  * New upstream release
-
- -- Ceph Release Team <ceph-maintainers@ceph.com>  Thu, 09 Apr 2020 16:17:27 +0000
-
-ceph (14.2.8-1) stable; urgency=medium
+ceph (15.2.15-1) stable; urgency=medium
 
   * New upstream release
 
- -- Ceph Release Team <ceph-maintainers@ceph.com>  Mon, 02 Mar 2020 17:49:19 +0000
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Wed, 20 Oct 2021 14:19:54 +0000
 
-ceph (14.2.7-1) stable; urgency=medium
-
-  * New upstream release
-
- -- Ceph Release Team <ceph-maintainers@ceph.com>  Fri, 31 Jan 2020 17:07:50 +0000
-
-ceph (14.2.6-1) stable; urgency=medium
+ceph (15.2.14-1) stable; urgency=medium
 
   * New upstream release
 
- -- Ceph Release Team <ceph-maintainers@ceph.com>  Wed, 08 Jan 2020 18:36:52 +0000
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Thu, 05 Aug 2021 17:11:52 +0000
 
-ceph (14.2.5-1) stable; urgency=medium
-
-  * New upstream release
-
- -- Ceph Release Team <ceph-maintainers@ceph.com>  Fri, 06 Dec 2019 16:42:32 +0000
-
-ceph (14.2.4-1) stable; urgency=medium
+ceph (15.2.13-1) stable; urgency=medium
 
   * New upstream release
 
- -- Ceph Release Team <ceph-maintainers@ceph.com>  Fri, 13 Sep 2019 14:07:41 -0400
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Wed, 26 May 2021 19:24:04 +0000
 
-ceph (14.2.3-1) stable; urgency=medium
-
-  * New upstream release
-
- -- Ceph Release Team <ceph-maintainers@ceph.com>  Tue, 03 Sep 2019 13:19:56 +0000
-
-ceph (14.2.2-1) stable; urgency=medium
+ceph (15.2.12-1) stable; urgency=medium
 
   * New upstream release
 
- -- Ceph Release Team <ceph-maintainers@ceph.com>  Wed, 17 Jul 2019 15:12:34 +0000
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Thu, 13 May 2021 17:26:09 +0000
 
-ceph (14.2.1-1) stable; urgency=medium
+ceph (15.2.11-1) stable; urgency=medium
 
   * New upstream release
 
- -- Ceph Release Team <ceph-maintainers@ceph.com>  Thu, 25 Apr 2019 18:15:46 +0000
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Mon, 19 Apr 2021 13:47:28 +0000
+
+ceph (15.2.10-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Wed, 17 Mar 2021 17:02:38 +0000
+
+ceph (15.2.9-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Tue, 23 Feb 2021 14:10:13 +0000
+
+ceph (15.2.8-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Wed, 16 Dec 2020 17:29:47 +0000
+
+ceph (15.2.7-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Mon, 30 Nov 2020 19:58:28 +0000
+
+ceph (15.2.6-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Tue, 17 Nov 2020 18:12:51 +0000
+
+ceph (15.2.5-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Tue, 15 Sep 2020 18:57:01 +0000
+
+ceph (15.2.4-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Tue, 30 Jun 2020 15:40:49 +0000
+
+ceph (15.2.3-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Fri, 29 May 2020 16:24:48 +0000
+
+ceph (15.2.2-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Mon, 18 May 2020 16:25:10 +0000
+
+ceph (15.2.1-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Wed, 08 Apr 2020 17:51:47 +0000
+
+ceph (15.2.0-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Mon, 23 Mar 2020 17:47:44 +0000
+
+ceph (15.1.1-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Fri, 13 Mar 2020 17:05:36 +0000
+
+ceph (15.1.0-1) stable; urgency=medium
+
+  * New upstream release
+
+ -- Ceph Release Team <ceph-maintainers@ceph.com>  Wed, 29 Jan 2020 22:10:22 +0000
 
 ceph (14.2.0-1) stable; urgency=medium
 
@@ -180,13 +234,13 @@ ceph (10.0.5) stable; urgency=low
 
 ceph (10.0.4) stable; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Thu, 03 Mar 2016 13:34:18 -0500
 
 ceph (10.0.3) stable; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Mon, 08 Feb 2016 17:10:25 -0500
 
@@ -372,13 +426,13 @@ ceph (0.75-1) stable; urgency=low
 
 ceph (0.74-1) stable; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <glowell@jenkins.front.sepia.ceph.com>  Mon, 30 Dec 2013 21:02:35 +0000
 
 ceph (0.73-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Tue, 10 Dec 2013 04:55:06 +0000
 
@@ -390,145 +444,145 @@ ceph (0.72-1) stable; urgency=low
 
 ceph (0.72-rc1-1) stable; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Wed, 30 Oct 2013 00:44:25 +0000
 
 ceph (0.71-1) stable; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Thu, 17 Oct 2013 09:19:02 +0000
 
 ceph (0.70-1) stable; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Fri, 04 Oct 2013 20:11:51 +0000
 
 ceph (0.69-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Wed, 18 Sep 2013 01:39:47 +0000
 
 ceph (0.68-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Tue, 03 Sep 2013 16:10:11 -0700
 
 ceph (0.67-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Tue, 13 Aug 2013 10:44:30 -0700
 
 ceph (0.67-rc3-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Tue, 30 Jul 2013 14:37:40 -0700
 
 ceph (0.67-rc2-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Wed, 24 Jul 2013 16:18:33 -0700
 
 ceph (0.67-rc1-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Mon, 22 Jul 2013 11:57:01 -0700
 
 ceph (0.66-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Mon, 08 Jul 2013 15:44:45 -0700
 
 ceph (0.65-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Tue, 25 Jun 2013 09:19:14 -0700
 
 ceph (0.64-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Wed, 12 Jun 2013 09:53:54 -0700
 
 ceph (0.63-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Tue, 28 May 2013 13:57:53 -0700
 
 ceph (0.62) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Tue, 14 May 2013 09:08:21 -0700
 
 ceph (0.61-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Mon, 06 May 2013 13:18:43 -0700
 
 ceph (0.60-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Mon, 01 Apr 2013 12:22:30 -0700
 
 ceph (0.59-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Tue, 19 Mar 2013 22:26:37 -0700
 
 ceph (0.58-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Mon, 04 Mar 2013 15:17:58 -0800
 
 ceph (0.57-1) quantal; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Tue, 19 Feb 2013 10:06:39 -0800
 
 ceph (0.56-1) quantal; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Mon, 31 Dec 2012 17:08:45 -0800
 
 ceph (0.55.1-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Wed, 12 Dec 2012 16:24:13 -0800
 
 ceph (0.55-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Mon, 03 Dec 2012 19:08:14 -0800
 
 ceph (0.54-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Tue, 13 Nov 2012 13:17:19 -0800
 
 ceph (0.53-1) precise; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Gary Lowell <gary.lowell@inktank.com>  Tue, 16 Oct 2012 17:40:46 +0000
 
@@ -540,133 +594,133 @@ ceph (0.52-1) precise; urgency=low
 
 ceph (0.51-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Sat, 25 Aug 2012 15:58:23 -0700
 
 ceph (0.50-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Mon, 13 Aug 2012 09:44:40 -0700
 
 ceph (0.49-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Fri, 20 Jul 2012 23:26:43 -0700
 
 ceph (0.48argonaut-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Sat, 30 Jun 2012 14:49:30 -0700
 
 ceph (0.47.3-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Wed, 20 Jun 2012 10:57:03 -0700
 
 ceph (0.47.2-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Wed, 23 May 2012 09:00:43 -0700
 
 ceph (0.47.1-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Mon, 21 May 2012 14:28:30 -0700
 
 ceph (0.47-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Sun, 20 May 2012 15:16:03 -0700
 
 ceph (0.46-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Sun, 29 Apr 2012 21:21:01 -0700
 
 ceph (0.45-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Tue, 10 Apr 2012 10:41:57 -0700
 
 ceph (0.44.2-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Thu, 05 Apr 2012 14:54:17 -0700
 
 ceph (0.44.1-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Tue, 27 Mar 2012 13:02:00 -0700
 
 ceph (0.44-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Sun, 18 Mar 2012 12:03:38 -0700
 
 ceph (0.43-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Fri, 02 Mar 2012 08:53:10 -0800
 
 ceph (0.42.2-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Fri, 24 Feb 2012 12:59:38 -0800
 
 ceph (0.42.1-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Thu, 23 Feb 2012 18:46:23 -0800
 
 ceph (0.42-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Sun, 19 Feb 2012 15:30:20 -0800
 
 ceph (0.41-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Fri, 27 Jan 2012 10:42:11 -0800
 
 ceph (0.40-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Fri, 13 Jan 2012 08:36:02 -0800
 
 ceph (0.39-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Fri, 02 Dec 2011 09:01:20 -0800
 
 ceph (0.38-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Thu, 10 Nov 2011 15:06:44 -0800
 
 ceph (0.37-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Mon, 17 Oct 2011 08:35:42 -0700
 
@@ -678,73 +732,73 @@ ceph (0.36-1) experimental; urgency=low
 
 ceph (0.35-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Wed, 21 Sep 2011 09:36:03 -0700
 
 ceph (0.34-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Fri, 26 Aug 2011 21:48:35 -0700
 
 ceph (0.33-1) experimental; urgency=low
 
-  * New upstream release. 
+  * New upstream release.
 
  -- Sage Weil <sage@newdream.net>  Mon, 15 Aug 2011 16:42:07 -0700
 
 ceph (0.32-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Fri, 29 Jul 2011 21:42:08 -0700
 
 ceph (0.30-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Mon, 27 Jun 2011 20:06:06 -0700
 
 ceph (0.29.1-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Thu, 16 Jun 2011 13:10:47 -0700
 
 ceph (0.29-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Mon, 06 Jun 2011 09:59:25 -0700
 
 ceph (0.28.2-1) experimental; urgency=low
 
-  * New upstream release. 
+  * New upstream release.
 
  -- Sage Weil <sage@newdream.net>  Sat, 28 May 2011 09:14:17 -0700
 
 ceph (0.28.1-1) experimental; urgency=low
 
-  * New upstream release. 
+  * New upstream release.
 
  -- Sage Weil <sage@newdream.net>  Mon, 23 May 2011 21:11:30 -0700
 
 ceph (0.28-1) experimental; urgency=low
 
-  * New upstream release. 
+  * New upstream release.
 
  -- Sage Weil <sage@newdream.net>  Tue, 17 May 2011 18:03:11 -0700
 
 ceph (0.27.1-1) experimental; urgency=low
 
-  * New upstream release. 
+  * New upstream release.
 
  -- Sage Weil <sage@newdream.net>  Thu, 05 May 2011 13:42:06 -0700
 
 ceph (0.27-1) experimental; urgency=low
 
-  * New upstream release. 
+  * New upstream release.
 
  -- Sage Weil <sage@newdream.net>  Fri, 22 Apr 2011 16:51:49 -0700
 
@@ -764,37 +818,37 @@ ceph (0.26-1) experimental; urgency=low
 
 ceph (0.25.2-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Sun, 20 Mar 2011 21:07:38 -0700
 
 ceph (0.25.1-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Mon, 14 Mar 2011 14:43:47 -0700
 
 ceph (0.25-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Fri, 04 Mar 2011 14:39:54 -0800
 
 ceph (0.24.3-1) experimental; urgency=low
 
-  * New upstream release 
+  * New upstream release
 
  -- Sage Weil <sage@newdream.net>  Thu, 10 Feb 2011 09:14:00 -0800
 
 ceph (0.24.2-1) experimental; urgency=low
 
-  * New upstream release. 
+  * New upstream release.
 
  -- Sage Weil <sage@newdream.net>  Mon, 24 Jan 2011 11:02:24 -0800
 
 ceph (0.24.1-1) experimental; urgency=low
 
-  * New upstream release. 
+  * New upstream release.
 
  -- Sage Weil <sage@newdream.net>  Fri, 07 Jan 2011 16:49:48 -0800
 

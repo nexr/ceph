@@ -34,9 +34,9 @@
 #include "common/config.h"
 #include "include/ceph_assert.h"
 #include "include/cephfs/ceph_ll_client.h"
+#include "include/ceph_fuse.h"
 
 #include "fuse_ll.h"
-#include <fuse.h>
 #include <fuse_lowlevel.h>
 
 #define dout_context g_ceph_context
@@ -93,7 +93,7 @@ public:
   char *mountpoint;
 #endif
 
-  Mutex stag_lock;
+  ceph::mutex stag_lock = ceph::make_mutex("fuse_ll.cc stag_lock");
   int last_stag;
 
   ceph::unordered_map<uint64_t,int> snap_stag_map;
@@ -135,7 +135,8 @@ static int getgroups(fuse_req_t req, gid_t **sgids)
 
 static void get_fuse_groups(UserPerm& perms, fuse_req_t req)
 {
-  if (g_conf().get_val<bool>("fuse_set_user_groups")) {
+  CephFuse::Handle *cfuse = (CephFuse::Handle *)fuse_req_userdata(req);
+  if (cfuse->client->cct->_conf.get_val<bool>("fuse_set_user_groups")) {
     gid_t *gids = NULL;
     int count = getgroups(req, &gids);
 
@@ -640,7 +641,13 @@ static void fuse_ll_flush(fuse_req_t req, fuse_ino_t ino,
 }
 
 #ifdef FUSE_IOCTL_COMPAT
-static void fuse_ll_ioctl(fuse_req_t req, fuse_ino_t ino, int cmd, void *arg, struct fuse_file_info *fi,
+static void fuse_ll_ioctl(fuse_req_t req, fuse_ino_t ino,
+#if FUSE_VERSION >= FUSE_MAKE_VERSION(3, 5)
+                          unsigned int cmd,
+#else
+                          int cmd,
+#endif
+                          void *arg, struct fuse_file_info *fi,
 			  unsigned flags, const void *in_buf, size_t in_bufsz, size_t out_bufsz)
 {
   CephFuse::Handle *cfuse = fuse_ll_req_prepare(req);
@@ -1073,7 +1080,6 @@ CephFuse::Handle::Handle(Client *c, int fd) :
   ch(NULL),
   mountpoint(NULL),
 #endif
-  stag_lock("fuse_ll.cc stag_lock"),
   last_stag(0)
 {
   snap_stag_map[CEPH_NOSNAP] = 0;
@@ -1257,7 +1263,14 @@ int CephFuse::Handle::loop()
   auto fuse_multithreaded = client->cct->_conf.get_val<bool>(
     "fuse_multithreaded");
   if (fuse_multithreaded) {
-#if FUSE_VERSION >= FUSE_MAKE_VERSION(3, 0)
+#if FUSE_VERSION >= FUSE_MAKE_VERSION(3, 1)
+    {
+      struct fuse_loop_config conf = { 0 };
+
+      conf.clone_fd = opts.clone_fd;
+      return fuse_session_loop_mt(se, &conf);
+    }
+#elif FUSE_VERSION >= FUSE_MAKE_VERSION(3, 0)
     return fuse_session_loop_mt(se, opts.clone_fd);
 #else
     return fuse_session_loop_mt(se);

@@ -254,6 +254,10 @@ class Module(MgrModule):
         for daemon, counters in six.iteritems(self.get_all_perf_counters()):
             svc_type, svc_id = daemon.split(".", 1)
             metadata = self.get_metadata(svc_type, svc_id)
+            if metadata is not None:
+                hostname = metadata['hostname']
+            else:
+                hostname = 'N/A'
 
             for path, counter_info in counters.items():
                 if counter_info['type'] & self.PERFCOUNTER_HISTOGRAM:
@@ -266,7 +270,7 @@ class Module(MgrModule):
                     "tags": {
                         "ceph_daemon": daemon,
                         "type_instance": path,
-                        "host": metadata['hostname'],
+                        "host": hostname,
                         "fsid": self.get_fsid()
                     },
                     "time": now,
@@ -439,11 +443,11 @@ class Module(MgrModule):
             'df_stats': df_stats
         }
 
-        return json.dumps(result, indent=2)
+        return json.dumps(result, indent=2, sort_keys=True)
 
     def handle_command(self, inbuf, cmd):
         if cmd['prefix'] == 'influx config-show':
-            return 0, json.dumps(self.config), ''
+            return 0, json.dumps(self.config, sort_keys=True), ''
         elif cmd['prefix'] == 'influx config-set':
             key = cmd['key']
             value = cmd['value']

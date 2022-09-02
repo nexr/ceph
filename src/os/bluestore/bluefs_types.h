@@ -3,6 +3,8 @@
 #ifndef CEPH_OS_BLUESTORE_BLUEFS_TYPES_H
 #define CEPH_OS_BLUESTORE_BLUEFS_TYPES_H
 
+#include <optional>
+
 #include "bluestore_types.h"
 #include "include/utime.h"
 #include "include/encoding.h"
@@ -68,7 +70,6 @@ struct bluefs_fnode_t {
   void encode(bufferlist::contiguous_appender& p) const {
     DENC_DUMP_PRE(bluefs_fnode_t);
     _denc_friend(*this, p);
-    DENC_DUMP_POST(bluefs_fnode_t);
   }
   void decode(buffer::ptr::const_iterator& p) {
     _denc_friend(*this, p);
@@ -131,6 +132,26 @@ WRITE_CLASS_DENC(bluefs_fnode_t)
 
 ostream& operator<<(ostream& out, const bluefs_fnode_t& file);
 
+struct bluefs_layout_t {
+  unsigned shared_bdev = 0;         ///< which bluefs bdev we are sharing
+  bool dedicated_db = false;        ///< whether block.db is present
+  bool dedicated_wal = false;       ///< whether block.wal is present
+
+  bool single_shared_device() const {
+    return !dedicated_db && !dedicated_wal;
+  }
+
+  bool operator==(const bluefs_layout_t& other) const {
+    return shared_bdev == other.shared_bdev &&
+           dedicated_db == other.dedicated_db &&
+           dedicated_wal == other.dedicated_wal;
+  }
+
+  void encode(ceph::bufferlist& bl) const;
+  void decode(ceph::bufferlist::const_iterator& p);
+  void dump(Formatter *f) const;
+};
+WRITE_CLASS_ENCODER(bluefs_layout_t)
 
 struct bluefs_super_t {
   uuid_d uuid;      ///< unique to this bluefs instance
@@ -139,6 +160,8 @@ struct bluefs_super_t {
   uint32_t block_size;
 
   bluefs_fnode_t log_fnode;
+
+  std::optional<bluefs_layout_t> memorized_layout;
 
   bluefs_super_t()
     : version(0),
@@ -205,24 +228,24 @@ struct bluefs_transaction_t {
     encode(offset, op_bl);
     encode(length, op_bl);
   }
-  void op_dir_create(const string& dir) {
+  void op_dir_create(std::string_view dir) {
     using ceph::encode;
     encode((__u8)OP_DIR_CREATE, op_bl);
     encode(dir, op_bl);
   }
-  void op_dir_remove(const string& dir) {
+  void op_dir_remove(std::string_view dir) {
     using ceph::encode;
     encode((__u8)OP_DIR_REMOVE, op_bl);
     encode(dir, op_bl);
   }
-  void op_dir_link(const string& dir, const string& file, uint64_t ino) {
+  void op_dir_link(std::string_view dir, std::string_view file, uint64_t ino) {
     using ceph::encode;
     encode((__u8)OP_DIR_LINK, op_bl);
     encode(dir, op_bl);
     encode(file, op_bl);
     encode(ino, op_bl);
   }
-  void op_dir_unlink(const string& dir, const string& file) {
+  void op_dir_unlink(std::string_view dir, std::string_view file) {
     using ceph::encode;
     encode((__u8)OP_DIR_UNLINK, op_bl);
     encode(dir, op_bl);

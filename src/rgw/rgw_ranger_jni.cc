@@ -9,7 +9,7 @@
 
 RGWRangerJniManager* rgw_rjm = nullptr;
 
-RGWRangerJniManager::RGWRangerJniManager(CephContext* const _cct, RGWRados* const _store, bool start_vm): RGWRangerManager(_cct), store(_store) {
+RGWRangerJniManager::RGWRangerJniManager(CephContext* const _cct, rgw::sal::RGWRadosStore* const _store, bool start_vm): RGWRangerManager(_cct), store(_store) {
   jni_config_dir = cct->_conf->rgw_ranger_jni_config_dir;
   trim_path(jni_config_dir);
   dout(10) << __func__ << "(): ranger jni config dir = " << jni_config_dir << dendl;
@@ -199,7 +199,7 @@ int RGWRangerJniManager::is_access_allowed(RGWUserEndpoint endp, RGWOp *& op, re
   allocated_t->url = endp.url;
   allocated_t->path = req_target;
   allocated_t->access_type = (need_read_access) ? "read" : "write";
-  allocated_t->user = s->user->user_id.to_str();
+  allocated_t->user = s->user->get_id().to_str();
   allocated_t->group = endp.tenant;
 
   allocated_t->addr_trace.clear();
@@ -225,7 +225,8 @@ int RGWRangerJniManager::is_access_allowed(RGWUserEndpoint endp, RGWOp *& op, re
   allocated_t->addr_trace.push_back(s->env["aws:SourceIp"]);
 
   RGWUserInfo owner_info;
-  int ret = rgw_get_user_info_by_uid(store, bucket_owner, owner_info, NULL, NULL, NULL);
+
+  int ret = rgw_get_user_info_by_uid(store->ctl()->user, bucket_owner, owner_info);
   if (ret < 0) { return ret; }
 
   RGWUserEndpoints* user_endps = &(owner_info.endpoints);

@@ -141,6 +141,7 @@ cdef extern from "cephfs/libcephfs.h" nogil:
     int ceph_init(ceph_mount_info *cmount)
     void ceph_shutdown(ceph_mount_info *cmount)
 
+    int ceph_getaddrs(ceph_mount_info* cmount, char** addrs)
     int ceph_conf_read_file(ceph_mount_info *cmount, const char *path_list)
     int ceph_conf_parse_argv(ceph_mount_info *cmount, int argc, const char **argv)
     int ceph_conf_get(ceph_mount_info *cmount, const char *option, char *buf, size_t len)
@@ -167,6 +168,8 @@ cdef extern from "cephfs/libcephfs.h" nogil:
                       const void *value, size_t size, int flags)
     int ceph_getxattr(ceph_mount_info *cmount, const char *path, const char *name,
                       void *value, size_t size)
+    int ceph_removexattr(ceph_mount_info *cmount, const char *path, const char *name)
+    int ceph_listxattr(ceph_mount_info *cmount, const char *path, char *list, size_t size)
     int ceph_write(ceph_mount_info *cmount, int fd, const char *buf, int64_t size, int64_t offset)
     int ceph_read(ceph_mount_info *cmount, int fd, char *buf, int64_t size, int64_t offset)
     int ceph_flock(ceph_mount_info *cmount, int fd, int operation, uint64_t owner)
@@ -185,6 +188,7 @@ cdef extern from "cephfs/libcephfs.h" nogil:
     int ceph_fsync(ceph_mount_info *cmount, int fd, int syncdataonly)
     int ceph_conf_parse_argv(ceph_mount_info *cmount, int argc, const char **argv)
     int ceph_chmod(ceph_mount_info *cmount, const char *path, mode_t mode)
+    int ceph_lchmod(ceph_mount_info *cmount, const char *path, mode_t mode)
     int ceph_chown(ceph_mount_info *cmount, const char *path, int uid, int gid)
     int ceph_lchown(ceph_mount_info *cmount, const char *path, int uid, int gid)
     int64_t ceph_lseek(ceph_mount_info *cmount, int fd, int64_t offset, int whence)
@@ -199,6 +203,11 @@ cdef extern from "cephfs/libcephfs.h" nogil:
 
 
 class Error(Exception):
+    def get_error_code(self):
+        return 1
+
+
+class LibCephFSStateError(Error):
     pass
 
 
@@ -206,10 +215,13 @@ class OSError(Error):
     def __init__(self, errno, strerror):
         super(OSError, self).__init__(errno, strerror)
         self.errno = errno
-        self.strerror = strerror
+        self.strerror = "%s: %s" % (strerror, os.strerror(errno))
 
     def __str__(self):
-        return '{0}: {1} [Errno {2}]'.format(self.strerror, os.strerror(self.errno), self.errno)
+        return '{} [Errno {}]'.format(self.strerror, self.errno)
+
+    def get_error_code(self):
+        return self.errno
 
 
 class PermissionError(OSError):
@@ -244,10 +256,6 @@ class OperationNotSupported(OSError):
     pass
 
 
-class LibCephFSStateError(Error):
-    pass
-
-
 class WouldBlock(OSError):
     pass
 
@@ -257,6 +265,12 @@ class OutOfRange(OSError):
 
 
 class ObjectNotEmpty(OSError):
+    pass
+
+class NotDirectory(OSError):
+    pass
+
+class DiskQuotaExceeded(OSError):
     pass
 
 
@@ -273,6 +287,7 @@ IF UNAME_SYSNAME == "FreeBSD":
         errno.ERANGE     : OutOfRange,
         errno.EWOULDBLOCK: WouldBlock,
         errno.ENOTEMPTY  : ObjectNotEmpty,
+        errno.EDQUOT     : DiskQuotaExceeded,
     }
 ELSE:
     cdef errno_to_exception =  {
@@ -287,6 +302,8 @@ ELSE:
         errno.ERANGE     : OutOfRange,
         errno.EWOULDBLOCK: WouldBlock,
         errno.ENOTEMPTY  : ObjectNotEmpty,
+        errno.ENOTDIR    : NotDirectory,
+        errno.EDQUOT     : DiskQuotaExceeded,
     }
 
 
@@ -310,8 +327,8 @@ cdef make_ex(ret, msg):
 class DirEntry(namedtuple('DirEntry',
                ['d_ino', 'd_off', 'd_reclen', 'd_type', 'd_name'])):
     DT_DIR = 0x4
-    DT_REG = 0xA
-    DT_LNK = 0xC
+    DT_REG = 0x8
+    DT_LNK = 0xA
     def is_dir(self):
         return self.d_type == self.DT_DIR
 
@@ -499,13 +516,18 @@ cdef class LibCephFS(object):
             raise Error("libcephfs_initialize failed with error code: %d" % ret)
         self.state = "configuring"
 
-    def create(self, conf=None, conffile=None, auth_id=None):
+    NO_CONF_FILE = -1
+    "special value that indicates no conffile should be read when creating a mount handle"
+    DEFAULT_CONF_FILES = -2
+    "special value that indicates the default conffiles should be read when creating a mount handle"
+
+    def create(self, conf=None, conffile=NO_CONF_FILE, auth_id=None):
         """
         Create a mount handle for interacting with Ceph.  All libcephfs
         functions operate on a mount info handle.
         
         :param conf dict opt: settings overriding the default ones and conffile
-        :param conffile str opt: the path to ceph.conf to override the default settings
+        :param conffile Union[int,str], optional: the path to ceph.conf to override the default settings
         :auth_id str opt: the id used to authenticate the client entity
         """
         if conf is not None and not isinstance(conf, dict):
@@ -523,14 +545,36 @@ cdef class LibCephFS(object):
             raise Error("libcephfs_initialize failed with error code: %d" % ret)
 
         self.state = "configuring"
-        if conffile is not None:
-            # read the default conf file when '' is given
-            if conffile == '':
-                conffile = None
+        if conffile in (self.NO_CONF_FILE, None):
+            pass
+        elif conffile in (self.DEFAULT_CONF_FILES, ''):
+            self.conf_read_file(None)
+        else:
             self.conf_read_file(conffile)
         if conf is not None:
             for key, value in conf.iteritems():
                 self.conf_set(key, value)
+
+    def get_addrs(self):
+        """
+        Get associated client addresses with this RADOS session.
+        """
+        self.require_state("mounted")
+
+        cdef:
+            char* addrs = NULL
+
+        try:
+
+            with nogil:
+                ret = ceph_getaddrs(self.cluster, &addrs)
+            if ret:
+                raise make_ex(ret, "error calling getaddrs")
+
+            return decode_cstr(addrs)
+        finally:
+            ceph_buffer_free(addrs)
+
 
     def conf_read_file(self, conffile=None):
         """
@@ -674,6 +718,8 @@ cdef class LibCephFS(object):
         # Configure which filesystem to mount if one was specified
         if filesystem_name is None:
             filesystem_name = b""
+        else:
+            filesystem_name = cstr(filesystem_name, 'filesystem_name')
         cdef:
             char *_filesystem_name = filesystem_name
         if filesystem_name:
@@ -889,6 +935,26 @@ cdef class LibCephFS(object):
             int _mode = mode
         with nogil:
             ret = ceph_chmod(self.cluster, _path, _mode)
+        if ret < 0:
+            raise make_ex(ret, "error in chmod {}".format(path.decode('utf-8')))
+
+    def lchmod(self, path, mode) -> None:
+        """
+        Change file mode. If the path is a symbolic link, it won't be dereferenced.
+
+        :param path: the path of the file. This must be either an absolute path or
+                     a relative path off of the current working directory.
+        :param mode: the permissions to be set .
+        """
+        self.require_state("mounted")
+        path = cstr(path, 'path')
+        if not isinstance(mode, int):
+            raise TypeError('mode must be an int')
+        cdef:
+            char* _path = path
+            int _mode = mode
+        with nogil:
+            ret = ceph_lchmod(self.cluster, _path, _mode)
         if ret < 0:
             raise make_ex(ret, "error in chmod {}".format(path.decode('utf-8')))
 
@@ -1197,6 +1263,54 @@ cdef class LibCephFS(object):
         if ret < 0:
             raise make_ex(ret, "error in setxattr")
 
+    def removexattr(self, path, name):
+        """
+        Remove an extended attribute of a file.
+
+        :param path: path of the file.
+        :param name: name of the extended attribute to remove.
+        """
+        self.require_state("mounted")
+
+        name = cstr(name, 'name')
+        path = cstr(path, 'path')
+
+        cdef:
+            char *_path = path
+            char *_name = name
+
+        with nogil:
+            ret = ceph_removexattr(self.cluster, _path, _name)
+        if ret < 0:
+            raise make_ex(ret, "error in removexattr")
+
+    def listxattr(self, path, size=65536):
+        """
+        List the extended attribute keys set on a file.
+
+        :param path: path of the file.
+        :param size: the size of list buffer to be filled with extended attribute keys.
+        """
+        self.require_state("mounted")
+
+        path = cstr(path, 'path')
+
+        cdef:
+            char *_path = path
+            char *ret_buf = NULL
+            size_t ret_length = size
+
+        try:
+            ret_buf = <char *>realloc_chk(ret_buf, ret_length)
+            with nogil:
+                ret = ceph_listxattr(self.cluster, _path, ret_buf, ret_length)
+
+            if ret < 0:
+                raise make_ex(ret, "error in listxattr")
+
+            return ret, ret_buf[:ret]
+        finally:
+            free(ret_buf)
 
     def stat(self, path, follow_symlink=True):
         """
@@ -1389,7 +1503,7 @@ cdef class LibCephFS(object):
                 ret = ceph_readlink(self.cluster, _path, buf, _size)
             if ret < 0:
                 raise make_ex(ret, "error in readlink")
-            return buf
+            return buf[:ret]
         finally:
             free(buf)
 

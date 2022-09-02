@@ -160,37 +160,31 @@ class CommandsRequest(object):
     def __json__(self):
         return {
             'id': self.id,
-            'running': map(
-                lambda x: {
+            'running': [
+                {
                     'command': x.command,
                     'outs': x.outs,
                     'outb': x.outb,
-                },
-                self.running
-            ),
-            'finished': map(
-                lambda x: {
+                } for x in self.running
+            ],
+            'finished': [
+                {
                     'command': x.command,
                     'outs': x.outs,
                     'outb': x.outb,
-                },
-                self.finished
-            ),
-            'waiting': map(
-                lambda x: map(
-                    lambda y: common.humanify_command(y),
-                    x
-                ),
-                self.waiting
-            ),
-            'failed': map(
-                lambda x: {
+                } for x in self.finished
+            ],
+            'waiting': [
+                [common.humanify_command(y) for y in x]
+                for x in self.waiting
+            ],
+            'failed': [
+                {
                     'command': x.command,
                     'outs': x.outs,
                     'outb': x.outb,
-                },
-                self.failed
-            ),
+                } for x in self.failed
+            ],
             'is_waiting': self.is_waiting(),
             'is_finished': self.is_finished(),
             'has_failed': self.has_failed(),
@@ -251,18 +245,20 @@ class Module(MgrModule):
 
 
     def serve(self):
+        self.log.debug('serve enter')
         while not self.stop_server:
             try:
                 self._serve()
                 self.server.socket.close()
             except CannotServe as cs:
-                self.log.warn("server not running: %s", cs)
+                self.log.warning("server not running: %s", cs)
             except:
                 self.log.error(str(traceback.format_exc()))
 
             # Wait and clear the threading event
             self.serve_event.wait()
             self.serve_event.clear()
+        self.log.debug('serve exit')
 
     def refresh_keys(self):
         self.keys = {}
@@ -342,14 +338,18 @@ class Module(MgrModule):
 
 
     def shutdown(self):
+        self.log.debug('shutdown enter')
         try:
             self.stop_server = True
             if self.server:
+                self.log.debug('calling server.shutdown')
                 self.server.shutdown()
+                self.log.debug('called server.shutdown')
             self.serve_event.set()
         except:
             self.log.error(str(traceback.format_exc()))
             raise
+        self.log.debug('shutdown exit')
 
 
     def restart(self):
@@ -409,7 +409,7 @@ class Module(MgrModule):
 
 
     def handle_command(self, inbuf, command):
-        self.log.warn("Handling command: '%s'" % str(command))
+        self.log.warning("Handling command: '%s'" % str(command))
         if command['prefix'] == "restful create-key":
             if command['key_name'] in self.keys:
                 return 0, self.keys[command['key_name']], ""
@@ -440,7 +440,7 @@ class Module(MgrModule):
             self.refresh_keys()
             return (
                 0,
-                json.dumps(self.keys, indent=2),
+                json.dumps(self.keys, indent=4, sort_keys=True),
                 "",
             )
 

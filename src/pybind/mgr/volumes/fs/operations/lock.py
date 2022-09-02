@@ -1,5 +1,12 @@
 from contextlib import contextmanager
+import logging
 from threading import Lock
+try:
+    from typing import Dict
+except ImportError:
+    pass
+
+log = logging.getLogger(__name__)
 
 # singleton design pattern taken from http://www.aleax.it/5ep.html
 
@@ -21,7 +28,7 @@ class GlobalLock(object):
     _shared_state = {
         'lock' : Lock(),
         'init' : False
-    }
+    } # type: Dict
 
     def __init__(self):
         with self._shared_state['lock']:
@@ -32,5 +39,8 @@ class GlobalLock(object):
 
     @contextmanager
     def lock_op(self):
+        log.debug("entering global lock")
         with self._shared_state['lock']:
+            log.debug("acquired global lock")
             yield
+        log.debug("exited global lock")

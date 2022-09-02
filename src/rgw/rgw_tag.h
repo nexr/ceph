@@ -1,5 +1,5 @@
 // -*- mode:C++; tab-width:8; c-basic-offset:2; indent-tabs-mode:t -*-
-// vim: ts=8 sw=2 smarttab
+// vim: ts=8 sw=2 smarttab ft=cpp
 
 #ifndef RGW_TAG_H
 #define RGW_TAG_H
@@ -15,9 +15,14 @@ public:
 
 protected:
   tag_map_t tag_map;
+
+  uint32_t max_obj_tags{10};
+  static constexpr uint32_t max_tag_key_size{128};
+  static constexpr uint32_t max_tag_val_size{256};
+
  public:
   RGWObjTags() = default;
-  ~RGWObjTags() = default;
+  RGWObjTags(uint32_t max_obj_tags):max_obj_tags(max_obj_tags) {}
 
   void encode(bufferlist& bl) const {
     ENCODE_START(1,1,bl);

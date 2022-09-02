@@ -1,8 +1,9 @@
+from tasks.mgr.mgr_test_case import MgrTestCase
+
 import json
 import logging
 import requests
 
-from .mgr_test_case import MgrTestCase
 
 log = logging.getLogger(__name__)
 
@@ -11,6 +12,7 @@ class TestPrometheus(MgrTestCase):
     MGRS_REQUIRED = 3
 
     def setUp(self):
+        super(TestPrometheus, self).setUp()
         self.setup_mgrs()
 
     def test_file_sd_command(self):
@@ -47,6 +49,7 @@ class TestPrometheus(MgrTestCase):
         r = requests.get(original_uri + "metrics", allow_redirects=False)
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.headers["content-type"], "text/plain;charset=utf-8")
+        self.assertEqual(r.headers["server"], "Ceph-Prometheus")
 
     def test_urls(self):
         self._assign_ports("prometheus", "server_port")
