@@ -1,3 +1,4 @@
+import sys
 import logging
 import json
 import socket
@@ -13,9 +14,9 @@ except ImportError:
 if TYPE_CHECKING:
     from cephadm import CephadmOrchestrator
 
-# Python 3:
-# >>> T = TypeVar('T')
-# >>> ConfEntity = NewType('ConfEntity', str)
+if sys.version_info.major == 3:
+    T = TypeVar('T')
+    ConfEntity = NewType('ConfEntity', str)
 
 logger = logging.getLogger(__name__)
 

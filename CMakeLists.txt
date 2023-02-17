@@ -428,7 +428,7 @@ endif (WITH_RADOSGW)
 option(WITH_CEPHFS "CephFS is enabled" ON)
 
 # Python stuff
-set(WITH_PYTHON3 "OFF" CACHE STRING "build python3 bindings with specified python3 version")
+option(WITH_PYTHON3 "build python3 bindings with specified python3 version" OFF)
 if(WITH_PYTHON3)
   if(WITH_PYTHON3 MATCHES "^(1|ON|YES|TRUE|Y)$")
     set(WITH_PYTHON3 "3")
@@ -702,6 +702,8 @@ endif()
 if(LINUX)
   add_subdirectory(etc/sysctl)
 endif()
+
+install(DIRECTORY etc/profile.d DESTINATION ${CMAKE_INSTALL_SYSCONFDIR})
 
 option(WITH_GRAFANA "install grafana dashboards" OFF)
 if(WITH_GRAFANA)

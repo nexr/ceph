@@ -1,4 +1,5 @@
 usr/share/ceph/mgr/alerts
+usr/share/ceph/mgr/atlassian_statuspage
 usr/share/ceph/mgr/balancer
 usr/share/ceph/mgr/crash
 usr/share/ceph/mgr/devicehealth
@@ -6,6 +7,7 @@ usr/share/ceph/mgr/influx
 usr/share/ceph/mgr/insights
 usr/share/ceph/mgr/iostat
 usr/share/ceph/mgr/localpool
+usr/share/ceph/mgr/objstore_usersync
 usr/share/ceph/mgr/orchestrator
 usr/share/ceph/mgr/osd_perf_query
 usr/share/ceph/mgr/osd_support

@@ -1274,13 +1274,13 @@ class MgrModule(ceph_module.BaseMgrModule, MgrModuleLoggingMixin):
 
     def _parse_opt_value(self, raw_value):
         parsed_value = ""
-        if re.match(r"^-?\d+$", raw_value):
+        if re.match(r"^-?\d+$", str(raw_value)):
             parsed_value = int(raw_value)
-        elif re.match(r"^-?\d*\.\d+$", raw_value):
+        elif re.match(r"^-?\d*\.\d+$", str(raw_value)):
             parsed_value = float(raw_value)
-        elif re.match(r"^true|True|TRUE$", raw_value):
+        elif re.match(r"^true|True|TRUE$", str(raw_value)):
             parsed_value = True
-        elif re.match(r"^false|False|FALSE$", raw_value):
+        elif re.match(r"^false|False|FALSE$", str(raw_value)):
             parsed_value = False
         else:
             parsed_value = raw_value

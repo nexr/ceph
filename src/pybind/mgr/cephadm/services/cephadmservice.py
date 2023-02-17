@@ -1,3 +1,4 @@
+import sys
 import json
 import re
 import logging
@@ -22,9 +23,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Python 3:
-# >>> ServiceSpecs = TypeVar('ServiceSpecs', bound=ServiceSpec)
-# >>> AuthEntity = NewType('AuthEntity', str)
+if sys.version_info.major == 3:
+    ServiceSpecs = TypeVar('ServiceSpecs', bound=ServiceSpec)
+    AuthEntity = NewType('AuthEntity', str)
 
 
 # Generic[ServiceSpecs]
@@ -85,7 +86,7 @@ class CephadmDaemonSpec():
         return files
 
 
-class CephadmService(abc.ABCMeta('ABC', (object,), {'__slots__': ()})):
+class CephadmService(ABCMeta('ABC', (object,), {'__slots__': ()})):
     """
     Base class for service types. Often providing a create() and config() fn.
     """

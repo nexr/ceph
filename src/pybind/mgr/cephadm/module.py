@@ -1,3 +1,4 @@
+import sys
 import json
 import errno
 import logging
@@ -83,8 +84,8 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Python 3:
-# >>> T = TypeVar('T')
+if sys.version_info.major == 3:
+    T = TypeVar('T')
 
 DEFAULT_SSH_CONFIG = """
 Host *
@@ -127,9 +128,9 @@ def trivial_completion(f):
 
 
 class ContainerInspectInfo(NamedTuple):
-    image_id # type: str
-    ceph_version # type: Optional[str]
-    repo_digest # type: Optional[str]
+    image_id = '' # type: str
+    ceph_version = None # type: Optional[str]
+    repo_digest = None # type: Optional[str]
 
 
 @six.add_metaclass(CLICommandMeta)
@@ -987,8 +988,8 @@ class CephadmOrchestrator(orchestrator.Orchestrator, MgrModule):
         return HandleCommandResult(stdout=self.extra_ceph_conf().conf)
 
     class ExtraCephConf(NamedTuple):
-        conf # type: str
-        last_modified # type: Optional[datetime.datetime]
+        conf = '' # type: str
+        last_modified = None # type: Optional[datetime.datetime]
 
     def extra_ceph_conf(self):
         # type: () -> CephadmOrchestrator.ExtraCephConf

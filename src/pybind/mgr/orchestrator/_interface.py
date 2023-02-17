@@ -5,6 +5,7 @@ ceph-mgr orchestrator interface
 Please see the ceph-mgr module developer's guide for more information.
 """
 
+import sys
 import copy
 import datetime
 import errno
@@ -37,8 +38,8 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Python 3:
-# >>> T = TypeVar('T')
+if sys.version_info.major == 3:
+    T = TypeVar('T')
 
 
 class OrchestratorError(Exception):
@@ -1198,8 +1199,8 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-# python 3:
-# >>> GenericSpec = Union[ServiceSpec, HostSpec]
+if sys.version_info.major == 3:
+    GenericSpec = Union[ServiceSpec, HostSpec]
 
 
 def json_to_generic_spec(spec):
