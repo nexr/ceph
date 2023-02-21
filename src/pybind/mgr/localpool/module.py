@@ -65,7 +65,7 @@ class Module(MgrModule):
         pg_num = self.get_module_option('pg_num')
         num_rep = self.get_module_option('num_rep')
         min_size = self.get_module_option('min_size')
-        prefix = self.get_module_option('prefix') or 'by-' + subtree_type + '-'
+        prefix = self.get_module_option('prefix') or 'by-' + str(subtree_type) + '-'
 
         osdmap = self.get("osd_map")
         lpools = []

@@ -457,7 +457,7 @@ class FSExport(object):
                 self.export_conf_objs = []  # type: List[Export]
                 self._read_raw_config(cluster_id)
                 self.exports[cluster_id] = self.export_conf_objs
-                log.info("Exports parsed successfully " + self.exports.items())
+                log.info("Exports parsed successfully " + str(self.exports.items()))
         return self._exports
 
     def _fetch_export(self, pseudo_path):
@@ -488,7 +488,7 @@ class FSExport(object):
             'prefix': 'auth rm',
             'entity': 'client.{}'.format(entity),
             })
-        log.info("Export user deleted is " + entity)
+        log.info("Export user deleted is " + str(entity))
 
     def _gen_export_id(self):
         exports = sorted([ex.export_id for ex in self.exports[self.rados_namespace]])
@@ -517,7 +517,7 @@ class FSExport(object):
     def _save_export(self, export):
         self.exports[self.rados_namespace].append(export)
         NFSRados(self.mgr, self.rados_namespace).write_obj(export.to_export_block(),
-                 'export-' + export.export_id, 'conf-nfs.ganesha-' + export.cluster_id)
+                 'export-' + str(export.export_id), 'conf-nfs.ganesha-' + str(export.cluster_id))
 
     def _delete_export(self, cluster_id, pseudo_path, export_obj=None):
         try:
@@ -529,7 +529,7 @@ class FSExport(object):
             if export:
                 if pseudo_path:
                     NFSRados(self.mgr, self.rados_namespace).remove_obj(
-                             'export-' + export.export_id, 'conf-nfs.ganesha-' + cluster_id)
+                             'export-' + str(export.export_id), 'conf-nfs.ganesha-' + str(cluster_id))
                 self.exports[cluster_id].remove(export)
                 self._delete_user(export.fsal.user_id)
                 if not self.exports[cluster_id]:
@@ -680,7 +680,7 @@ class NFSCluster:
 
     def _restart_nfs_service(self):
         completion = self.mgr.service_action(action='restart',
-                                             service_name='nfs.'+self.cluster_id)
+                                             service_name='nfs.'+str(self.cluster_id))
         self.mgr._orchestrator_wait([completion])
         orchestrator.raise_if_exception(completion)
 
@@ -695,7 +695,7 @@ class NFSCluster:
                 r, out, err = create_pool(self.mgr, self.pool_name)
                 if r != 0:
                     return r, out, err
-                log.info("Pool Status: " +out)
+                log.info("Pool Status: " +str(out))
 
                 self.mgr.check_mon_command({'prefix': 'osd pool application enable',
                                             'pool': self.pool_name, 'app': 'nfs'})
@@ -727,7 +727,7 @@ class NFSCluster:
             cluster_list = available_clusters(self.mgr)
             if cluster_id in cluster_list:
                 self.mgr.fs_export.delete_all_exports(cluster_id)
-                completion = self.mgr.remove_service('nfs.' + self.cluster_id)
+                completion = self.mgr.remove_service('nfs.' + str(self.cluster_id))
                 self.mgr._orchestrator_wait([completion])
                 orchestrator.raise_if_exception(completion)
                 self.delete_config_obj()

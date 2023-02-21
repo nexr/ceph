@@ -1,3 +1,4 @@
+import sys
 import logging
 import json
 import socket
@@ -13,9 +14,9 @@ except ImportError:
 if TYPE_CHECKING:
     from cephadm import CephadmOrchestrator
 
-# Python 3:
-# >>> T = TypeVar('T')
-# >>> ConfEntity = NewType('ConfEntity', str)
+if sys.version_info.major == 3:
+    T = TypeVar('T')
+    ConfEntity = NewType('ConfEntity', str)
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ def name_to_config_section(name):
     """
     daemon_type = name.split('.', 1)[0]
     if daemon_type in ['rgw', 'rbd-mirror', 'nfs', 'crash', 'iscsi']:
-        return ConfEntity('client.' + name)
+        return ConfEntity('client.' + str(name))
     elif daemon_type in ['mon', 'osd', 'mds', 'mgr', 'client']:
         return ConfEntity(name)
     else:

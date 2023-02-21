@@ -170,7 +170,7 @@ class TaskHandler:
 
     def extract_image_spec(self, image_spec):
         match = re.match(r'^(?:([^/]+)/(?:([^/]+)/)?)?([^/@]+)$',
-                         image_spec or '')
+                         str(image_spec) or '')
         if not match:
             raise ValueError("Invalid image spec: {}".format(image_spec))
         return (match.group(1) or self.default_pool_name, match.group(2) or '',

@@ -5,6 +5,7 @@ ceph-mgr orchestrator interface
 Please see the ceph-mgr module developer's guide for more information.
 """
 
+import sys
 import copy
 import datetime
 import errno
@@ -37,8 +38,8 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Python 3:
-# >>> T = TypeVar('T')
+if sys.version_info.major == 3:
+    T = TypeVar('T')
 
 
 class OrchestratorError(Exception):
@@ -191,7 +192,7 @@ class _Promise(object):
         try:
             self._serialized_exception_ = pickle.dumps(e) if e is not None else None
         except pickle.PicklingError:
-            logger.error("failed to pickle " + e)
+            logger.error("failed to pickle " + str(e))
             if isinstance(e, Exception):
                 e = Exception(*e.args)
             else:
@@ -340,7 +341,7 @@ class _Promise(object):
         assert self._state in (self.INITIALIZED, self.RUNNING)
         logger.exception('_Promise failed')
         self._exception = e
-        self._value = '_exception: ' + e
+        self._value = '_exception: ' + str(e)
         if self._next_promise:
             self._next_promise.fail(e)
         self._state = self.FINISHED
@@ -1198,8 +1199,8 @@ class Orchestrator(object):
         """
         raise NotImplementedError()
 
-# python 3:
-# >>> GenericSpec = Union[ServiceSpec, HostSpec]
+if sys.version_info.major == 3:
+    GenericSpec = Union[ServiceSpec, HostSpec]
 
 
 def json_to_generic_spec(spec):

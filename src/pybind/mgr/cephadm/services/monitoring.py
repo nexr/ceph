@@ -144,7 +144,7 @@ class AlertmanagerService(CephadmService):
         for dd in self.mgr.cache.get_daemons_by_service('alertmanager'):
             deps.append(dd.name())
             addr = self.mgr.inventory.get_addr(dd.hostname)
-            peers.append(addr.split(':')[0] + ':' + port)
+            peers.append(addr.split(':')[0] + ':' + str(port))
         return {
             "files": {
                 "alertmanager.yml": yml
@@ -209,7 +209,7 @@ class PrometheusService(CephadmService):
             if dd.daemon_id == self.mgr.get_mgr_id():
                 continue
             addr = self.mgr.inventory.get_addr(dd.hostname)
-            mgr_scrape_list.append(addr.split(':')[0] + ':' + port)
+            mgr_scrape_list.append(addr.split(':')[0] + ':' + str(port))
 
         # scrape node exporters
         nodes = []

@@ -185,12 +185,12 @@ class TestCephadm(object):
         with with_host(cephadm_module, 'test'):
             with with_daemon(cephadm_module, RGWSpec(service_id='myrgw.foobar'), CephadmOrchestrator.add_rgw, 'test') as daemon_id:
 
-                c = cephadm_module.daemon_action('redeploy', 'rgw.' + daemon_id)
+                c = cephadm_module.daemon_action('redeploy', 'rgw.' + str(daemon_id))
                 assert wait(cephadm_module,
                             c) == f"Scheduled to redeploy rgw.{daemon_id} on host 'test'"
 
                 for what in ('start', 'stop', 'restart'):
-                    c = cephadm_module.daemon_action(what, 'rgw.' + daemon_id)
+                    c = cephadm_module.daemon_action(what, 'rgw.' + str(daemon_id))
                     assert wait(cephadm_module,
                                 c) == F"Scheduled to {what} rgw.{daemon_id} on host 'test'"
 
@@ -1100,7 +1100,7 @@ Traceback (most recent call last):
             _run_cephadm.side_effect = OrchestratorError(error_message)
 
             s = CephadmServe(cephadm_module)._refresh_host_devices('test')
-            assert s == 'host test `cephadm ceph-volume` failed: ' + error_message
+            assert s == 'host test `cephadm ceph-volume` failed: ' + str(error_message)
 
             assert _run_cephadm.mock_calls == [
                 mock.call('test', 'osd', 'ceph-volume',

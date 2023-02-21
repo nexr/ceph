@@ -478,7 +478,7 @@ class Module(MgrModule):
             obj = getattr(root, _obj)
 
             if isinstance(obj, RestController):
-                doc.update(self.get_doc_api(obj, prefix + '/' + _obj))
+                doc.update(self.get_doc_api(obj, prefix + '/' + str(_obj)))
 
         if getattr(root, '_lookup', None) and isinstance(root._lookup('0')[0], RestController):
             doc.update(self.get_doc_api(root._lookup('0')[0], prefix + '/<arg>'))

@@ -361,13 +361,13 @@ class Module(MgrModule):
         return 0, "", ""
 
     def scrape_device(self, devid):
-        r = self.get("device " + devid)
+        r = self.get("device " + str(devid))
         if not r or 'device' not in r.keys():
-            return -errno.ENOENT, '', 'device ' + devid + ' not found'
+            return -errno.ENOENT, '', 'device ' + str(devid) + ' not found'
         daemons = r['device'].get('daemons', [])
         if not daemons:
             return (-errno.EAGAIN, '',
-                    'device ' + devid + ' not claimed by any active daemons')
+                    'device ' + str(devid) + ' not claimed by any active daemons')
         (daemon_type, daemon_id) = daemons[0].split('.')
         ioctx = self.open_connection()
         if not ioctx:
@@ -470,9 +470,9 @@ class Module(MgrModule):
 
     def show_device_metrics(self, devid, sample):
         # verify device exists
-        r = self.get("device " + devid)
+        r = self.get("device " + str(devid))
         if not r or 'device' not in r.keys():
-            return -errno.ENOENT, '', 'device ' + devid + ' not found'
+            return -errno.ENOENT, '', 'device ' + str(devid) + ' not found'
         # fetch metrics
         res = self._get_device_metrics(devid, sample=sample)
         return 0, json.dumps(res, indent=4, sort_keys=True), ''
@@ -529,7 +529,7 @@ class Module(MgrModule):
             if life_expectancy_max - now <= warn_threshold_td:
                 # device can appear in more than one location in case
                 # of SCSI multipath
-                device_locations = map(lambda x: x['host'] + ':' + x['dev'],
+                device_locations = map(lambda x: x['host'] + ':' + str(x['dev']),
                                        dev['location'])
                 health_warnings[DEVICE_HEALTH].append(
                     '%s (%s); daemons %s; life expectancy between %s and %s'

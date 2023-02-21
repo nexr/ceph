@@ -32,7 +32,7 @@ class OSDService(CephService):
 
     def create_from_spec(self, drive_group):
         # type: (DriveGroupSpec) -> str
-        logger.debug("Processing DriveGroup " + drive_group)
+        logger.debug("Processing DriveGroup " + str(drive_group))
         osd_id_claims = self.find_destroyed_osds()
         if osd_id_claims:
             logger.info(
@@ -48,7 +48,7 @@ class OSDService(CephService):
                     drive_group.service_id))
                 return None
             logger.info('Applying drive group %s on host %s...' % (drive_group.service_id, host))
-            env_vars = ["CEPH_VOLUME_OSDSPEC_AFFINITY=" + drive_group.service_id] # type: List[str]
+            env_vars = ["CEPH_VOLUME_OSDSPEC_AFFINITY=" + str(drive_group.service_id)] # type: List[str]
             ret_msg = self.create_single_host(
                 host, cmd, replace_osd_ids=osd_id_claims.get(host, []), env_vars=env_vars
             )
@@ -142,10 +142,10 @@ class OSDService(CephService):
             raise OrchestratorError("No inventory found for host: {}".format(hostname))
 
         # 3) iterate over matching_host and call DriveSelection
-        logger.debug("Checking matching hosts -> " +matching_hosts)
+        logger.debug("Checking matching hosts -> " +str(matching_hosts))
         for host in matching_hosts:
             inventory_for_host = _find_inv_for_host(host, self.mgr.cache.devices)
-            logger.debug("Found inventory for host " + inventory_for_host)
+            logger.debug("Found inventory for host " + str(inventory_for_host))
 
             # List of Daemons on that host
             dd_for_spec = self.mgr.cache.get_daemons_by_service(drive_group.service_name())
@@ -153,7 +153,7 @@ class OSDService(CephService):
 
             drive_selection = DriveSelection(drive_group, inventory_for_host,
                                              existing_daemons=len(dd_for_spec_and_host))
-            logger.debug("Found drive selection " + drive_selection)
+            logger.debug("Found drive selection " + str(drive_selection))
             host_ds_map.append((host, drive_selection))
         return host_ds_map
 
@@ -163,7 +163,7 @@ class OSDService(CephService):
         logger.debug("Translating DriveGroup <%s> to ceph-volume command" % drive_selection.spec)
         cmd = translate.to_ceph_volume(drive_selection,
                                        osd_id_claims, preview=preview).run() # type: Optional[str]
-        logger.debug("Resulting ceph-volume cmd: "+ cmd)
+        logger.debug("Resulting ceph-volume cmd: "+ str(cmd))
         return cmd
 
     def get_previews(self, host):
@@ -192,7 +192,7 @@ class OSDService(CephService):
 
         Note: One host can have multiple previews based on its assigned OSDSpecs.
         """
-        self.mgr.log.debug("Generating OSDSpec previews for " + osdspecs)
+        self.mgr.log.debug("Generating OSDSpec previews for " + str(osdspecs))
         ret_all = [] # type: List[Dict[str, Any]]
         if not osdspecs:
             return ret_all
@@ -307,7 +307,7 @@ class OSDService(CephService):
                     {node.get('name'): [str(_id) for _id in node.get('children', list())]}
                 )
         if osd_host_map:
-            self.mgr.log.info("Found osd claims -> " + osd_host_map)
+            self.mgr.log.info("Found osd claims -> " + str(osd_host_map))
         return osd_host_map
 
 
@@ -383,7 +383,7 @@ class RemoveUtil(object):
 
     def set_osd_flag(self, osds, flag):
         # type: (List["OSD"], str) -> bool
-        base_cmd = "osd "+ flag
+        base_cmd = "osd "+ str(flag)
         self.mgr.log.debug("running cmd: %s on ids %s" % (base_cmd, osds))
         ret, out, err = self.mgr.mon_command({
             'prefix': base_cmd,
@@ -498,7 +498,7 @@ class OSD:
     def start(self):
         # type: () -> None
         if self.started:
-            logger.debug("Already started draining " + self)
+            logger.debug("Already started draining " + str(self))
             return None
         self.started = True
         self.stopped = False
@@ -525,7 +525,7 @@ class OSD:
     def stop(self):
         # type: () -> None
         if self.stopped:
-            logger.debug("Already stopped draining " + self)
+            logger.debug("Already stopped draining " + str(self))
             return None
         self.started = False
         self.stopped = True
@@ -673,7 +673,7 @@ class OSDRemovalQueue(object):
 
         logger.debug(
             "{} OSDs are scheduled ".format(self.queue_size())
-          + "for removal: " + all_osds)
+          + "for removal: " + str(all_osds))
 
         # Check all osds for their state and take action (remove, purge etc)
         new_queue = set() # type: Set[OSD]

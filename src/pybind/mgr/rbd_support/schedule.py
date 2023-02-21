@@ -87,7 +87,7 @@ class LevelSpec:
         # parse names like:
         # '', 'rbd/', 'rbd/ns/', 'rbd//image', 'rbd/image', 'rbd/ns/image'
         match = re.match(r'^(?:([^/]+)/(?:(?:([^/]*)/|)(?:([^/@]+))?)?)?$',
-                         name)
+                         str(name))
         if not match:
             raise ValueError("failed to parse {}".format(name))
         if match.group(3) and not allow_image_level:
@@ -129,7 +129,7 @@ class LevelSpec:
                                 with rbd.Image(ioctx, image_name,
                                                read_only=True) as image:
                                     image_id = image.id()
-                                    id += "/" + image_id
+                                    id += "/" + str(image_id)
                                     if image_validator:
                                         image_validator(image)
                             except rbd.ImageNotFound:
@@ -154,7 +154,7 @@ class LevelSpec:
                 image_validator=None):
         # parse ids like:
         # '', '123', '123/', '123/ns', '123//image_id', '123/ns/image_id'
-        match = re.match(r'^(?:(\d+)(?:/([^/]*)(?:/([^/@]+))?)?)?$', id)
+        match = re.match(r'^(?:(\d+)(?:/([^/]*)(?:/([^/@]+))?)?)?$', str(id))
         if not match:
             raise ValueError("failed to parse: {}".format(id))
 
@@ -233,7 +233,7 @@ class Interval:
 
     @classmethod
     def from_string(cls, interval):
-        match = re.match(r'^(\d+)(d|h|m)?$', interval)
+        match = re.match(r'^(\d+)(d|h|m)?$', str(interval))
         if not match:
             raise ValueError("Invalid interval ({})".format(interval))
 

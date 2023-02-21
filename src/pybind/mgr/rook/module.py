@@ -79,7 +79,7 @@ class RookEnv(object):
 
         self.operator_namespace = os.environ.get('ROOK_OPERATOR_NAMESPACE', self.namespace)
         self.crd_version = os.environ.get('ROOK_CEPH_CLUSTER_CRD_VERSION', 'v1')
-        self.api_name = "ceph.rook.io/" + self.crd_version
+        self.api_name = "ceph.rook.io/" + str(self.crd_version)
 
     def api_version_match(self):
         return self.crd_version == 'v1'
@@ -327,7 +327,7 @@ class RookOrchestrator(MgrModule, orchestrator.Orchestrator):
         for zone in all_zones.get('items', []):
             rgw_realm = zone['metadata']['name']
             rgw_zone = rgw_realm
-            svc = 'rgw.' + rgw_realm + '.' + rgw_zone
+            svc = 'rgw.' + str(rgw_realm) + '.' + str(rgw_zone)
             if svc in spec:
                 continue
             active = zone['spec']['gateway']['instances'];
@@ -339,7 +339,7 @@ class RookOrchestrator(MgrModule, orchestrator.Orchestrator):
                 port = zone['spec']['gateway']['port'] or 80
             spec[svc] = orchestrator.ServiceDescription(
                 spec=RGWSpec(
-                    service_id=rgw_realm + '.' + rgw_zone,
+                    service_id=rgw_realm + '.' + str(rgw_zone),
                     rgw_realm=rgw_realm,
                     rgw_zone=rgw_zone,
                     ssl=ssl,

@@ -223,7 +223,7 @@ class ObjstoreUsersync(MgrModule):
             is_success = (list_rc == 0)
 
             if not is_success:
-                self.log.warning("Failed to get user list: " + list_err)
+                self.log.warning("Failed to get user list: " + str(list_err))
                 break
 
             ret_json = json.loads(list_out)
@@ -330,13 +330,13 @@ class ObjstoreUsersync(MgrModule):
         self.log.debug("{")
 
         for type_key in emap.keys():
-            self.log.debug("  " + type_key + ": [")
+            self.log.debug("  " + str(type_key) + ": [")
 
             for user_key in emap[type_key].keys():
-                self.log.debug("    " + user_key + ": {")
+                self.log.debug("    " + str(user_key) + ": {")
 
                 for item_key in emap[type_key][user_key]:
-                    self.log.debug("      " + item_key + ": " + emap[type_key][user_key][item_key] + ",")
+                    self.log.debug("      " + str(item_key) + ": " + str(emap[type_key][user_key][item_key]) + ",")
 
                 self.log.debug("    },")
 
@@ -443,7 +443,7 @@ class ObjstoreUsersync(MgrModule):
         if group_id == '':
             group_id = self._fetch_ranger_group_id(endpoint)
 
-        resp, scode = self._request_ranger_rest("get", "/service/xusers/users/userName/" + user_name, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/xusers/users/userName/" + str(user_name), endpoint)
 
         is_not_exist = ( scode == 200 and resp['vxUser']['isVisible'] == '0' ) or \
                        ( scode == 400 and \
@@ -451,12 +451,12 @@ class ObjstoreUsersync(MgrModule):
 
         is_success = (scode == 200) or is_not_exist
         if not is_success:
-            self.log.warning("Failed to get user info: " + user_name)
+            self.log.warning("Failed to get user info: " + str(user_name))
             return is_success
 
         user_id = ''
         if is_not_exist:
-            self.log.debug("'%s' ranger user is not exist" % user_name)
+            self.log.debug("'%s' ranger user is not exist" % str(user_name))
 
             initial_pw = self.ranger_user_initial_password
 
@@ -550,7 +550,7 @@ class ObjstoreUsersync(MgrModule):
             endp_key = user_name if user_name in self.endpoint_map['ranger'] else '_default'
             endpoint = self.endpoint_map['ranger'][endp_key]
 
-        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + user_name, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + str(user_name), endpoint)
         is_success = (scode == 200 or scode == 404)
         is_service_exist = (scode == 200)
         is_service_enabled = (is_service_exist and resp['isEnabled'] == True)
@@ -666,7 +666,7 @@ class ObjstoreUsersync(MgrModule):
             endp_key = user_name if user_name in self.endpoint_map['ranger'] else '_default'
             endpoint = self.endpoint_map['ranger'][endp_key]
 
-        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + user_name, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + str(user_name), endpoint)
         is_success = (scode == 200 or scode == 404)
         is_service_exist = (scode == 200)
         is_service_enabled = (is_service_exist and resp['isEnabled'] == True)
@@ -709,7 +709,7 @@ class ObjstoreUsersync(MgrModule):
         if group_id == '':
             group_id = self._fetch_ranger_group_id(endpoint)
 
-        resp, scode = self._request_ranger_rest("get", "/service/xusers/users/userName/" + user_name, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/xusers/users/userName/" + str(user_name), endpoint)
 
         is_not_exist = ( scode == 400 and \
                          resp['vxResponse']['messageList']['name'] == 'DATA_NOT_FOUND' )
@@ -717,7 +717,7 @@ class ObjstoreUsersync(MgrModule):
         is_success = (scode == 200) or is_not_exist
 
         if not is_success:
-            self.log.warning("Failed to get user id: " + user_name)
+            self.log.warning("Failed to get user id: " + str(user_name))
             return is_success
 
         user_id = ''
@@ -797,7 +797,7 @@ class ObjstoreUsersync(MgrModule):
 
         cycle_after_emap_update = self.endpoint_map_update_cycle
 
-        make_tgtusers_pool_key = lambda endp: endp['url'] + '#' + endp['tenant']
+        make_tgtusers_pool_key = lambda endp: endp['url'] + '#' + str(endp['tenant'])
 
         while self.run:
             # Do some useful background work here.

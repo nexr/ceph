@@ -80,7 +80,7 @@ class RHDiskFailurePredictor(object):
         # read config file as json, if it exists
         config_path = os.path.join(model_dirpath, self.CONFIG_FILE)
         if not os.path.isfile(config_path):
-            return "Missing config file: " + config_path
+            return "Missing config file: " + str(config_path)
         else:
             with open(config_path) as f_conf:
                 self.model_context = json.load(f_conf)
@@ -262,7 +262,7 @@ class PSDiskFailurePredictor(object):
 
         config_path = os.path.join(model_dirpath, self.CONFIG_FILE)
         if not os.path.isfile(config_path):
-            return "Missing config file: " + config_path
+            return "Missing config file: " + str(config_path)
         else:
             with open(config_path) as f_conf:
                 self.model_context = json.load(f_conf)
@@ -271,7 +271,7 @@ class PSDiskFailurePredictor(object):
             model_path = os.path.join(model_dirpath, model_name)
 
             if not os.path.isfile(model_path):
-                return "Missing model file: " + model_path
+                return "Missing model file: " + str(model_path)
 
         self.model_dirpath = model_dirpath
 

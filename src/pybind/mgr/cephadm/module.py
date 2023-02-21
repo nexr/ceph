@@ -1,3 +1,4 @@
+import sys
 import json
 import errno
 import logging
@@ -83,8 +84,8 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
-# Python 3:
-# >>> T = TypeVar('T')
+if sys.version_info.major == 3:
+    T = TypeVar('T')
 
 DEFAULT_SSH_CONFIG = """
 Host *
@@ -127,9 +128,9 @@ def trivial_completion(f):
 
 
 class ContainerInspectInfo(NamedTuple):
-    image_id # type: str
-    ceph_version # type: Optional[str]
-    repo_digest # type: Optional[str]
+    image_id = '' # type: str
+    ceph_version = None # type: Optional[str]
+    repo_digest = None # type: Optional[str]
 
 
 @six.add_metaclass(CLICommandMeta)
@@ -987,8 +988,8 @@ class CephadmOrchestrator(orchestrator.Orchestrator, MgrModule):
         return HandleCommandResult(stdout=self.extra_ceph_conf().conf)
 
     class ExtraCephConf(NamedTuple):
-        conf # type: str
-        last_modified # type: Optional[datetime.datetime]
+        conf = '' # type: str
+        last_modified = None # type: Optional[datetime.datetime]
 
     def extra_ceph_conf(self):
         # type: () -> CephadmOrchestrator.ExtraCephConf
@@ -1022,7 +1023,7 @@ class CephadmOrchestrator(orchestrator.Orchestrator, MgrModule):
                 return conn, r
             else:
                 self._reset_con(host)
-        n = self.ssh_user + '@' + host
+        n = self.ssh_user + '@' + str(host)
         self.log.debug("Opening connection to {} with ssh options '{}'".format(
             n, self._ssh_options))
         child_logger = self.log.getChild(n)
@@ -1545,7 +1546,7 @@ To check that the host is reachable:
                 'prefix': 'config set',
                 'name': 'container_image',
                 'value': image,
-                'who': utils.name_to_config_section(daemon_type + '.' + daemon_id),
+                'who': utils.name_to_config_section(daemon_type + '.' + str(daemon_id)),
             })
 
     @trivial_completion
@@ -2255,7 +2256,7 @@ To check that the host is reachable:
     def upgrade_check(self, image, version):
         # type: (str, str) -> str
         if version:
-            target_name = self.container_image_base + ':v' + version
+            target_name = self.container_image_base + ':v' + str(version)
         elif image:
             target_name = image
         else:
