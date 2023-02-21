@@ -625,7 +625,7 @@ class Module(MgrModule):
                 'num': len([h for h in servers if h['hostname']]),
             }
             for t in ['mon', 'mds', 'osd', 'mgr']:
-                report['hosts']['num_with_' + t] = len(
+                report['hosts']['num_with_' + str(t)] = len(
                     [h for h in servers
                      if len([s for s in h['services'] if s['type'] == t])]
                 )
@@ -752,7 +752,7 @@ class Module(MgrModule):
             return 0, json.dumps(r, indent=4, sort_keys=True), ''
         elif command['prefix'] == 'telemetry on':
             if command.get('license') != LICENSE:
-                return -errno.EPERM, '', "Telemetry data is licensed under the " + LICENSE_NAME + " (" + LICENSE_URL + ").\nTo enable, add '--license " + LICENSE + "' to the 'ceph telemetry on' command."
+                return -errno.EPERM, '', "Telemetry data is licensed under the " + str(LICENSE_NAME) + " (" + str(LICENSE_URL) + ").\nTo enable, add '--license " + str(LICENSE) + "' to the 'ceph telemetry on' command."
             self.on()
             return 0, '', ''
         elif command['prefix'] == 'telemetry off':
@@ -761,7 +761,7 @@ class Module(MgrModule):
         elif command['prefix'] == 'telemetry send':
             if self.last_opt_revision < LAST_REVISION_RE_OPT_IN and command.get('license') != LICENSE:
                 self.log.debug('A telemetry send attempt while opted-out. Asking for license agreement')
-                return -errno.EPERM, '', "Telemetry data is licensed under the " + LICENSE_NAME + " (" + LICENSE_URL + ").\nTo manually send telemetry data, add '--license " + LICENSE + "' to the 'ceph telemetry send' command.\nPlease consider enabling the telemetry module with 'ceph telemetry on'."
+                return -errno.EPERM, '', "Telemetry data is licensed under the " + str(LICENSE_NAME) + " (" + str(LICENSE_URL) + ").\nTo manually send telemetry data, add '--license " + str(LICENSE) + "' to the 'ceph telemetry send' command.\nPlease consider enabling the telemetry module with 'ceph telemetry on'."
             self.last_report = self.compile_report()
             return self.send(self.last_report, command.get('endpoint'))
 

@@ -815,7 +815,7 @@ class Module(MgrModule):
                         stattype = self._stattype_to_str(counter_info['type'])
                         labels = (pool_name, nspace_name, image_name)
                         if counter_info['type'] == self.PERFCOUNTER_COUNTER:
-                            path = 'rbd_' + key
+                            path = 'rbd_' + str(key)
                             if path not in self.metrics:
                                 self.metrics[path] = Metric(
                                     stattype,
@@ -825,7 +825,7 @@ class Module(MgrModule):
                                 )
                             self.metrics[path].set(counters[i][0], labels)
                         elif counter_info['type'] == self.PERFCOUNTER_LONGRUNAVG:
-                            path = 'rbd_' + key + '_sum'
+                            path = 'rbd_' + str(key) + '_sum'
                             if path not in self.metrics:
                                 self.metrics[path] = Metric(
                                     stattype,
@@ -834,7 +834,7 @@ class Module(MgrModule):
                                     label_names,
                                 )
                             self.metrics[path].set(counters[i][0], labels)
-                            path = 'rbd_' + key + '_count'
+                            path = 'rbd_' + str(key) + '_count'
                             if path not in self.metrics:
                                 self.metrics[path] = Metric(
                                     'counter',

@@ -42,7 +42,7 @@ class ConfigOsd(RestController):
                 mode = 'unset'
 
             commands.append({
-                'prefix': 'osd ' + mode,
+                'prefix': 'osd ' + str(mode),
                 'key': flag,
             })
 

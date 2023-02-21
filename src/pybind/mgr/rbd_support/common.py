@@ -21,7 +21,7 @@ def extract_pool_key(pool_spec):
     if not pool_spec:
         return GLOBAL_POOL_KEY
 
-    match = re.match(r'^([^/]+)(?:/([^/]+))?$', pool_spec)
+    match = re.match(r'^([^/]+)(?:/([^/]+))?$', str(pool_spec))
     if not match:
         raise ValueError("Invalid pool spec: {}".format(pool_spec))
     return (match.group(1), match.group(2) or '')

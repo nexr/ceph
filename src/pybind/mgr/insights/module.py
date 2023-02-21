@@ -185,7 +185,7 @@ class Module(MgrModule):
         ENABLE_GIT_VERSION=OFF.
         """
         r = r"ceph version (?P<release>\d+)\.(?P<major>\d+)\.(?P<minor>\d+)"
-        m = re.match(r, version)
+        m = re.match(r, str(version))
         ver = {} if not m else {
             "release": m.group("release"),
             "major": m.group("major"),

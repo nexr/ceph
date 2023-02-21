@@ -170,7 +170,7 @@ class NFSService(CephService):
         daemon_id = daemon.daemon_id # type: str
         entity = self.get_auth_entity(daemon_id +'-rgw') # type: AuthEntity
 
-        logger.info('Remove keyring: '+ entity)
+        logger.info('Remove keyring: '+ str(entity))
         ret, out, err = self.mgr.check_mon_command({
             'prefix': 'auth rm',
             'entity': entity,

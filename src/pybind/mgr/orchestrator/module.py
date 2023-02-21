@@ -1458,7 +1458,7 @@ ceph orch daemon add %s <placement>''' % (daemon_type or '<daemon_type>')
           Maybe you meant `--ceph-version 15.2.0`?
 
         """
-        if image and re.match(r'^v?\d+\.\d+\.\d+$', image) and ceph_version is None:
+        if image and re.match(r'^v?\d+\.\d+\.\d+$', str(image)) and ceph_version is None:
             ver = image[1:] if image.startswith('v') else image
             s = "Error: unable to pull image name `%s`.\n" \
               + "  Maybe you meant `--ceph-version %s`?" % (image, ver)

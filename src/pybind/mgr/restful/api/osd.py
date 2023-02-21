@@ -47,7 +47,7 @@ class OsdIdCommand(RestController):
             return {'message': 'Command "{}" not available'.format(command)}
 
         return context.instance.submit_request([[{
-            'prefix': 'osd ' + command,
+            'prefix': 'osd ' + str(command),
             'who': str(self.osd_id)
         }]], **kwargs)
 

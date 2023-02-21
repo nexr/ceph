@@ -38,7 +38,7 @@ class Line(object):
 
         return u'{0}{1} {2}{3}'.format(
             self.get_output_measurement(),
-            "," + tags if tags else '',
+            "," + str(tags) if tags else '',
             self.get_output_values(),
             self.get_output_timestamp()
         )

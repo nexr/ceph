@@ -37,7 +37,7 @@ def name_to_config_section(name):
     """
     daemon_type = name.split('.', 1)[0]
     if daemon_type in ['rgw', 'rbd-mirror', 'nfs', 'crash', 'iscsi']:
-        return ConfEntity('client.' + name)
+        return ConfEntity('client.' + str(name))
     elif daemon_type in ['mon', 'osd', 'mds', 'mgr', 'client']:
         return ConfEntity(name)
     else:

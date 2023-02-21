@@ -481,9 +481,9 @@ class MgrService(CephService):
         # type: () -> None
         if not self.mgr_map_has_standby():
             raise OrchestratorError('Need standby mgr daemon', event_kind_subject=(
-                'daemon', 'mgr' + self.mgr.get_mgr_id()))
+                'daemon', 'mgr' + str(self.mgr.get_mgr_id())))
 
-        self.mgr.events.for_daemon('mgr' + self.mgr.get_mgr_id(),
+        self.mgr.events.for_daemon('mgr' + str(self.mgr.get_mgr_id()),
                                    'INFO', 'Failing over to other MGR')
         logger.info('Failing over to other MGR')
 
@@ -515,7 +515,7 @@ class MdsService(CephService):
         # ensure mds_join_fs is set for these daemons
         ret, out, err = self.mgr.check_mon_command({
             'prefix': 'config set',
-            'who': 'mds.' + spec.service_id,
+            'who': 'mds.' + str(spec.service_id),
             'name': 'mds_join_fs',
             'value': spec.service_id,
         })

@@ -725,8 +725,8 @@ class EventStore():
 
     def get_for_service(self, name):
         # type: (str) -> List[OrchestratorEvent]
-        return self.events.get('service:' + name, [])
+        return self.events.get('service:' + str(name), [])
 
     def get_for_daemon(self, name):
         # type: (str) -> List[OrchestratorEvent]
-        return self.events.get('daemon:' + name, [])
+        return self.events.get('daemon:' + str(name), [])

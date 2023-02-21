@@ -31,7 +31,7 @@ class Module(MgrModule):
         },
     ]
 
-        
+
     def get_latest(self, daemon_type, daemon_name, stat):
         data = self.get_counter(daemon_type, daemon_name, stat)[stat]
         #self.log.error("get_latest {0} data={1}".format(stat, data))
@@ -189,7 +189,7 @@ class Module(MgrModule):
             for pool_id in [metadata_pool_id] + data_pool_ids:
                 pool_type = "metadata" if pool_id == metadata_pool_id else "data"
                 stats = pool_stats[pool_id]
-                
+
                 if output_format in ('json', 'json-pretty'):
                     json_output['pools'].append({
                         'id': pool_id,
@@ -204,7 +204,7 @@ class Module(MgrModule):
                         mgr_util.format_bytes(stats['bytes_used'], 5),
                         mgr_util.format_bytes(stats['max_avail'], 5)
                     ])
-            
+
             if output_format in ('json', 'json-pretty'):
                 json_output['clients'].append({
                     'fs': mdsmap['fs_name'],
@@ -218,7 +218,7 @@ class Module(MgrModule):
                 output += "\n" + pools_table.get_string() + "\n"
 
         if not output and not json_output and fs_filter is not None:
-            return errno.EINVAL, "", "Invalid filesystem: " + fs_filter
+            return errno.EINVAL, "", "Invalid filesystem: " + str(fs_filter)
 
         standby_table = PrettyTable(["STANDBY MDS"], border=False)
         standby_table.left_padding_width = 0

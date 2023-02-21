@@ -98,7 +98,7 @@ class CephadmUpgrade:
             r.target_image = self.target_image
             r.in_progress = True
             if self.upgrade_state.error:
-                r.message = 'Error: ' + self.upgrade_state.error
+                r.message = 'Error: ' + str(self.upgrade_state.error)
             elif self.upgrade_state.paused:
                 r.message = 'Upgrade paused'
         return r
@@ -117,7 +117,7 @@ class CephadmUpgrade:
                 raise OrchestratorError('version must be in the form X.Y.Z (e.g., 15.2.3)')
             if int(major) < 15 or (int(major) == 15 and int(minor) < 2):
                 raise OrchestratorError('cephadm only supports octopus (15.2.0) or later')
-            target_name = self.mgr.container_image_base + ':v' + version
+            target_name = self.mgr.container_image_base + ':v' + str(version)
         elif image:
             target_name = image
         else:
@@ -199,9 +199,9 @@ class CephadmUpgrade:
             r = self.mgr.cephadm_services[s.daemon_type].ok_to_stop([s.daemon_id])
 
             if not r.retval:
-                logger.info('Upgrade: ' + r.stdout)
+                logger.info('Upgrade: ' + str(r.stdout))
                 return True
-            logger.error('Upgrade: ' + r.stderr)
+            logger.error('Upgrade: ' + str(r.stderr))
 
             time.sleep(15)
             tries -= 1
@@ -222,7 +222,7 @@ class CephadmUpgrade:
         if not self.upgrade_state:
             assert False, 'No upgrade in progress'
 
-        self.upgrade_state.error = alert_id + ': ' + alert['summary']
+        self.upgrade_state.error = alert_id + ': ' + str(alert['summary'])
         self.upgrade_state.paused = True
         self._save_upgrade_state()
         self.mgr.health_checks[alert_id] = alert
@@ -381,7 +381,7 @@ class CephadmUpgrade:
                 except OrchestratorError as e:
                     self._fail_upgrade('UPGRADE_NO_STANDBY_MGR', {
                         'severity': 'warning',
-                        'summary': 'Upgrade: ' + e,
+                        'summary': 'Upgrade: ' + str(e),
                         'count': 1,
                         'detail': [
                             'The upgrade process needs to upgrade the mgr, '

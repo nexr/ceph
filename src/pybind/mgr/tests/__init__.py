@@ -25,7 +25,7 @@ if 'UNITTEST' in os.environ:
 
         * self.set_store() populates self._store
         * self.set_module_option() populates self._store[module_name]
-        * self.get(thing) comes from self._store['_ceph_get' + thing]
+        * self.get(thing) comes from self._store['_ceph_get' + str(thing)]
 
         """
 

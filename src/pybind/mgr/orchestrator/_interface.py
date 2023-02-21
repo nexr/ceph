@@ -192,7 +192,7 @@ class _Promise(object):
         try:
             self._serialized_exception_ = pickle.dumps(e) if e is not None else None
         except pickle.PicklingError:
-            logger.error("failed to pickle " + e)
+            logger.error("failed to pickle " + str(e))
             if isinstance(e, Exception):
                 e = Exception(*e.args)
             else:
@@ -341,7 +341,7 @@ class _Promise(object):
         assert self._state in (self.INITIALIZED, self.RUNNING)
         logger.exception('_Promise failed')
         self._exception = e
-        self._value = '_exception: ' + e
+        self._value = '_exception: ' + str(e)
         if self._next_promise:
             self._next_promise.fail(e)
         self._state = self.FINISHED
