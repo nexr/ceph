@@ -66,13 +66,6 @@
 # distros that need a py2 Ceph build
 %bcond_without python2
 %endif
-%if 0%{?rhel} == 7
-# distros that need a python3_compat
-%bcond_without python3_compat
-%else
-# distros that does not need a python3_compat
-%bcond_with python3_compat
-%endif
 %bcond_with seastar
 %if 0%{?fedora} || 0%{?suse_version} >= 1500 || 0%{?rhel}
 # distros that ship cmd2 and/or colorama
@@ -389,7 +382,7 @@ BuildRequires:	expat-devel
 BuildRequires:  redhat-rpm-config
 %endif
 %if 0%{with seastar}
-%if 0%{?fedora} || 0%{??rhel}
+%if 0%{?fedora} || 0%{?rhel}
 BuildRequires:  cryptopp-devel
 BuildRequires:  numactl-devel
 BuildRequires:  protobuf-compiler
@@ -1389,15 +1382,15 @@ ${CMAKE} .. \
     -DCMAKE_INSTALL_INCLUDEDIR=%{_includedir} \
     -DWITH_MANPAGE=ON \
     -DWITH_PYTHON3=%{python3_version} \
+%if 0%{?rhel} == 7
+    -DWITH_PYTHON3_COMPAT=ON \
+%endif
     -DWITH_MGR_DASHBOARD_FRONTEND=OFF \
 %if %{with python2}
     -DWITH_PYTHON2=ON \
     -DMGR_PYTHON_VERSION=2 \
 %else
     -DWITH_PYTHON2=OFF \
-%endif
-%if 0%{with python3_compat}
-    -DWITH_PYTHON3_COMPAT=ON \
 %endif
 %if 0%{without ceph_test_package}
     -DWITH_TESTS=OFF \
