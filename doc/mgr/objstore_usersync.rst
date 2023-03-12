@@ -41,10 +41,10 @@ ceph 오브젝트 스토리지의 사용자 목록을 조회하여 상황에 맞
 
   # ranger connection config
   $ ceph config set mgr mgr/objstore_usersync/ranger_rest_url <ranger url> # ex) http[s]://x.x.x.x:yy
-  $ ceph config set mgr mgr/objstore_usersync/ranger_rest_admin_user <ranger admin user name>
+  $ ceph config set mgr mgr/objstore_usersync/ranger_admin_user <ranger admin user name>
   ## choose one of bellow two password config.
-  $ ceph config set mgr mgr/objstore_usersync/ranger_rest_admin_password <ranger admin password>
-  $ ceph config set mgr mgr/objstore_usersync/ranger_rest_admin_password_path <path to file containing password>
+  $ ceph config set mgr mgr/objstore_usersync/ranger_admin_password <ranger admin password>
+  $ ceph config set mgr mgr/objstore_usersync/ranger_admin_password_path <path to file containing password>
 
   # ranger action config
   $ ceph config set mgr mgr/objstore_usersync/ranger_user_initial_password <default password for newly created user>

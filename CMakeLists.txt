@@ -427,6 +427,15 @@ endif (WITH_RADOSGW)
 #option for CephFS
 option(WITH_CEPHFS "CephFS is enabled" ON)
 
+# if CMAKE_INSTALL_PREFIX is an empty string, must replace
+# it with "/" to make PYTHON_INSTALL_TEMPLATE an absolute path to be
+# consistent with all other installation paths.
+if(CMAKE_INSTALL_PREFIX)
+  set(PYTHON_INSTALL_TEMPLATE "${CMAKE_INSTALL_PREFIX}")
+else(CMAKE_INSTALL_PREFIX)
+  set(PYTHON_INSTALL_TEMPLATE "/")
+endif(CMAKE_INSTALL_PREFIX)
+
 # Python stuff
 option(WITH_PYTHON3 "build python3 bindings with specified python3 version" OFF)
 if(WITH_PYTHON3)
@@ -442,6 +451,12 @@ if(WITH_PYTHON3)
   unset(find_python3_exact)
 
   set(PYTHON_EXECUTABLE ${Python3_EXECUTABLE})
+
+  execute_process(
+    COMMAND
+    ${PYTHON_EXECUTABLE} -c "from distutils import sysconfig; print(sysconfig.get_python_lib(prefix='${PYTHON_INSTALL_TEMPLATE}'))"
+    OUTPUT_VARIABLE "Python3_INSTDIR"
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif()
 
 option(WITH_PYTHON2 "build python2 bindings" ON)
@@ -458,6 +473,12 @@ if(WITH_PYTHON2)
   unset(find_python2_exact)
 
   set(PYTHON_EXECUTABLE ${Python2_EXECUTABLE})
+
+  execute_process(
+    COMMAND
+    ${PYTHON_EXECUTABLE} -c "from distutils import sysconfig; print(sysconfig.get_python_lib(prefix='${PYTHON_INSTALL_TEMPLATE}'))"
+    OUTPUT_VARIABLE "Python2_INSTDIR"
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif()
 
 option(WITH_MGR "ceph-mgr is enabled" ON)

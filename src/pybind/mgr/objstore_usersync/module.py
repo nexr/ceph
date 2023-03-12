@@ -409,7 +409,7 @@ class ObjstoreUsersync(MgrModule):
                 if result_size == 1:
                     ret_list.append(resp['vxUserList']['vXUsers']['name'])
                 elif result_size > 1:
-                    ret_list += map(lambda x: x['name'], resp['vxUserList']['vXUsers'])
+                    ret_list += list(map(lambda x: x['name'], resp['vxUserList']['vXUsers']))
 
                 need_continue = (result_size == page_size)
                 if need_continue: offset = offset + page_size
@@ -507,7 +507,7 @@ class ObjstoreUsersync(MgrModule):
             if result_size == 1:
                 user_groups = [ resp['vxGroupList']['vXGroups']['id'] ]
             elif result_size > 1:
-                user_groups = map(lambda x: x['id'], resp['vxGroupList']['vXGroups'])
+                user_groups = list(map(lambda x: x['id'], resp['vxGroupList']['vXGroups']))
         else:
             self.log.warning("Failed to get groups of user '%s'" % user_name)
             return is_success
@@ -738,7 +738,7 @@ class ObjstoreUsersync(MgrModule):
             if result_size == 1:
                 user_groups = [ resp['vxGroupList']['vXGroups']['id'] ]
             elif result_size > 1:
-                user_groups = map(lambda x: x['id'], resp['vxGroupList']['vXGroups'])
+                user_groups = list(map(lambda x: x['id'], resp['vxGroupList']['vXGroups']))
         else:
             self.log.warning("Failed to get groups of user '%s'" % user_name)
             return is_success

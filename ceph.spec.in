@@ -59,7 +59,7 @@
 %global _fillupdir /var/adm/fillup-templates
 %endif
 %endif
-%if 0%{?fedora} >= 29 || 0%{?suse_version} >= 1500 || 0%{?rhel} >= 8
+%if 0%{?fedora} >= 29 || 0%{?suse_version} >= 1500 || 0%{?rhel} >= 7
 # distros that need a py3 Ceph build
 %bcond_with python2
 %else
@@ -67,7 +67,7 @@
 %bcond_without python2
 %endif
 %bcond_with seastar
-%if 0%{?fedora} || 0%{?suse_version} >= 1500
+%if 0%{?fedora} || 0%{?suse_version} >= 1500 || 0%{?rhel}
 # distros that ship cmd2 and/or colorama
 %bcond_without cephfs_shell
 %else
@@ -550,6 +550,27 @@ module derived from Calamari) and expose CLI hooks.  ceph-mgr gathers
 the cluster maps, the daemon metadata, and performance counters, and
 exposes all these to the python modules.
 
+%if 0%{?rhel} == 7
+%if 0%{?_python_buildid} == 3
+%package mgr-modules-python3-compat
+Summary:        Python3 packages for Ceph Manager Daemon
+%if 0%{?suse_version}
+Group:          System/Filesystems
+%endif
+Requires: python%{_python_buildid}
+Requires: python%{python3_version_nodots}-markupsafe
+Requires: python%{python3_version_nodots}-jinja2
+Requires: python%{python3_version_nodots}-certifi
+Requires: python%{python3_version_nodots}-PyYAML
+Requires: python%{python3_version_nodots}-websocket-client
+Requires: python%{python3_version_nodots}-execnet
+%description mgr-modules-python3-compat
+ceph-mgr-modules-python3-compat provide python3 packages.
+The packages are imported by mgr python modules.
+Collection of python3 package that is not exists in el7 repository.
+%endif
+%endif
+
 %package mgr-dashboard
 Summary:        Ceph Dashboard
 BuildArch:      noarch
@@ -559,10 +580,14 @@ Group:          System/Filesystems
 Requires:       ceph-mgr = %{_epoch_prefix}%{version}-%{release}
 Requires:       ceph-grafana-dashboards = %{_epoch_prefix}%{version}-%{release}
 %if 0%{?fedora} || 0%{?rhel}
-Requires:       python-cherrypy
-Requires:       python-jwt
-Requires:       python-routes
-Requires:       python-werkzeug
+%if 0%{?_python_buildid} == 3 && 0%{?rhel} == 7
+Requires:       ceph-mgr-modules-python3-compat
+%else
+Requires:       python%{_python_buildid}-cherrypy
+Requires:       python%{_python_buildid}-jwt
+Requires:       python%{_python_buildid}-routes
+Requires:       python%{_python_buildid}-werkzeug
+%endif
 %if 0%{?weak_deps}
 Recommends:     python%{python3_pkgversion}-saml
 %endif
@@ -575,7 +600,11 @@ Requires:       python%{python3_pkgversion}-Werkzeug
 Recommends:     python%{python3_pkgversion}-python3-saml
 %endif
 %if 0%{?rhel} == 7
+%if 0%{?_python_buildid} == 3
+Requires:       python%{python3_version_nodots}-pyOpenSSL
+%else
 Requires:       pyOpenSSL
+%endif
 %else
 Requires:       python%{_python_buildid}-pyOpenSSL
 %endif
@@ -594,6 +623,7 @@ Group:          System/Filesystems
 Requires:       ceph-mgr = %{_epoch_prefix}%{version}-%{release}
 %if 0%{?rhel} == 7
 %if 0%{?_python_buildid} == 3
+Requires:       ceph-mgr-modules-python3-compat
 Requires:	      python%{python3_version_nodots}-numpy
 Requires:	      python%{python3_version_nodots}-scipy
 %else
@@ -619,6 +649,9 @@ Requires:       ceph-mgr = %{_epoch_prefix}%{version}-%{release}
 %if 0%{without python2}
 Requires:       python3-grpcio
 Requires:       python3-protobuf
+%if 0%{?rhel} == 7
+Requires:       ceph-mgr-modules-python3-compat
+%endif
 %else
 Requires:       python2-grpcio
 Requires:       python2-protobuf
@@ -640,6 +673,7 @@ Requires:       python%{python3_version_nodots}-pyOpenSSL
 Requires:       python%{python3_version_nodots}-requests
 Requires:       python%{python3_version_nodots}-PyYAML
 Requires:       python%{python3_version_nodots}-dateutil
+Requires:       ceph-mgr-modules-python3-compat
 %else
 Requires:       python%{_python_buildid}-bcrypt
 Requires:       pyOpenSSL%{_python_buildid}
@@ -681,6 +715,8 @@ Requires:       ceph-mgr = %{_epoch_prefix}%{version}-%{release}
 %if 0%{with python2}
 Requires:       python%{_python_buildid}-kubernetes
 Requires:       python%{_python_buildid}-jsonpatch
+%else if 0%{?rhel} == 7
+Requires:       ceph-mgr-modules-python3-compat
 %else
 Requires:       python%{python3_pkgversion}-kubernetes
 Requires:       python%{python3_pkgversion}-jsonpatch
@@ -698,6 +734,8 @@ Group:          System/Filesystems
 Requires:       ceph-mgr = %{_epoch_prefix}%{version}-%{release}
 %if 0%{with python2}
 Requires:       python%{_python_buildid}-kubernetes
+%else if 0%{?rhel} == 7
+Requires:       ceph-mgr-modules-python3-compat
 %else
 Requires:       python%{python3_pkgversion}-kubernetes
 %endif
@@ -712,19 +750,18 @@ BuildArch:	noarch
 Group:          System/Filesystems
 %endif
 Requires:       ceph-mgr = %{_epoch_prefix}%{version}-%{release}
+Requires:       cephadm = %{_epoch_prefix}%{version}-%{release}
+%if 0%{?rhel} == 7
+Requires:       ceph-mgr-modules-python3-compat
+%else
 Requires:       python%{python3_pkgversion}-kubernetes
 Requires:       python%{python3_pkgversion}-remoto
-Requires:       cephadm = %{_epoch_prefix}%{version}-%{release}
 %if 0%{?suse_version}
 Requires:       openssh
 Requires:       python%{python3_pkgversion}-Jinja2
-%endif
-%if 0%{?rhel} || 0%{?fedora}
+%else if 0%{?rhel} || 0%{?fedora}
 Requires:       openssh-clients
-%if 0%{?_python_buildid} == 3
 Requires:       python%{python3_pkgversion}-jinja2
-%else
-Requires:       python%{_python_buildid}-jinja2
 %endif
 %endif
 %description mgr-cephadm
@@ -1162,8 +1199,20 @@ It also contains utilities used for the cephadm orchestrator.
 %if 0%{with cephfs_shell}
 %package -n cephfs-shell
 Summary:    Interactive shell for Ceph file system
+%if 0%{?fedora} || 0%{?suse_version} >= 1500
 Requires:   python%{python3_pkgversion}-cmd2
 Requires:   python%{python3_pkgversion}-colorama
+%else if 0%{?rhel}
+%if 0%{?rhel} == 7
+Requires:   python%{python3_version_nodots}-zipp
+Requires:   python%{python3_version_nodots}-wcwidth
+Requires:   python%{python3_version_nodots}-attrs
+%else
+Requires:   python%{python3_pkgversion}-zipp
+Requires:   python%{python3_pkgversion}-wcwidth
+Requires:   python%{python3_pkgversion}-attrs
+%endif
+%endif
 Requires:   python%{python3_pkgversion}-cephfs
 %description -n cephfs-shell
 This package contains an interactive tool that allows accessing a Ceph
@@ -1349,6 +1398,9 @@ ${CMAKE} .. \
     -DCMAKE_INSTALL_INCLUDEDIR=%{_includedir} \
     -DWITH_MANPAGE=ON \
     -DWITH_PYTHON3=%{python3_version} \
+%if 0%{?rhel} == 7
+    -DWITH_PYTHON3_COMPAT=ON \
+%endif
     -DWITH_MGR_DASHBOARD_FRONTEND=OFF \
 %if %{with python2}
     -DWITH_PYTHON2=ON \
@@ -1383,6 +1435,9 @@ ${CMAKE} .. \
 %endif
 %if 0%{with cephfs_shell}
     -DWITH_CEPHFS_SHELL=ON \
+%if 0%{?rhel}
+    -DWITH_CEPHFS_SHELL_PYTHON3_COMPAT=ON \
+%endif
 %endif
 %if 0%{with libradosstriper}
     -DWITH_LIBRADOSSTRIPER=ON \
@@ -1797,6 +1852,55 @@ if [ $1 -ge 1 ] ; then
     /usr/bin/systemctl try-restart ceph-mgr@\*.service > /dev/null 2>&1 || :
   fi
 fi
+
+%files mgr-modules-python3-compat
+%{python3_sitelib}/cherrypy
+%{python3_sitelib}/CherryPy-*.egg-info
+%{python3_sitelib}/mako
+%{python3_sitelib}/Mako-*.egg-info
+%{python3_sitelib}/jwt
+%{python3_sitelib}/PyJWT-*.egg-info
+%{python3_sitelib}/routes
+%{python3_sitelib}/Routes-*.egg-info
+%{python3_sitelib}/webob
+%{python3_sitelib}/WebOb-*.egg-info
+%{python3_sitelib}/webtest
+%{python3_sitelib}/WebTest-*.egg-info
+%{python3_sitelib}/werkzeug
+%{python3_sitelib}/Werkzeug-*.egg-info
+%{python3_sitelib}/bs4
+%{python3_sitelib}/beautifulsoup4-*.egg-info
+%{python3_sitelib}/cachetools
+%{python3_sitelib}/cachetools-*.egg-info
+%{python3_sitelib}/google
+%{python3_sitelib}/google-auth-*.egg-info
+%{python3_sitelib}/jsonpatch.py
+%{python3_sitelib}/jsonpatch-*.egg-info
+%{python3_sitelib}/__pycache__/jsonpatch.cpython*.py*
+%{python3_sitelib}/jsonpointer.py
+%{python3_sitelib}/jsonpointer-*.egg-info
+%{python3_sitelib}/__pycache__/jsonpointer.cpython*.py*
+%{python3_sitelib}/kubernetes
+%{python3_sitelib}/kubernetes-*.egg-info
+%{python3_sitelib}/logutils
+%{python3_sitelib}/logutils-*.egg-info
+%{python3_sitelib}/oauthlib
+%{python3_sitelib}/oauthlib-*.egg-info
+%{python3_sitelib}/pecan
+%{python3_sitelib}/pecan-*.egg-info
+%{python3_sitelib}/remoto
+%{python3_sitelib}/remoto-*.egg-info
+%{python3_sitelib}/repoze
+%{python3_sitelib}/repoze.lru-*.egg-info
+%{python3_sitelib}/requests_oauthlib
+%{python3_sitelib}/requests_oauthlib-*.egg-info
+%{python3_sitelib}/soupsieve
+%{python3_sitelib}/soupsieve-*.egg-info
+%{python3_sitelib}/waitress
+%{python3_sitelib}/waitress-*.egg-info
+%{python3_sitelib}/xmltodict.py
+%{python3_sitelib}/xmltodict-*.egg-info
+%{python3_sitelib}/__pycache__/xmltodict.cpython*.py*
 
 %files mgr-dashboard
 %{_datadir}/ceph/mgr/dashboard
@@ -2350,6 +2454,19 @@ source %{_sysconfdir}/profile.d/librados.sh
 %files -n cephfs-shell
 %{python3_sitelib}/cephfs_shell-*.egg-info
 %{_bindir}/cephfs-shell
+%if 0%{?rhel}
+%{python3_sitelib}/cmd2
+%{python3_sitelib}/cmd2-*.egg-info
+%{python3_sitelib}/colorama
+%{python3_sitelib}/colorama-*.egg-info
+%{python3_sitelib}/importlib_metadata
+%{python3_sitelib}/importlib_metadata-*.egg-info
+%{python3_sitelib}/pyperclip
+%{python3_sitelib}/pyperclip-*.egg-info
+%{python3_sitelib}/typing_extensions.py
+%{python3_sitelib}/typing_extensions-*.egg-info
+%{python3_sitelib}/__pycache__/typing_extensions.cpython*.py*
+%endif
 %endif
 
 %if 0%{with ceph_test_package}

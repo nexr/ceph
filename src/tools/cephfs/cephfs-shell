@@ -342,7 +342,11 @@ def dirwalk(path):
 class CephFSShell(Cmd):
 
     def __init__(self):
-        super().__init__(use_ipython=False)
+        if LooseVersion(cmd2_version) >= LooseVersion("2.0.0"):
+            super().__init__(include_ipy=False)
+        else:
+            super().__init__(use_ipython=False)
+
         self.working_dir = cephfs.getcwd().decode('utf-8')
         self.set_prompt()
         self.interactive = False
