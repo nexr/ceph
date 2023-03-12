@@ -715,12 +715,11 @@ Requires:       ceph-mgr = %{_epoch_prefix}%{version}-%{release}
 %if 0%{with python2}
 Requires:       python%{_python_buildid}-kubernetes
 Requires:       python%{_python_buildid}-jsonpatch
+%else if 0%{?rhel} == 7
+Requires:       ceph-mgr-modules-python3-compat
 %else
 Requires:       python%{python3_pkgversion}-kubernetes
 Requires:       python%{python3_pkgversion}-jsonpatch
-%if 0%{?rhel} == 7
-Requires:       ceph-mgr-modules-python3-compat
-%endif
 %endif
 %description mgr-rook
 ceph-mgr-rook is a ceph-mgr module for orchestration functions using
@@ -735,11 +734,10 @@ Group:          System/Filesystems
 Requires:       ceph-mgr = %{_epoch_prefix}%{version}-%{release}
 %if 0%{with python2}
 Requires:       python%{_python_buildid}-kubernetes
+%else if 0%{?rhel} == 7
+Requires:       ceph-mgr-modules-python3-compat
 %else
 Requires:       python%{python3_pkgversion}-kubernetes
-%if 0%{?rhel} == 7
-Requires:       ceph-mgr-modules-python3-compat
-%endif
 %endif
 %description mgr-k8sevents
 ceph-mgr-k8sevents is a ceph-mgr module that sends every ceph-events
@@ -753,6 +751,9 @@ Group:          System/Filesystems
 %endif
 Requires:       ceph-mgr = %{_epoch_prefix}%{version}-%{release}
 Requires:       cephadm = %{_epoch_prefix}%{version}-%{release}
+%if 0%{?rhel} == 7
+Requires:       ceph-mgr-modules-python3-compat
+%else
 Requires:       python%{python3_pkgversion}-kubernetes
 Requires:       python%{python3_pkgversion}-remoto
 %if 0%{?suse_version}
@@ -761,8 +762,6 @@ Requires:       python%{python3_pkgversion}-Jinja2
 %else if 0%{?rhel} || 0%{?fedora}
 Requires:       openssh-clients
 Requires:       python%{python3_pkgversion}-jinja2
-%if 0%{?rhel} == 7
-Requires:       ceph-mgr-modules-python3-compat
 %endif
 %endif
 %description mgr-cephadm
@@ -1875,6 +1874,12 @@ fi
 %{python3_sitelib}/cachetools-*.egg-info
 %{python3_sitelib}/google
 %{python3_sitelib}/google-auth-*.egg-info
+%{python3_sitelib}/jsonpatch.py
+%{python3_sitelib}/jsonpatch-*.egg-info
+%{python3_sitelib}/__pycache__/jsonpatch.cpython*.py*
+%{python3_sitelib}/jsonpointer.py
+%{python3_sitelib}/jsonpointer-*.egg-info
+%{python3_sitelib}/__pycache__/jsonpointer.cpython*.py*
 %{python3_sitelib}/kubernetes
 %{python3_sitelib}/kubernetes-*.egg-info
 %{python3_sitelib}/logutils
