@@ -1,6 +1,5 @@
 tasks:
 - cbt:
-    branch: 'nautilus'
     benchmarks:
       radosbench:
         concurrent_ops: 4

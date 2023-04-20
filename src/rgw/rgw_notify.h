@@ -5,9 +5,13 @@
 
 #include <string>
 #include "common/ceph_time.h"
+#include "include/common_fwd.h"
 #include "rgw_notify_event_type.h"
 
 // forward declarations
+namespace rgw::sal {
+    class RGWRadosStore;
+}
 class RGWRados;
 class req_state;
 struct rgw_obj_key;
@@ -21,7 +25,7 @@ int publish(const req_state* s,
         const ceph::real_time& mtime, 
         const std::string& etag, 
         EventType event_type,
-        RGWRados* store);
+        rgw::sal::RGWRadosStore* store);
 
 }
 

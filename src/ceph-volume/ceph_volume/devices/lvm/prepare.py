@@ -135,22 +135,7 @@ class Prepare(object):
             raise RuntimeError('unable to use device')
         return uuid
 
-    def get_lv(self, argument):
-        """
-        Perform some parsing of the command-line value so that the process
-        can determine correctly if it got a device path or an lv.
-
-        :param argument: The command-line value that will need to be split to
-                         retrieve the actual lv
-        """
-        #TODO is this efficient?
-        try:
-            vg_name, lv_name = argument.split('/')
-        except (ValueError, AttributeError):
-            return None
-        return api.get_lv(lv_name=lv_name, vg_name=vg_name)
-
-    def setup_device(self, device_type, device_name, tags, size):
+    def setup_device(self, device_type, device_name, tags, size, slots):
         """
         Check if ``device`` is an lv, if so, set the tags, making sure to
         update the tags with the lv_uuid and lv_path which the incoming tags
@@ -163,41 +148,50 @@ class Prepare(object):
             return '', '', tags
         tags['ceph.type'] = device_type
         tags['ceph.vdo'] = api.is_vdo(device_name)
-        lv = self.get_lv(device_name)
+
+        try:
+            vg_name, lv_name = device_name.split('/')
+            lv = api.get_single_lv(filters={'lv_name': lv_name,
+                                            'vg_name': vg_name})
+        except ValueError:
+            lv = None
+
         if lv:
-            uuid = lv.lv_uuid
+            lv_uuid = lv.lv_uuid
             path = lv.lv_path
-            tags['ceph.%s_uuid' % device_type] = uuid
+            tags['ceph.%s_uuid' % device_type] = lv_uuid
             tags['ceph.%s_device' % device_type] = path
             lv.set_tags(tags)
         elif disk.is_device(device_name):
             # We got a disk, create an lv
             lv_type = "osd-{}".format(device_type)
-            uuid = system.generate_uuid()
-            tags['ceph.{}_uuid'.format(device_type)] = uuid
+            name_uuid = system.generate_uuid()
             kwargs = {
                 'device': device_name,
                 'tags': tags,
-                'slots': getattr(self.args,
-                                 'block_{}_slots'.format(device_type),
-                                 1),
+                'slots': slots
             }
+            #TODO use get_block_db_size and co here to get configured size in
+            #conf file
             if size != 0:
-                kwargs['size'] = disk.Size.parse(size)
+                kwargs['size'] = size
             lv = api.create_lv(
                 lv_type,
-                uuid,
+                name_uuid,
                 **kwargs)
             path = lv.lv_path
             tags['ceph.{}_device'.format(device_type)] = path
+            tags['ceph.{}_uuid'.format(device_type)] = lv.lv_uuid
+            lv_uuid = lv.lv_uuid
             lv.set_tags(tags)
         else:
             # otherwise assume this is a regular disk partition
-            uuid = self.get_ptuuid(device_name)
+            name_uuid = self.get_ptuuid(device_name)
             path = device_name
-            tags['ceph.%s_uuid' % device_type] = uuid
+            tags['ceph.%s_uuid' % device_type] = name_uuid
             tags['ceph.%s_device' % device_type] = path
-        return path, uuid, tags
+            lv_uuid = name_uuid
+        return path, lv_uuid, tags
 
     def prepare_data_device(self, device_type, osd_uuid):
         """
@@ -220,7 +214,7 @@ class Prepare(object):
                      }
             logger.debug('data device size: {}'.format(self.args.data_size))
             if self.args.data_size != 0:
-                kwargs['size'] = disk.Size.parse(self.args.data_size)
+                kwargs['size'] = self.args.data_size
             return api.create_lv(
                 lv_name_prefix,
                 osd_uuid,
@@ -243,7 +237,15 @@ class Prepare(object):
         """
         if args is not None:
             self.args = args
-        if api.is_ceph_device(self.get_lv(self.args.data)):
+
+        try:
+            vgname, lvname = self.args.data.split('/')
+            lv = api.get_single_lv(filters={'lv_name': lvname,
+                                            'vg_name': vgname})
+        except ValueError:
+            lv = None
+
+        if api.is_ceph_device(lv):
             logger.info("device {} is already used".format(self.args.data))
             raise RuntimeError("skipping {}, it is already prepared".format(self.args.data))
         try:
@@ -297,26 +299,49 @@ class Prepare(object):
             'ceph.osdspec_affinity': prepare_utils.get_osdspec_affinity()
         }
         if self.args.filestore:
-            #TODO: allow auto creation of journal on passed device, only works
-            # when physical device is passed, not LV
             if not self.args.journal:
-                raise RuntimeError('--journal is required when using --filestore')
+                logger.info(('no journal was specifed, creating journal lv '
+                             'on {}').format(self.args.data))
+                self.args.journal = self.args.data
+                self.args.journal_size = disk.Size(g=5)
+                # need to adjust data size/slots for colocated journal
+                if self.args.data_size:
+                    self.args.data_size -= self.args.journal_size
+                if self.args.data_slots == 1:
+                    self.args.data_slots = 0
+                else:
+                    raise RuntimeError('Can\'t handle multiple filestore OSDs '
+                                       'with colocated journals yet. Please '
+                                       'create journal LVs manually')
+            tags['ceph.cephx_lockbox_secret'] = cephx_lockbox_secret
+            tags['ceph.encrypted'] = encrypted
 
-            data_lv = self.get_lv(self.args.data)
+            journal_device, journal_uuid, tags = self.setup_device(
+                'journal',
+                self.args.journal,
+                tags,
+                self.args.journal_size,
+                self.args.journal_slots)
+
+            try:
+                vg_name, lv_name = self.args.data.split('/')
+                data_lv = api.get_single_lv(filters={'lv_name': lv_name,
+                                                    'vg_name': vg_name})
+            except ValueError:
+                data_lv = None
+
             if not data_lv:
                 data_lv = self.prepare_data_device('data', osd_fsid)
 
             tags['ceph.data_device'] = data_lv.lv_path
             tags['ceph.data_uuid'] = data_lv.lv_uuid
-            tags['ceph.cephx_lockbox_secret'] = cephx_lockbox_secret
-            tags['ceph.encrypted'] = encrypted
             tags['ceph.vdo'] = api.is_vdo(data_lv.lv_path)
-
-            journal_device, journal_uuid, tags = self.setup_device(
-                'journal', self.args.journal, tags, self.args.journal_size)
-
             tags['ceph.type'] = 'data'
             data_lv.set_tags(tags)
+            if not journal_device.startswith('/'):
+                # we got a journal lv, set rest of the tags
+                api.get_single_lv(filters={'lv_name': lv_name,
+                                           'vg_name': vg_name}).set_tags(tags)
 
             prepare_filestore(
                 data_lv.lv_path,
@@ -327,7 +352,13 @@ class Prepare(object):
                 osd_fsid,
             )
         elif self.args.bluestore:
-            block_lv = self.get_lv(self.args.data)
+            try:
+                vg_name, lv_name = self.args.data.split('/')
+                block_lv = api.get_single_lv(filters={'lv_name': lv_name,
+                                                      'vg_name': vg_name})
+            except ValueError:
+                block_lv = None
+
             if not block_lv:
                 block_lv = self.prepare_data_device('block', osd_fsid)
 
@@ -338,9 +369,17 @@ class Prepare(object):
             tags['ceph.vdo'] = api.is_vdo(block_lv.lv_path)
 
             wal_device, wal_uuid, tags = self.setup_device(
-                'wal', self.args.block_wal, tags, self.args.block_wal_size)
+                'wal',
+                self.args.block_wal,
+                tags,
+                self.args.block_wal_size,
+                self.args.block_wal_slots)
             db_device, db_uuid, tags = self.setup_device(
-                'db', self.args.block_db, tags, self.args.block_db_size)
+                'db',
+                self.args.block_db,
+                tags,
+                self.args.block_db_size,
+                self.args.block_db_slots)
 
             tags['ceph.type'] = 'block'
             block_lv.set_tags(tags)

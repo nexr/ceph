@@ -7,6 +7,7 @@
 #include "cls/rbd/cls_rbd_types.h"
 #include "librbd/ExclusiveLock.h"
 #include "librbd/Utils.h"
+#include "librbd/exclusive_lock/StandardPolicy.h"
 #include "librbd/image/ListWatchersRequest.h"
 #include "librbd/journal/DisabledPolicy.h"
 #include "librbd/operation/SnapshotRemoveRequest.h"
@@ -26,6 +27,17 @@ bool auto_delete_snapshot(const SnapInfo& snap_info) {
     snap_info.snap_namespace);
   switch (snap_namespace_type) {
   case cls::rbd::SNAPSHOT_NAMESPACE_TYPE_TRASH:
+    return true;
+  default:
+    return false;
+  }
+}
+
+bool ignore_snapshot(const SnapInfo& snap_info) {
+  auto snap_namespace_type = cls::rbd::get_snap_namespace_type(
+    snap_info.snap_namespace);
+  switch (snap_namespace_type) {
+  case cls::rbd::SNAPSHOT_NAMESPACE_TYPE_MIRROR:
     return true;
   default:
     return false;
@@ -52,8 +64,10 @@ void PreRemoveRequest<I>::send() {
 
 template <typename I>
 void PreRemoveRequest<I>::acquire_exclusive_lock() {
-  RWLock::RLocker owner_lock(m_image_ctx->owner_lock);
+  // lock for write for set_exclusive_lock_policy()
+  std::unique_lock owner_locker{m_image_ctx->owner_lock};
   if (m_image_ctx->exclusive_lock == nullptr) {
+    owner_locker.unlock();
     validate_image_removal();
     return;
   }
@@ -61,17 +75,24 @@ void PreRemoveRequest<I>::acquire_exclusive_lock() {
   auto cct = m_image_ctx->cct;
   ldout(cct, 5) << dendl;
 
+  // refuse to release exclusive lock when (in the midst of) removing
+  // the image
+  m_image_ctx->set_exclusive_lock_policy(
+    new exclusive_lock::StandardPolicy<I>(m_image_ctx));
+
   // do not attempt to open the journal when removing the image in case
   // it's corrupt
   if (m_image_ctx->test_features(RBD_FEATURE_JOURNALING)) {
-    RWLock::WLocker snap_locker(m_image_ctx->snap_lock);
+    std::unique_lock image_locker{m_image_ctx->image_lock};
     m_image_ctx->set_journal_policy(new journal::DisabledPolicy());
   }
 
-  auto ctx = create_context_callback<
-    PreRemoveRequest<I>, &PreRemoveRequest<I>::handle_exclusive_lock>(this);
+  m_exclusive_lock = m_image_ctx->exclusive_lock;
 
-  m_image_ctx->exclusive_lock->try_acquire_lock(ctx);
+  auto ctx = create_context_callback<
+    PreRemoveRequest<I>,
+    &PreRemoveRequest<I>::handle_exclusive_lock>(this, m_exclusive_lock);
+  m_exclusive_lock->acquire_lock(ctx);
 }
 
 template <typename I>
@@ -96,8 +117,9 @@ void PreRemoveRequest<I>::handle_exclusive_lock(int r) {
 
 template <typename I>
 void PreRemoveRequest<I>::shut_down_exclusive_lock() {
-  RWLock::RLocker owner_lock(m_image_ctx->owner_lock);
+  std::shared_lock owner_locker{m_image_ctx->owner_lock};
   if (m_image_ctx->exclusive_lock == nullptr) {
+    owner_locker.unlock();
     validate_image_removal();
     return;
   }
@@ -118,7 +140,7 @@ void PreRemoveRequest<I>::handle_shut_down_exclusive_lock(int r) {
   auto cct = m_image_ctx->cct;
   ldout(cct, 5) << "r=" << r << dendl;
 
-  delete m_exclusive_lock;
+  m_exclusive_lock->put();
   m_exclusive_lock = nullptr;
 
   if (r < 0) {
@@ -152,19 +174,19 @@ void PreRemoveRequest<I>::check_image_snaps() {
   auto cct = m_image_ctx->cct;
   ldout(cct, 5) << dendl;
 
-  m_image_ctx->snap_lock.get_read();
+  m_image_ctx->image_lock.lock_shared();
   for (auto& snap_info : m_image_ctx->snap_info) {
     if (auto_delete_snapshot(snap_info.second)) {
       m_snap_infos.insert(snap_info);
-    } else {
-      m_image_ctx->snap_lock.put_read();
+    } else if (!ignore_snapshot(snap_info.second)) {
+      m_image_ctx->image_lock.unlock_shared();
 
-      lderr(cct) << "image has snapshots - not removing" << dendl;
+      ldout(cct, 5) << "image has snapshots - not removing" << dendl;
       finish(-ENOTEMPTY);
       return;
     }
   }
-  m_image_ctx->snap_lock.put_read();
+  m_image_ctx->image_lock.unlock_shared();
 
   list_image_watchers();
 }
@@ -273,7 +295,7 @@ void PreRemoveRequest<I>::remove_snapshot() {
   ldout(cct, 20) << "snap_id=" << snap_id << ", "
                  << "snap_name=" << snap_info.name << dendl;
 
-  RWLock::RLocker owner_lock(m_image_ctx->owner_lock);
+  std::shared_lock owner_lock{m_image_ctx->owner_lock};
   auto ctx = create_context_callback<
     PreRemoveRequest<I>, &PreRemoveRequest<I>::handle_remove_snapshot>(this);
   auto req = librbd::operation::SnapshotRemoveRequest<I>::create(
@@ -288,14 +310,15 @@ void PreRemoveRequest<I>::handle_remove_snapshot(int r) {
   auto cct = m_image_ctx->cct;
   ldout(cct, 5) << "r=" << r << dendl;
 
-  if (r < 0 && r != -ENOENT) {
+  if (r == -EBUSY) {
+    ldout(cct, 5) << "skipping attached child" << dendl;
+    if (m_ret_val == 0) {
+      m_ret_val = -ECHILD;
+    }
+  } else if (r < 0 && r != -ENOENT) {
     auto snap_id = m_snap_infos.begin()->first;
     lderr(cct) << "failed to auto-prune snapshot " << snap_id << ": "
                << cpp_strerror(r) << dendl;
-
-    if (r == -EBUSY) {
-      r = -ENOTEMPTY;
-    }
     finish(r);
     return;
   }
@@ -311,7 +334,11 @@ void PreRemoveRequest<I>::finish(int r) {
   auto cct = m_image_ctx->cct;
   ldout(cct, 5) << "r=" << r << dendl;
 
-  m_on_finish->complete(r);
+  if (m_ret_val == 0) {
+    m_ret_val = r;
+  }
+
+  m_on_finish->complete(m_ret_val);
   delete this;
 }
 

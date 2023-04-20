@@ -1,5 +1,4 @@
 #include "rgw_ranger.h"
-#include "rgw_user.h"
 
 #include <dirent.h>
 
@@ -8,7 +7,7 @@
 
 RGWRangerManager* rgw_rm = nullptr;
 
-void init_global_ranger_manager(CephContext* const cct, RGWRados* store) {
+void init_global_ranger_manager(CephContext* const cct, rgw::sal::RGWRadosStore* store) {
   if (rgw_rm != nullptr) { return; }
 
   string ranger_engine = cct->_conf->rgw_ranger_engine;
@@ -29,13 +28,14 @@ void destroy_global_ranger_manager() {
   if (rgw_rm == nullptr) { return; }
 
   delete rgw_rm;
+  rgw_rm = nullptr;
 };
 
-bool get_ranger_endpoint(RGWUserEndpoint& out, RGWRados* store, req_state * const s) {
+bool get_ranger_endpoint(RGWUserEndpoint& out, rgw::sal::RGWRadosStore *store, req_state * const s) {
   RGWUserInfo owner_info;
   rgw_user bucket_owner = s->bucket_owner.get_id();
 
-  int ret = rgw_get_user_info_by_uid(store, bucket_owner, owner_info, NULL, NULL, NULL);
+  int ret = rgw_get_user_info_by_uid(store->ctl()->user, bucket_owner, owner_info);
   if (ret < 0) { return ret; }
 
   RGWUserEndpoints* user_endps = &(owner_info.endpoints);
@@ -66,7 +66,7 @@ bool get_ranger_endpoint(RGWUserEndpoint& out, RGWRados* store, req_state * cons
   return true;
 }
 
-int rgw_ranger_authorize(RGWRados* store, RGWOp *& op, req_state * const s)
+int rgw_ranger_authorize(rgw::sal::RGWRadosStore* store, RGWOp *& op, req_state * const s)
 {
   // check wheter ranger authorize is needed or not
   const string bucket_owner = s->bucket_owner.get_id().to_str();
@@ -83,7 +83,7 @@ int rgw_ranger_authorize(RGWRados* store, RGWOp *& op, req_state * const s)
     return -ERR_INVALID_REQUEST;
   }
 
-  if (rgw_rm == NULL) {
+  if (rgw_rm == nullptr) {
     return -ERR_INTERNAL_ERROR;
   }
 

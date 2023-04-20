@@ -1,10 +1,13 @@
+#! /usr/bin/dh-exec
+
 lib/systemd/system/ceph-osd*
 lib/systemd/system/ceph-volume@.service
 usr/bin/ceph-bluestore-tool
 usr/bin/ceph-clsinfo
+usr/bin/ceph-erasure-code-tool
 usr/bin/ceph-objectstore-tool
 usr/bin/ceph-osdomap-tool
-usr/bin/ceph-osd
+usr/bin/${CEPH_OSD_BASENAME} => /usr/bin/ceph-osd
 usr/bin/ceph_objectstore_bench
 usr/lib/ceph/ceph-osd-prestart.sh
 usr/lib/libos_tp.so*
@@ -19,4 +22,3 @@ usr/share/man/man8/ceph-volume-systemd.8
 usr/share/man/man8/ceph-osd.8
 usr/share/man/man8/ceph-bluestore-tool.8
 etc/sysctl.d/30-ceph-osd.conf
-etc/sudoers.d/ceph-osd-smartctl

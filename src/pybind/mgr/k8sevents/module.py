@@ -1,9 +1,9 @@
-# Integrate with the kubernetes events API. 
+# Integrate with the kubernetes events API.
 # This module sends events to Kubernetes, and also captures/tracks all events
 # in the rook-ceph namespace so kubernetes activity like pod restarts,
 # imagepulls etc can be seen from within the ceph cluster itself.
 #
-# To interact with the events API, the mgr service to access needs to be 
+# To interact with the events API, the mgr service to access needs to be
 # granted additional permissions
 # e.g. kubectl -n rook-ceph edit clusterrole rook-ceph-mgr-cluster-rules
 #
@@ -34,14 +34,14 @@ import tempfile
 import threading
 
 try:
-    # python 3 
+    # python 3
     from urllib.parse import urlparse
 except ImportError:
     # python 2 fallback
     from urlparse import urlparse
 
 from datetime import tzinfo, datetime, timedelta
-   
+
 from urllib3.exceptions import MaxRetryError,ProtocolError
 from collections import OrderedDict
 
@@ -102,7 +102,7 @@ def text_suffix(num):
 
 
 def create_temp_file(fname, content, suffix=".tmp"):
-    """Create a temp file 
+    """Create a temp file
 
     Attempt to create an temporary file containing the given content
 
@@ -141,13 +141,13 @@ class HealthCheck(object):
         self.name = None
         self.text = None
         self.valid = False
-        
+
         if msg.lower().startswith('health check'):
 
             self.valid = True
             self.msg = msg
             msg_tokens = self.msg.split()
-            
+
             if msg_level == 'INF':
                 self.text = ' '.join(msg_tokens[3:])
                 self.name = msg_tokens[3]   # health check name e.g. OSDMAP_FLAGS
@@ -175,11 +175,11 @@ class LogEntry(object):
         self.level = level
         self.tstamp = tstamp
         self.healthcheck = None
-        
+
         if 'health check ' in self.msg.lower():
             self.healthcheck = HealthCheck(self.msg, self.level)
 
-    
+
     def __str__(self):
         return "source={}, msg_type={}, msg={}, level={}, tstamp={}".format(self.source,
                                                                             self.msg_type,
@@ -197,16 +197,16 @@ class LogEntry(object):
         else:
             _m=self.msg[:-10].replace("\'","").split("cmd=")
             _s='"cmd":{}'.format(_m[1])
-            cmds_list = json.loads('{' + _s + '}')['cmd']
+            cmds_list = json.loads('{' + str(_s) + '}')['cmd']
 
             # TODO. Assuming only one command was issued for now
             _c = cmds_list[0]
             return "{} {}".format(_c['prefix'], _c.get('key', ''))
-    
+
     @property
     def event_type(self):
         return 'Normal' if self.level == 'INF' else 'Warning'
-    
+
     @property
     def event_reason(self):
         return self.reason_map[self.msg_type]
@@ -225,14 +225,14 @@ class LogEntry(object):
             return "mgr.k8sevents-module"
         else:
             return None
-   
+
     @property
     def event_entity(self):
         if self.msg_type == 'audit':
             return self.msg.replace("\'","").split('entity=')[1].split(' ')[0]
         else:
             return None
-    
+
     @property
     def event_msg(self):
         if self.msg_type == 'audit':
@@ -250,10 +250,31 @@ class BaseThread(threading.Thread):
     daemon = True
 
 
+def clean_event(event):
+    """ clean an event record """
+    if not event.first_timestamp:
+        log.error("first_timestamp is empty")
+        if event.metadata.creation_timestamp:
+            log.error("setting first_timestamp to the creation timestamp")
+            event.first_timestamp = event.metadata.creation_timestamp
+        else:
+            log.error("defaulting event first timestamp to current datetime")
+            event.first_timestamp = datetime.datetime.now()
+
+    if not event.last_timestamp:
+        log.error("setting event last timestamp to {}".format(event.first_timestamp))
+        event.last_timestamp = event.first_timestamp
+
+    if not event.count:
+        event.count = 1
+
+    return event
+
+
 class NamespaceWatcher(BaseThread):
-    """Watch events in a given namespace 
-    
-    Using the watch package we can listen to event traffic in the namespace to 
+    """Watch events in a given namespace
+
+    Using the watch package we can listen to event traffic in the namespace to
     get an idea of what kubernetes related events surround the ceph cluster. The
     thing to bear in mind is that events have a TTL enforced by the kube-apiserver
     so this stream will only really show activity inside this retention window.
@@ -287,9 +308,9 @@ class NamespaceWatcher(BaseThread):
         else:
             self.active = True
             self.resource_version = resp.metadata.resource_version
-            
+
             for item in resp.items:
-                self.events[item.metadata.name] = item
+                self.events[item.metadata.name] = clean_event(item)
             log.info('Added {} events'.format(len(resp.items)))
 
     def run(self):
@@ -299,7 +320,7 @@ class NamespaceWatcher(BaseThread):
         if self.active:
             log.info("Namespace event watcher started")
 
-            
+
             while True:
 
                 try:
@@ -311,13 +332,13 @@ class NamespaceWatcher(BaseThread):
                         with self.lock:
 
                             if item['type'] in ['ADDED', 'MODIFIED']:
-                                self.events[obj.metadata.name] = obj
+                                self.events[obj.metadata.name] = clean_event(obj)
 
                             elif item['type'] == 'DELETED':
                                 del self.events[obj.metadata.name]
-                            
+
                 # TODO test the exception for auth problem (403?)
-    
+
                 # Attribute error is generated when urllib3 on the system is old and doesn't have a
                 # read_chunked method
                 except AttributeError as e:
@@ -331,6 +352,10 @@ class NamespaceWatcher(BaseThread):
                     # refresh the resource_version & watcher
                     log.warning("API exception caught in watcher ({})".format(e))
                     log.warning("Restarting namespace watcher")
+                    self.fetch()
+
+                except ProtocolError as e:
+                    log.warning("Namespace watcher hit protocolerror ({}) - restarting".format(e))
                     self.fetch()
 
                 except Exception:
@@ -377,27 +402,27 @@ class KubernetesEvent(object):
     @property
     def event_body(self):
         if self.unique_name:
-            obj_meta = client.V1ObjectMeta(name="{}".format(self.event_name)) 
+            obj_meta = client.V1ObjectMeta(name="{}".format(self.event_name))
         else:
             obj_meta = client.V1ObjectMeta(generate_name="{}".format(self.event_name))
 
         # field_path is needed to prevent problems in the namespacewatcher when
         # deleted event are received
         obj_ref = client.V1ObjectReference(kind="CephCluster",
-                                           field_path='spec.containers{mgr}', 
-                                           name=self.event_name, 
+                                           field_path='spec.containers{mgr}',
+                                           name=self.event_name,
                                            namespace=self.namespace)
 
-        event_source = client.V1EventSource(component="ceph-mgr", 
+        event_source = client.V1EventSource(component="ceph-mgr",
                                             host=self.host)
         return  client.V1Event(
-                    involved_object=obj_ref, 
-                    metadata=obj_meta, 
-                    message=self.message, 
-                    count=self.count, 
+                    involved_object=obj_ref,
+                    metadata=obj_meta,
+                    message=self.message,
+                    count=self.count,
                     type=self.event_type,
                     reason=self.event_reason,
-                    source=event_source, 
+                    source=event_source,
                     first_timestamp=self.first_timestamp,
                     last_timestamp=self.last_timestamp
                 )
@@ -417,7 +442,7 @@ class KubernetesEvent(object):
             self.api_status = 400
         except MaxRetryError:
             # k8s config has not be defined properly
-            log.error("multiple attempts to connect to the API have failed") 
+            log.error("multiple attempts to connect to the API have failed")
             self.api_status = 403       # Forbidden
         except ApiException as e:
             log.debug("event.write status:{}".format(e.status))
@@ -505,7 +530,7 @@ class KubernetesEvent(object):
         except ApiException as e:
             log.error("event patch call failed: {}".format(e.status))
             if e.status == 404:
-                # tried to patch, but hit a 404. The event's TTL must have been reached, and 
+                # tried to patch, but hit a 404. The event's TTL must have been reached, and
                 # pruned by the kube-apiserver
                 log.debug("event not found, so attempting to create it")
                 try:
@@ -518,7 +543,7 @@ class KubernetesEvent(object):
                     self.api_status = 200
         else:
             log.debug("event {} updated".format(self.event_name))
-            self.api_status = 200 
+            self.api_status = 200
 
 
 class EventProcessor(BaseThread):
@@ -537,7 +562,7 @@ class EventProcessor(BaseThread):
 
     def startup(self):
         """Log an event to show we're active"""
-        
+
         event = KubernetesEvent(
             LogEntry(
                 source='self',
@@ -550,10 +575,10 @@ class EventProcessor(BaseThread):
             api_client_config=self.api_client_config,
             namespace=self.namespace
         )
-        
+
         event.write()
         return event.api_success
-    
+
     @property
     def ok(self):
         return self.startup()
@@ -574,7 +599,7 @@ class EventProcessor(BaseThread):
                 del self.events[event_name]
 
     def process(self, log_object):
-        
+
         log.debug("log entry being processed : {}".format(str(log_object)))
 
         event_out = False
@@ -588,17 +613,17 @@ class EventProcessor(BaseThread):
             else:
                 # NO OP - ignoring 'dispatch' log records
                 return
-        
+
         elif log_object.msg_type == 'cluster':
             # cluster messages : health checks
             if log_object.event_name:
                 event_out = True
 
         elif log_object.msg_type == 'config':
-            # configuration checker messages 
+            # configuration checker messages
             event_out = True
             unique_name = False
-            
+
         elif log_object.msg_type == 'heartbeat':
             # hourly health message summary from Ceph
             event_out = True
@@ -650,7 +675,7 @@ class EventProcessor(BaseThread):
                     )
                     log.exception(self.health)
                     break
-            
+
             if not self.can_run:
                 break
 
@@ -687,14 +712,14 @@ class CephConfigWatcher(BaseThread):
         self.osd_map = dict()
         self.pool_map = dict()
         self.service_map = dict()
-        
+
         self.config_check_secs = mgr.config_check_secs
-    
+
     @property
     def raw_capacity(self):
         # Note. if the osd's are not online the capacity field will be 0
         return sum([self.osd_map[osd]['capacity'] for osd in self.osd_map])
-    
+
     @property
     def num_servers(self):
         return len(self.server_map.keys())
@@ -702,7 +727,7 @@ class CephConfigWatcher(BaseThread):
     @property
     def num_osds(self):
         return len(self.osd_map.keys())
-    
+
     @property
     def num_pools(self):
         return len(self.pool_map.keys())
@@ -712,11 +737,11 @@ class CephConfigWatcher(BaseThread):
 
         s += "{} : {:>3} host{}, {} pool{}, {} OSDs. Raw Capacity {}B".format(
             json.loads(self.mgr.get('health')['json'])['status'],
-            self.num_servers, 
+            self.num_servers,
             text_suffix(self.num_servers),
-            self.num_pools, 
+            self.num_pools,
             text_suffix(self.num_pools),
-            self.num_osds, 
+            self.num_osds,
             MgrModule.to_pretty_iec(self.raw_capacity))
         return s
 
@@ -737,23 +762,23 @@ class CephConfigWatcher(BaseThread):
             server_map[server_info.get('hostname')] = services
 
         return server_map, service_map
-    
+
     def fetch_pools(self):
         interesting = ["type", "size", "min_size"]
-        # pools = [{'pool': 1, 'pool_name': 'replicapool', 'flags': 1, 'flags_names': 'hashpspool', 
-        #           'type': 1, 'size': 3, 'min_size': 1, 'crush_rule': 1, 'object_hash': 2, 'pg_autoscale_mode': 'warn', 
-        #           'pg_num': 100, 'pg_placement_num': 100, 'pg_placement_num_target': 100, 'pg_num_target': 100, 'pg_num_pending': 100, 
-        #           'last_pg_merge_meta': {'ready_epoch': 0, 'last_epoch_started': 0, 'last_epoch_clean': 0, 'source_pgid': '0.0', 
+        # pools = [{'pool': 1, 'pool_name': 'replicapool', 'flags': 1, 'flags_names': 'hashpspool',
+        #           'type': 1, 'size': 3, 'min_size': 1, 'crush_rule': 1, 'object_hash': 2, 'pg_autoscale_mode': 'warn',
+        #           'pg_num': 100, 'pg_placement_num': 100, 'pg_placement_num_target': 100, 'pg_num_target': 100, 'pg_num_pending': 100,
+        #           'last_pg_merge_meta': {'ready_epoch': 0, 'last_epoch_started': 0, 'last_epoch_clean': 0, 'source_pgid': '0.0',
         #           'source_version': "0'0", 'target_version': "0'0"}, 'auid': 0, 'snap_mode': 'selfmanaged', 'snap_seq': 0, 'snap_epoch': 0,
-        #           'pool_snaps': [], 'quota_max_bytes': 0, 'quota_max_objects': 0, 'tiers': [], 'tier_of': -1, 'read_tier': -1, 
-        #           'write_tier': -1, 'cache_mode': 'none', 'target_max_bytes': 0, 'target_max_objects': 0, 
-        #           'cache_target_dirty_ratio_micro': 400000, 'cache_target_dirty_high_ratio_micro': 600000, 
-        #           'cache_target_full_ratio_micro': 800000, 'cache_min_flush_age': 0, 'cache_min_evict_age': 0, 
-        #           'erasure_code_profile': '', 'hit_set_params': {'type': 'none'}, 'hit_set_period': 0, 'hit_set_count': 0, 
-        #           'use_gmt_hitset': True, 'min_read_recency_for_promote': 0, 'min_write_recency_for_promote': 0, 
-        #           'hit_set_grade_decay_rate': 0, 'hit_set_search_last_n': 0, 'grade_table': [], 'stripe_width': 0, 
-        #           'expected_num_objects': 0, 'fast_read': False, 'options': {}, 'application_metadata': {'rbd': {}}, 
-        #           'create_time': '2019-08-02 02:23:01.618519', 'last_change': '19', 'last_force_op_resend': '0', 
+        #           'pool_snaps': [], 'quota_max_bytes': 0, 'quota_max_objects': 0, 'tiers': [], 'tier_of': -1, 'read_tier': -1,
+        #           'write_tier': -1, 'cache_mode': 'none', 'target_max_bytes': 0, 'target_max_objects': 0,
+        #           'cache_target_dirty_ratio_micro': 400000, 'cache_target_dirty_high_ratio_micro': 600000,
+        #           'cache_target_full_ratio_micro': 800000, 'cache_min_flush_age': 0, 'cache_min_evict_age': 0,
+        #           'erasure_code_profile': '', 'hit_set_params': {'type': 'none'}, 'hit_set_period': 0, 'hit_set_count': 0,
+        #           'use_gmt_hitset': True, 'min_read_recency_for_promote': 0, 'min_write_recency_for_promote': 0,
+        #           'hit_set_grade_decay_rate': 0, 'hit_set_search_last_n': 0, 'grade_table': [], 'stripe_width': 0,
+        #           'expected_num_objects': 0, 'fast_read': False, 'options': {}, 'application_metadata': {'rbd': {}},
+        #           'create_time': '2019-08-02 02:23:01.618519', 'last_change': '19', 'last_force_op_resend': '0',
         #           'last_force_op_resend_prenautilus': '0', 'last_force_op_resend_preluminous': '0', 'removed_snaps': '[]'}]
         pools = self.mgr.get('osd_map')['pools']
         pool_map = dict()
@@ -770,13 +795,13 @@ class CephConfigWatcher(BaseThread):
 
         devices = self.mgr.get('osd_map_crush')['devices']
         for dev in devices:
-            osd_id = str(dev['id']) 
+            osd_id = str(dev['id'])
             osd_map[osd_id] = dict(
                 deviceclass=dev.get('class'),
                 capacity=0,
                 hostname=service_map['osd', osd_id]
                 )
-        
+
         for osd_stat in stats['osd_stats']:
             osd_id = str(osd_stat.get('osd'))
             osd_map[osd_id]['capacity'] = osd_stat['statfs']['total']
@@ -797,7 +822,7 @@ class CephConfigWatcher(BaseThread):
                 level='INF',
                 tstamp=None
         )
-    
+
     def _check_hosts(self, server_map):
         log.debug("K8sevents checking host membership")
         changes = list()
@@ -830,7 +855,7 @@ class CephConfigWatcher(BaseThread):
         after_osds = list()
         for svr in server_map:
             after_osds.extend(server_map[svr].get('osd',[]))
-        
+
         if set(before_osds) == set(after_osds):
             # no change in osd id's
             pass
@@ -842,7 +867,7 @@ class CephConfigWatcher(BaseThread):
             for new_osd in osds.added:
                 changes.append(self._generate_config_logentry(
                                     msg=osd_msg.format(
-                                            new_osd, 
+                                            new_osd,
                                             osd_map[new_osd]['deviceclass'],
                                             MgrModule.to_pretty_iec(osd_map[new_osd]['capacity']),
                                             'added to',
@@ -942,7 +967,7 @@ class CephConfigWatcher(BaseThread):
         self.pool_map = self.fetch_pools()
 
         self.osd_map = self.fetch_osd_map(self.service_map)
-        
+
         while True:
 
             try:
@@ -961,10 +986,10 @@ class CephConfigWatcher(BaseThread):
                 self.service_map = service_map
 
                 checks_duration = int(time.time() - start_time)
-                
-                # check that the time it took to run the checks fits within the 
+
+                # check that the time it took to run the checks fits within the
                 # interval, and if not extend the interval and emit a log message
-                # to show that the runtime for the checks exceeded the desired 
+                # to show that the runtime for the checks exceeded the desired
                 # interval
                 if checks_duration > self.config_check_secs:
                     new_interval = self.config_check_secs * 2
@@ -975,8 +1000,8 @@ class CephConfigWatcher(BaseThread):
                                                                    new_interval))
                     self.config_check_secs = new_interval
 
-                time.sleep(self.config_check_secs)    
-            
+                time.sleep(self.config_check_secs)
+
             except Exception:
                 self.health = "{} Exception at {}".format(
                     sys.exc_info()[0].__name__,
@@ -1043,7 +1068,7 @@ class Module(MgrModule):
         self.error_msg = None
         self._api_client_config = None
         self._namespace = None
-        
+
         # Declare the module options we accept
         self.config_check_secs = None
         self.ceph_event_retention_days = None
@@ -1058,7 +1083,7 @@ class Module(MgrModule):
         super(Module, self).__init__(*args, **kwargs)
 
     def k8s_ready(self):
-        """Validate the k8s_config dict 
+        """Validate the k8s_config dict
 
         Returns:
          - bool .... indicating whether the config is ready to use
@@ -1094,7 +1119,7 @@ class Module(MgrModule):
 
     def process_clog(self, log_message):
         """Add log message to the event queue
-        
+
         :param log_message:     dict from the cluster log (audit/cluster channels)
         """
         required_fields = ['channel', 'message', 'priority', 'stamp']
@@ -1115,7 +1140,7 @@ class Module(MgrModule):
                     tstamp=log_message.get('stamp')
                 )
             )
-            
+
         else:
             self.log.warning("Unexpected clog message format received - skipped: {}".format(log_message))
 
@@ -1132,7 +1157,7 @@ class Module(MgrModule):
                             "command" notifications this is set to the tag
                             ``from send_command``.
         """
-        
+
         # only interested in cluster log (clog) messages for now
         if notify_type == 'clog':
             self.log.debug("received a clog entry from mgr.notify")
@@ -1148,7 +1173,7 @@ class Module(MgrModule):
         fmt = "{:<20}  {:<8}  {:>5}  {:<" + str(max_msg_length) + "}  {}\n"
         s = fmt.format("Last Seen (UTC)", "Type", "Count", "Message", "Event Object Name")
 
-        for event_name in sorted(events, 
+        for event_name in sorted(events,
                                  key = lambda name: events[name].last_timestamp,
                                  reverse=True):
 
@@ -1156,10 +1181,10 @@ class Module(MgrModule):
 
             s += fmt.format(
                     datetime.strftime(event.last_timestamp,"%Y/%m/%d %H:%M:%S"),
-                    event.type,
-                    event.count,
-                    event.message,
-                    event_name
+                    str(event.type),
+                    str(event.count),
+                    str(event.message),
+                    str(event_name)
             )
         s += "Total : {:>3}\n".format(len(events))
         return s
@@ -1242,16 +1267,16 @@ class Module(MgrModule):
         pattern = re.compile(r"^[a-z][a-z0-9\-\.]+$")
         if not pattern.match(namespace):
             return False, "Invalid characters in the name"
-        
+
         return True, ""
 
     def _config_set(self, key, val):
         """Attempt to validate the content, then save to KV store"""
 
-        val = val.rstrip()                      # remove any trailing whitespace/newline 
+        val = val.rstrip()                      # remove any trailing whitespace/newline
 
         try:
-            checker = getattr(self, "_valid_" + key)
+            checker = getattr(self, "_valid_" + str(key))
         except AttributeError:
             # no checker available, just let it pass
             self.log.warning("Unable to validate '{}' parameter - checker not implemented".format(key))
@@ -1261,7 +1286,7 @@ class Module(MgrModule):
 
         if valid:
             self.set_store(key, val)
-            self.log.info("Updated config KV Store item: " + key)
+            self.log.info("Updated config KV Store item: " + str(key))
             return 0, "", "Config updated for parameter '{}'".format(key)
         else:
             return -22, "", "Invalid value for '{}' :{}".format(key, reason)
@@ -1278,7 +1303,7 @@ class Module(MgrModule):
 
         if cmd['prefix'] == 'k8sevents clear-config':
             return self.clear_config_settings()
-        
+
         if cmd['prefix'] == 'k8sevents set-access':
             if cmd['key'] not in access_options:
                 return -errno.EINVAL, "", "Unknown access option. Must be one of; {}".format(','.join(access_options))
@@ -1295,10 +1320,10 @@ class Module(MgrModule):
 
             return self._config_set(cmd['key'], cmd['value'])
 
-        # At this point the command is trying to interact with k8sevents, so intercept if the configuration is 
+        # At this point the command is trying to interact with k8sevents, so intercept if the configuration is
         # not ready
         if self.error_msg:
-            _msg = "k8sevents unavailable: " + self.error_msg
+            _msg = "k8sevents unavailable: " + str(self.error_msg)
             ready, _ = self.k8s_ready()
             if not self.kubernetes_control and not ready:
                 _msg += "\nOnce all variables have been defined, you must restart the k8sevents module for the changes to take effect"
@@ -1327,7 +1352,7 @@ class Module(MgrModule):
     def load_kubernetes_config(self):
         """Load configuration for remote kubernetes API using KV store values
 
-        Attempt to create an API client configuration from settings stored in 
+        Attempt to create an API client configuration from settings stored in
         KV store.
 
         Returns:
@@ -1337,7 +1362,7 @@ class Module(MgrModule):
         OSError: unable to create the cacrt file
         """
 
-        # the kubernetes setting Configuration.ssl_ca_cert is a path, so we have to create a 
+        # the kubernetes setting Configuration.ssl_ca_cert is a path, so we have to create a
         # temporary file containing the cert for the client to load from
         try:
             ca_crt_file = create_temp_file('cacrt', self.k8s_config['cacrt'])
@@ -1350,7 +1375,7 @@ class Module(MgrModule):
         configuration = client.Configuration()
         configuration.host = self.k8s_config['server']
         configuration.ssl_ca_cert = ca_crt_file
-        configuration.api_key = { "authorization": "Bearer " + self.k8s_config['token'] }
+        configuration.api_key = { "authorization": "Bearer " + str(self.k8s_config['token']) }
         api_client = client.ApiClient(configuration)
         self.log.info("API client created for remote kubernetes access using cacrt and token from KV store")
 
@@ -1392,12 +1417,12 @@ class Module(MgrModule):
         # All checks have passed
         self.config_watcher = CephConfigWatcher(self)
 
-        self.event_processor = EventProcessor(self.config_watcher, 
+        self.event_processor = EventProcessor(self.config_watcher,
                                               self.ceph_event_retention_days,
                                               self._api_client_config,
                                               self._namespace)
 
-        self.ns_watcher = NamespaceWatcher(api_client_config=self._api_client_config, 
+        self.ns_watcher = NamespaceWatcher(api_client_config=self._api_client_config,
                                            namespace=self._namespace)
 
         if self.event_processor.ok:
@@ -1409,7 +1434,7 @@ class Module(MgrModule):
             self.ns_watcher.start()
 
             self.trackers.extend([self.event_processor, self.config_watcher, self.ns_watcher])
-            
+
             while True:
                 # stay alive
                 time.sleep(1)

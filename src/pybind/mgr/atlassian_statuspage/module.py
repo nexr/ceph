@@ -180,7 +180,7 @@ class AtlassianStatuspage(MgrModule):
     def _health_check_msg(self, code, summary, detail='', severity='warning'):
         hc_code = code.upper()
         if hc_code == "": hc_code = "UNKNOWN"
-        if not hc_code.startswith("ATLASSIAN_STATUSPAGE"): hc_code = "ATLASSIAN_STATUSPAGE_" + hc_code
+        if not hc_code.startswith("ATLASSIAN_STATUSPAGE"): hc_code = "ATLASSIAN_STATUSPAGE_" + str(hc_code)
 
         hc_summary = summary
         if hc_summary == "": hc_summary = "empty_summary"
@@ -191,7 +191,7 @@ class AtlassianStatuspage(MgrModule):
         return {
             hc_code: {
                 'severity': severity,
-                'summary' : "[Module 'atlassian_statuspage'] " + summary,
+                'summary' : "[Module 'atlassian_statuspage'] " + str(summary),
                 'detail'  : [ hc_detail ],
                 'count'   : 1,
             }
@@ -254,7 +254,7 @@ class AtlassianStatuspage(MgrModule):
     def _send_msg_to_atlassian_statuspage_through_rest(self, status, diff):
         self.log.debug('_send_msg_to_atlassian_statuspage_through_rest')
 
-        if not re.match("^\w{12}$", self.component_id):
+        if not re.match("^\w{12}$", str(self.component_id)):
             return self._health_check_msg(
                 'CONFIG_INVALID',
                 "The 'component_id' have invalid value.",
@@ -366,7 +366,7 @@ class AtlassianStatuspage(MgrModule):
     def _send_msg_to_atlassian_statuspage_through_email(self, status, diff):
         self.log.debug('_send_msg_to_atlassian_statuspage_through_email')
 
-        if not re.match("^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}$", self.component_id):
+        if not re.match("^\w{8}-\w{4}-\w{4}-\w{4}-\w{12}$", str(self.component_id)):
             return self._health_check_msg(
                 'CONFIG_INVALID',
                 "The 'component_id' have invalid value.",
@@ -388,7 +388,7 @@ class AtlassianStatuspage(MgrModule):
             comp_destination = 'component+{}@notifications.statuspage.io'.format(self.component_id)
             subject = subject + '(DOWN)'
         else:
-            self.log.warning("Unexpected cluster status: "+comp_destination)
+            self.log.warning("Unexpected cluster status: " + str(comp_destination))
             return None
 
         message = ('From: {from_name} <{sender}>\n'

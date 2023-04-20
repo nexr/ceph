@@ -8,6 +8,7 @@
 #include "common/version.h"
 #include "include/stringify.h"
 
+#include "PythonCompat.h"
 #include "PyOSDMap.h"
 #include "PyFormatter.h"
 #include "Gil.h"
@@ -35,12 +36,12 @@ typedef struct {
 
 static PyObject *osdmap_get_epoch(BasePyOSDMap *self, PyObject *obj)
 {
-  return PyInt_FromLong(self->osdmap->get_epoch());
+  return PyLong_FromLong(self->osdmap->get_epoch());
 }
 
 static PyObject *osdmap_get_crush_version(BasePyOSDMap* self, PyObject *obj)
 {
-  return PyInt_FromLong(self->osdmap->get_crush_version());
+  return PyLong_FromLong(self->osdmap->get_crush_version());
 }
 
 static PyObject *osdmap_dump(BasePyOSDMap* self, PyObject *obj)
@@ -155,7 +156,7 @@ static PyObject *osdmap_calc_pg_upmaps(BasePyOSDMap* self, PyObject *args)
 				 incobj->inc);
   PyEval_RestoreThread(tstate);
   dout(10) << __func__ << " r = " << r << dendl;
-  return PyInt_FromLong(r);
+  return PyLong_FromLong(r);
 }
 
 static PyObject *osdmap_map_pool_pgs_up(BasePyOSDMap* self, PyObject *args)
@@ -377,7 +378,7 @@ BasePyOSDMapIncremental_dealloc(BasePyOSDMapIncremental *self)
 static PyObject *osdmap_inc_get_epoch(BasePyOSDMapIncremental *self,
     PyObject *obj)
 {
-  return PyInt_FromLong(self->inc->epoch);
+  return PyLong_FromLong(self->inc->epoch);
 }
 
 static PyObject *osdmap_inc_dump(BasePyOSDMapIncremental *self,
@@ -560,7 +561,7 @@ static PyObject *crush_get_item_name(BasePyCRUSH *self, PyObject *args)
   if (!self->crush->item_exists(item)) {
     Py_RETURN_NONE;
   }
-  return PyString_FromString(self->crush->get_item_name(item));
+  return PyUnicode_FromString(self->crush->get_item_name(item));
 }
 
 static PyObject *crush_get_item_weight(BasePyCRUSH *self, PyObject *args)

@@ -65,6 +65,7 @@ public:
     static const int STATE_DIRTYPARENT = (1<<1);
     static const int STATE_DIRTYPOOL   = (1<<2);
     static const int STATE_NEED_SNAPFLUSH = (1<<3);
+    static const int STATE_EPHEMERAL_RANDOM = (1<<4);
     std::string  dn;         // dentry
     snapid_t dnfirst, dnlast;
     version_t dnv{0};
@@ -104,13 +105,14 @@ public:
     void encode(bufferlist& bl, uint64_t features) const;
     void decode(bufferlist::const_iterator &bl);
     void dump(Formatter *f) const;
-    static void generate_test_instances(list<EMetaBlob::fullbit*>& ls);
+    static void generate_test_instances(std::list<EMetaBlob::fullbit*>& ls);
 
     void update_inode(MDSRank *mds, CInode *in);
     bool is_dirty() const { return (state & STATE_DIRTY); }
     bool is_dirty_parent() const { return (state & STATE_DIRTYPARENT); }
     bool is_dirty_pool() const { return (state & STATE_DIRTYPOOL); }
     bool need_snapflush() const { return (state & STATE_NEED_SNAPFLUSH); }
+    bool is_export_ephemeral_random() const { return (state & STATE_EPHEMERAL_RANDOM); }
 
     void print(ostream& out) const {
       out << " fullbit dn " << dn << " [" << dnfirst << "," << dnlast << "] dnv " << dnv
@@ -158,7 +160,7 @@ public:
 	  << " dirty=" << dirty << std::endl;
     }
     void dump(Formatter *f) const;
-    static void generate_test_instances(list<remotebit*>& ls);
+    static void generate_test_instances(std::list<remotebit*>& ls);
   };
   WRITE_CLASS_ENCODER(remotebit)
 
@@ -179,7 +181,7 @@ public:
     void encode(bufferlist& bl) const;
     void decode(bufferlist::const_iterator &bl);
     void dump(Formatter *f) const;
-    static void generate_test_instances(list<nullbit*>& ls);
+    static void generate_test_instances(std::list<nullbit*>& ls);
     void print(ostream& out) const {
       out << " nullbit dn " << dn << " [" << dnfirst << "," << dnlast << "] dnv " << dnv
 	  << " dirty=" << dirty << std::endl;
@@ -296,7 +298,7 @@ public:
     void encode(bufferlist& bl, uint64_t features) const;
     void decode(bufferlist::const_iterator &bl);
     void dump(Formatter *f) const;
-    static void generate_test_instances(list<dirlump*>& ls);
+    static void generate_test_instances(std::list<dirlump*>& ls);
   };
   WRITE_CLASS_ENCODER_FEATURES(dirlump)
 
@@ -322,7 +324,7 @@ private:
 
   // inodes i've truncated
   vector<inodeno_t> truncate_start;        // start truncate
-  map<inodeno_t, log_segment_seq_t> truncate_finish;  // finished truncate (started in segment blah)
+  map<inodeno_t, LogSegment::seq_t> truncate_finish;  // finished truncate (started in segment blah)
 
 public:
   vector<inodeno_t> destroyed_inodes;
@@ -341,7 +343,7 @@ private:
   entity_name_t get_client_name() const {return client_name;}
 
   void dump(Formatter *f) const;
-  static void generate_test_instances(list<EMetaBlob*>& ls);
+  static void generate_test_instances(std::list<EMetaBlob*>& ls);
   // soft stateadd
   uint64_t last_subtree_map;
   uint64_t event_seq;
@@ -445,6 +447,10 @@ private:
   void add_primary_dentry(dirlump& lump, CDentry *dn, CInode *in, __u8 state) {
     if (!in) 
       in = dn->get_projected_linkage()->get_inode();
+
+    if (in->is_ephemeral_rand()) {
+      state |= fullbit::STATE_EPHEMERAL_RANDOM;
+    }
 
     // make note of where this inode was last journaled
     in->last_journaled = event_seq;

@@ -3,10 +3,10 @@ import time
 import requests
 import errno
 import logging
+
 from teuthology.exceptions import CommandFailedError
 
-from .mgr_test_case import MgrTestCase
-
+from tasks.mgr.mgr_test_case import MgrTestCase
 
 log = logging.getLogger(__name__)
 
@@ -24,6 +24,7 @@ class TestModuleSelftest(MgrTestCase):
     MGRS_REQUIRED = 1
 
     def setUp(self):
+        super(TestModuleSelftest, self).setUp()
         self.setup_mgrs()
 
     def _selftest_plugin(self, module_name):
@@ -49,6 +50,13 @@ class TestModuleSelftest(MgrTestCase):
         self._selftest_plugin("influx")
 
     def test_diskprediction_local(self):
+        self._load_module("selftest")
+        python_version = self.mgr_cluster.mon_manager.raw_cluster_cmd(
+            "mgr", "self-test", "python-version")
+        if tuple(int(v) for v in python_version.split('.')) >= (3, 8):
+            # https://tracker.ceph.com/issues/45147
+            self.skipTest(f'python {python_version} not compatible with '
+                          'diskprediction_local')
         self._selftest_plugin("diskprediction_local")
 
     # Not included in qa/packages/packages.yaml
@@ -80,8 +88,8 @@ class TestModuleSelftest(MgrTestCase):
     def test_crash(self):
         self._selftest_plugin("crash")
 
-    def test_orchestrator_cli(self):
-        self._selftest_plugin("orchestrator_cli")
+    def test_orchestrator(self):
+        self._selftest_plugin("orchestrator")
 
 
     def test_selftest_config_update(self):

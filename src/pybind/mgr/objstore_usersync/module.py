@@ -127,7 +127,7 @@ class ObjstoreUsersync(MgrModule):
 
         self.endpoint_map = {
             'ranger': {
-                'default': self.def_ranger_endp
+                '_default': self.def_ranger_endp
             }
         };
 
@@ -180,7 +180,7 @@ class ObjstoreUsersync(MgrModule):
 
 
     def _exec_radosgw_admin(self, cmd):
-        timeout_sec = int(self.interval / 2)
+        timeout_sec = int(int(self.interval) / 2)
         if timeout_sec < 15: timeout_sec = 15
 
         full_cmd  = "timeout %d " % timeout_sec
@@ -223,7 +223,7 @@ class ObjstoreUsersync(MgrModule):
             is_success = (list_rc == 0)
 
             if not is_success:
-                self.log.warning("Failed to get user list: " + list_err)
+                self.log.warning("Failed to get user list: " + str(list_err))
                 break
 
             ret_json = json.loads(list_out)
@@ -256,7 +256,7 @@ class ObjstoreUsersync(MgrModule):
 
     def _request_ranger_rest(self, method, path, endpoint = {}, data = {}):
         if len(endpoint) == 0:
-            endpoint = self.endpoint_map['ranger']['default']
+            endpoint = self.endpoint_map['ranger']['_default']
 
         method = method.upper()
 
@@ -296,7 +296,7 @@ class ObjstoreUsersync(MgrModule):
 
     def _fetch_ranger_group_id(self, endpoint = {}):
         if len(endpoint) == 0:
-            endpoint = self.endpoint_map['ranger']['default']
+            endpoint = self.endpoint_map['ranger']['_default']
 
         sync_tenant = endpoint['tenant']
 
@@ -330,13 +330,13 @@ class ObjstoreUsersync(MgrModule):
         self.log.debug("{")
 
         for type_key in emap.keys():
-            self.log.debug("  " + type_key + ": [")
+            self.log.debug("  " + str(type_key) + ": [")
 
             for user_key in emap[type_key].keys():
-                self.log.debug("    " + user_key + ": {")
+                self.log.debug("    " + str(user_key) + ": {")
 
                 for item_key in emap[type_key][user_key]:
-                    self.log.debug("      " + item_key + ": " + emap[type_key][user_key][item_key] + ",")
+                    self.log.debug("      " + str(item_key) + ": " + str(emap[type_key][user_key][item_key]) + ",")
 
                 self.log.debug("    },")
 
@@ -352,12 +352,7 @@ class ObjstoreUsersync(MgrModule):
             self.log.warning("Failed to get user list")
             return is_success
 
-        self.def_ranger_endp['group_id'] = ''
-        self.endpoint_map = {
-            'ranger': {
-                'default': self.def_ranger_endp
-            }
-        }
+        self.endpoint_map['ranger']['_default']['group_id'] = ''
 
         for each_user in user_list:
             user_info, is_success = self._get_objuser_info(each_user)
@@ -393,7 +388,7 @@ class ObjstoreUsersync(MgrModule):
         ret_list = []
 
         if len(endpoint) == 0:
-            endpoint = self.endpoint_map['ranger']['default']
+            endpoint = self.endpoint_map['ranger']['_default']
 
         group_id = endpoint['group_id']
         if group_id == '':
@@ -414,7 +409,7 @@ class ObjstoreUsersync(MgrModule):
                 if result_size == 1:
                     ret_list.append(resp['vxUserList']['vXUsers']['name'])
                 elif result_size > 1:
-                    ret_list += map(lambda x: x['name'], resp['vxUserList']['vXUsers'])
+                    ret_list += list(map(lambda x: x['name'], resp['vxUserList']['vXUsers']))
 
                 need_continue = (result_size == page_size)
                 if need_continue: offset = offset + page_size
@@ -441,14 +436,14 @@ class ObjstoreUsersync(MgrModule):
         is_success = False
 
         if len(endpoint) == 0:
-            endpoint = self.endpoint_map['ranger']['default']
+            endpoint = self.endpoint_map['ranger']['_default']
 
         group_name = endpoint["tenant"]
         group_id   = endpoint["group_id"]
         if group_id == '':
             group_id = self._fetch_ranger_group_id(endpoint)
 
-        resp, scode = self._request_ranger_rest("get", "/service/xusers/users/userName/" + user_name, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/xusers/users/userName/" + str(user_name), endpoint)
 
         is_not_exist = ( scode == 200 and resp['vxUser']['isVisible'] == '0' ) or \
                        ( scode == 400 and \
@@ -456,12 +451,12 @@ class ObjstoreUsersync(MgrModule):
 
         is_success = (scode == 200) or is_not_exist
         if not is_success:
-            self.log.warning("Failed to get user info: " + user_name)
+            self.log.warning("Failed to get user info: " + str(user_name))
             return is_success
 
         user_id = ''
         if is_not_exist:
-            self.log.debug("'%s' ranger user is not exist" % user_name)
+            self.log.debug("'%s' ranger user is not exist" % str(user_name))
 
             initial_pw = self.ranger_user_initial_password
 
@@ -512,7 +507,7 @@ class ObjstoreUsersync(MgrModule):
             if result_size == 1:
                 user_groups = [ resp['vxGroupList']['vXGroups']['id'] ]
             elif result_size > 1:
-                user_groups = map(lambda x: x['id'], resp['vxGroupList']['vXGroups'])
+                user_groups = list(map(lambda x: x['id'], resp['vxGroupList']['vXGroups']))
         else:
             self.log.warning("Failed to get groups of user '%s'" % user_name)
             return is_success
@@ -548,14 +543,14 @@ class ObjstoreUsersync(MgrModule):
         return is_success
 
 
-    def _enable_ranger_service(self, user_name):
+    def _enable_ranger_service(self, user_name, endpoint = {}):
         is_success = False
 
-        endp_key = user_name if user_name in self.endpoint_map['ranger'] else 'default'
+        if len(endpoint) == 0:
+            endp_key = user_name if user_name in self.endpoint_map['ranger'] else '_default'
+            endpoint = self.endpoint_map['ranger'][endp_key]
 
-        endpoint = self.endpoint_map['ranger'][endp_key]
-
-        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + user_name, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + str(user_name), endpoint)
         is_success = (scode == 200 or scode == 404)
         is_service_exist = (scode == 200)
         is_service_enabled = (is_service_exist and resp['isEnabled'] == True)
@@ -653,25 +648,25 @@ class ObjstoreUsersync(MgrModule):
         return is_success
 
 
-    def _enable_tgtservice(self, user_name, target = 'ranger'):
+    def _enable_tgtservice(self, user_name, target = 'ranger', endpoint = {}):
         is_success = False
 
         if target == "ranger":
-            is_success = self._enable_ranger_service(user_name)
+            is_success = self._enable_ranger_service(user_name, endpoint)
         else:
             self.log.warning("The '%s' is not supported user enable target" % target)
 
         return is_success
 
 
-    def _disable_ranger_service(self, user_name):
+    def _disable_ranger_service(self, user_name, endpoint = {}):
         is_success = False
 
-        endp_key = user_name if user_name in self.endpoint_map['ranger'] else 'default'
+        if len(endpoint) == 0:
+            endp_key = user_name if user_name in self.endpoint_map['ranger'] else '_default'
+            endpoint = self.endpoint_map['ranger'][endp_key]
 
-        endpoint = self.endpoint_map['ranger'][endp_key]
-
-        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + user_name, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + str(user_name), endpoint)
         is_success = (scode == 200 or scode == 404)
         is_service_exist = (scode == 200)
         is_service_enabled = (is_service_exist and resp['isEnabled'] == True)
@@ -692,11 +687,11 @@ class ObjstoreUsersync(MgrModule):
 
         return is_success
 
-    def _disable_tgtservice(self, user_name, target = 'ranger'):
+    def _disable_tgtservice(self, user_name, target = 'ranger', endpoint = {}):
         is_success = False
 
         if target == "ranger":
-            is_success = self._disable_ranger_service(user_name)
+            is_success = self._disable_ranger_service(user_name, endpoint)
         else:
             self.log.warning("The '%s' is not supported user disable target" % target)
 
@@ -707,14 +702,14 @@ class ObjstoreUsersync(MgrModule):
         is_success = False
 
         if len(endpoint) == 0:
-            endpoint = self.endpoint_map['ranger']['default']
+            endpoint = self.endpoint_map['ranger']['_default']
 
         group_name = endpoint['tenant']
         group_id   = endpoint['group_id']
         if group_id == '':
             group_id = self._fetch_ranger_group_id(endpoint)
 
-        resp, scode = self._request_ranger_rest("get", "/service/xusers/users/userName/" + user_name, endpoint)
+        resp, scode = self._request_ranger_rest("get", "/service/xusers/users/userName/" + str(user_name), endpoint)
 
         is_not_exist = ( scode == 400 and \
                          resp['vxResponse']['messageList']['name'] == 'DATA_NOT_FOUND' )
@@ -722,7 +717,7 @@ class ObjstoreUsersync(MgrModule):
         is_success = (scode == 200) or is_not_exist
 
         if not is_success:
-            self.log.warning("Failed to get user id: " + user_name)
+            self.log.warning("Failed to get user id: " + str(user_name))
             return is_success
 
         user_id = ''
@@ -743,7 +738,7 @@ class ObjstoreUsersync(MgrModule):
             if result_size == 1:
                 user_groups = [ resp['vxGroupList']['vXGroups']['id'] ]
             elif result_size > 1:
-                user_groups = map(lambda x: x['id'], resp['vxGroupList']['vXGroups'])
+                user_groups = list(map(lambda x: x['id'], resp['vxGroupList']['vXGroups']))
         else:
             self.log.warning("Failed to get groups of user '%s'" % user_name)
             return is_success
@@ -802,15 +797,15 @@ class ObjstoreUsersync(MgrModule):
 
         cycle_after_emap_update = self.endpoint_map_update_cycle
 
-        make_tgtusers_pool_key = lambda endp: endp['url'] + '#' + endp['tenant']
+        make_tgtusers_pool_key = lambda endp: endp['url'] + '#' + str(endp['tenant'])
 
         while self.run:
             # Do some useful background work here.
             if is_first:
                 is_first = False
             else:
-                self.log.debug('Sleeping for %d seconds', self.interval)
-                ret = self.event.wait(self.interval)
+                self.log.debug('Sleeping for %d seconds', int(self.interval))
+                ret = self.event.wait(float(self.interval))
                 self.event.clear()
                 cycle_after_emap_update += 1
 
@@ -866,15 +861,17 @@ class ObjstoreUsersync(MgrModule):
 
                 if not self.allow_user_remove: continue
 
+                removed_users = set()
                 for each_endp in target_emap.values():
                     pool_key = make_tgtusers_pool_key(each_endp)
 
                     each_tgtusers = tgtusers_pool[pool_key]
                     for each_tgtuser in each_tgtusers:
-                        self._disable_tgtservice(each_tgtuser, each_target)
+                        self._disable_tgtservice(each_tgtuser, each_target, each_endp)
 
                         is_remove_success = self._remove_tgtuser(each_tgtuser, each_target, each_endp)
                         if is_remove_success:
+                            removed_users.add(each_tgtuser)
                             user_remove_msg  = "The user '%s' was removed " % each_tgtuser
                             user_remove_msg += "from %s" % each_target
                             self.log.info(user_remove_msg)
@@ -883,8 +880,11 @@ class ObjstoreUsersync(MgrModule):
                             user_remove_fail_msg += "from %s" % each_target
                             self.log.warning(user_remove_fail_msg)
 
-
                     tgtusers_pool[pool_key] = []
+
+                for each_user in removed_users:
+                    if each_user not in target_emap: continue
+                    del target_emap[each_user]
 
 
     def shutdown(self):

@@ -276,7 +276,7 @@ private:
    */
   int commits_started = 0;
 
-  Cond shutdown_cond;
+  ceph::condition_variable shutdown_cond;
 
 public:
   /**
@@ -402,7 +402,7 @@ private:
    * keep leases. Each lease will have an expiration date, which may or may
    * not be extended. 
    */
-  utime_t lease_expire;
+  ceph::real_clock::time_point lease_expire;
   /**
    * List of callbacks waiting for our state to change into STATE_ACTIVE.
    */
@@ -1045,7 +1045,7 @@ public:
    * @param name A name for the paxos service. It serves as the naming space
    * of the underlying persistent storage for this service.
    */
-  Paxos(Monitor *m, const string &name) 
+  Paxos(Monitor *m, const string &name)
 		 : mon(m),
 		   logger(NULL),
 		   paxos_name(name),
@@ -1064,6 +1064,10 @@ public:
 		   accept_timeout_event(0),
 		   clock_drift_warned(0),
 		   trimming(false) { }
+
+  ~Paxos() {
+    delete logger;
+  }
 
   const string get_name() const {
     return paxos_name;

@@ -99,6 +99,7 @@ struct ConfigMap {
   Section global;
   std::map<std::string,Section> by_type;
   std::map<std::string,Section> by_id;
+  std::list<std::unique_ptr<Option>> stray_options;
 
   Section *find_section(const std::string& name) {
     if (name == "global") {
@@ -118,14 +119,14 @@ struct ConfigMap {
     global.clear();
     by_type.clear();
     by_id.clear();
+    stray_options.clear();
   }
   void dump(Formatter *f) const;
-  void generate_entity_map(
+  std::map<std::string,std::string,std::less<>> generate_entity_map(
     const EntityName& name,
     const map<std::string,std::string>& crush_location,
     const CrushWrapper *crush,
     const std::string& device_class,
-    std::map<std::string,std::string> *out,
     std::map<std::string,pair<std::string,const MaskedOption*>> *src=0);
 
   static bool parse_mask(

@@ -18,10 +18,11 @@
 
 #include "common/CommandTable.h"
 #include "common/Finisher.h"
-#include "common/Mutex.h"
 #include "common/Timer.h"
+#include "common/ceph_mutex.h"
 #include "common/cmdparse.h"
 #include "common/compiler_extensions.h"
+#include "include/common_fwd.h"
 #include "include/cephfs/ceph_ll_client.h"
 #include "include/filepath.h"
 #include "include/interval_set.h"
@@ -53,7 +54,6 @@ class FSMap;
 class FSMapUser;
 class MonClient;
 
-class CephContext;
 
 struct DirStat;
 struct LeaseStat;
@@ -63,7 +63,6 @@ class Filer;
 class Objecter;
 class WritebackHandler;
 
-class PerfCounters;
 class MDSMap;
 class Message;
 
@@ -222,6 +221,7 @@ struct dir_result_t {
   frag_t buffer_frag;
 
   vector<dentry> buffer;
+  struct dirent de;
 };
 
 class Client : public Dispatcher, public md_config_obs_t {
@@ -244,8 +244,10 @@ public:
   class CommandHook : public AdminSocketHook {
   public:
     explicit CommandHook(Client *client);
-    bool call(std::string_view command, const cmdmap_t& cmdmap,
-              std::string_view format, bufferlist& out) override;
+    int call(std::string_view command, const cmdmap_t& cmdmap,
+	     Formatter *f,
+	     std::ostream& errss,
+	     bufferlist& out) override;
   private:
     Client *m_client;
   };
@@ -478,6 +480,7 @@ public:
   int ll_lookup(Inode *parent, const char *name, struct stat *attr,
 		Inode **out, const UserPerm& perms);
   int ll_lookup_inode(struct inodeno_t ino, const UserPerm& perms, Inode **inode);
+  int ll_lookup_vino(vinodeno_t vino, const UserPerm& perms, Inode **inode);
   int ll_lookupx(Inode *parent, const char *name, Inode **out,
 			struct ceph_statx *stx, unsigned want, unsigned flags,
 			const UserPerm& perms);
@@ -590,8 +593,8 @@ public:
   int ll_delegation(Fh *fh, unsigned cmd, ceph_deleg_cb_t cb, void *priv);
 
   entity_name_t get_myname() { return messenger->get_myname(); }
-  void wait_on_list(list<Cond*>& ls);
-  void signal_cond_list(list<Cond*>& ls);
+  void wait_on_list(std::list<ceph::condition_variable*>& ls);
+  void signal_cond_list(std::list<ceph::condition_variable*>& ls);
 
   void set_filer_flags(int flags);
   void clear_filer_flags(int flags);
@@ -626,14 +629,14 @@ public:
 		      inodeno_t realm, int flags, const UserPerm& perms);
   void remove_cap(Cap *cap, bool queue_release);
   void remove_all_caps(Inode *in);
-  void remove_session_caps(MetaSession *session);
+  void remove_session_caps(MetaSession *session, int err);
   int mark_caps_flushing(Inode *in, ceph_tid_t *ptid);
   void adjust_session_flushing_caps(Inode *in, MetaSession *old_s, MetaSession *new_s);
   void flush_caps_sync();
   void kick_flushing_caps(Inode *in, MetaSession *session);
   void kick_flushing_caps(MetaSession *session);
   void early_kick_flushing_caps(MetaSession *session);
-  int get_caps(Inode *in, int need, int want, int *have, loff_t endoff);
+  int get_caps(Fh *fh, int need, int want, int *have, loff_t endoff);
   int get_caps_used(Inode *in);
 
   void maybe_update_snaprealm(SnapRealm *realm, snapid_t snap_created, snapid_t snap_highwater,
@@ -663,7 +666,6 @@ public:
   void wait_sync_caps(ceph_tid_t want);
   void queue_cap_snap(Inode *in, SnapContext &old_snapc);
   void finish_cap_snap(Inode *in, CapSnap &capsnap, int used);
-  void _flushed_cap_snap(Inode *in, snapid_t seq);
 
   void _schedule_invalidate_dentry_callback(Dentry *dn, bool del);
   void _async_dentry_invalidate(vinodeno_t dirino, vinodeno_t ino, string& name);
@@ -765,7 +767,7 @@ protected:
   MetaSession *_get_or_open_mds_session(mds_rank_t mds);
   MetaSession *_open_mds_session(mds_rank_t mds);
   void _close_mds_session(MetaSession *s);
-  void _closed_mds_session(MetaSession *s);
+  void _closed_mds_session(MetaSession *s, int err=0, bool rejected=false);
   bool _any_stale_sessions() const;
   void _kick_stale_sessions();
   void handle_client_session(const MConstRef<MClientSession>& m);
@@ -776,7 +778,7 @@ protected:
   void _sync_write_commit(Inode *in);
 
   void dump_mds_requests(Formatter *f);
-  void dump_mds_sessions(Formatter *f);
+  void dump_mds_sessions(Formatter *f, bool cap_dump=false);
 
   int make_request(MetaRequest *req, const UserPerm& perms,
 		   InodeRef *ptarget = 0, bool *pcreated = 0,
@@ -784,7 +786,8 @@ protected:
   void put_request(MetaRequest *request);
   void unregister_request(MetaRequest *request);
 
-  int verify_reply_trace(int r, MetaRequest *request, const MConstRef<MClientReply>& reply,
+  int verify_reply_trace(int r, MetaSession *session, MetaRequest *request,
+			 const MConstRef<MClientReply>& reply,
 			 InodeRef *ptarget, bool *pcreated,
 			 const UserPerm& perms);
   void encode_cap_releases(MetaRequest *request, mds_rank_t mds);
@@ -909,7 +912,6 @@ protected:
   bool ms_handle_reset(Connection *con) override;
   void ms_handle_remote_reset(Connection *con) override;
   bool ms_handle_refused(Connection *con) override;
-  bool ms_get_authorizer(int dest_type, AuthAuthorizer **authorizer) override;
 
   int authenticate();
 
@@ -946,7 +948,8 @@ protected:
 
   // global client lock
   //  - protects Client and buffer cache both!
-  Mutex                  client_lock;
+  ceph::mutex client_lock = ceph::make_mutex("Client::client_lock");
+;
 
   std::map<snapid_t, int> ll_snap_ref;
 
@@ -985,7 +988,7 @@ private:
   struct VXattr {
 	  const string name;
 	  size_t (Client::*getxattr_cb)(Inode *in, char *val, size_t size);
-	  bool readonly, hidden;
+	  bool readonly;
 	  bool (Client::*exists_cb)(Inode *in);
 	  unsigned int flags;
   };
@@ -1004,11 +1007,14 @@ private:
 
   /* Flags for VXattr */
   static const unsigned VXATTR_RSTAT = 0x1;
+  static const unsigned VXATTR_DIRSTAT = 0x2;
 
   static const VXattr _dir_vxattrs[];
   static const VXattr _file_vxattrs[];
+  static const VXattr _common_vxattrs[];
 
 
+  bool is_reserved_vino(vinodeno_t &vino);
 
   void fill_dirent(struct dirent *de, const char *name, int type, uint64_t ino, loff_t next_off);
 
@@ -1156,6 +1162,9 @@ private:
   bool _vxattrcb_snap_btime_exists(Inode *in);
   size_t _vxattrcb_snap_btime(Inode *in, char *val, size_t size);
 
+  size_t _vxattrcb_cluster_fsid(Inode *in, char *val, size_t size);
+  size_t _vxattrcb_client_id(Inode *in, char *val, size_t size);
+
   static const VXattr *_get_vxattrs(Inode *in);
   static const VXattr *_match_vxattr(Inode *in, const char *name);
 
@@ -1176,7 +1185,7 @@ private:
   int _ll_getattr(Inode *in, int caps, const UserPerm& perms);
   int _lookup_parent(Inode *in, const UserPerm& perms, Inode **parent=NULL);
   int _lookup_name(Inode *in, Inode *parent, const UserPerm& perms);
-  int _lookup_ino(inodeno_t ino, const UserPerm& perms, Inode **inode=NULL);
+  int _lookup_vino(vinodeno_t ino, const UserPerm& perms, Inode **inode=NULL);
   bool _ll_forget(Inode *in, uint64_t count);
 
 
@@ -1210,10 +1219,11 @@ private:
 
   // mds sessions
   map<mds_rank_t, MetaSession> mds_sessions;  // mds -> push seq
-  list<Cond*> waiting_for_mdsmap;
+  std::set<mds_rank_t> mds_ranks_closing;  // mds ranks currently tearing down sessions
+  std::list<ceph::condition_variable*> waiting_for_mdsmap;
 
   // FSMap, for when using mds_command
-  list<Cond*> waiting_for_fsmap;
+  std::list<ceph::condition_variable*> waiting_for_fsmap;
   std::unique_ptr<FSMap> fsmap;
   std::unique_ptr<FSMapUser> fsmap_user;
 
@@ -1230,6 +1240,7 @@ private:
   ceph::unordered_map<int, Fh*> fd_map;
   set<Fh*> ll_unclosed_fh_set;
   ceph::unordered_set<dir_result_t*> opened_dirs;
+  uint64_t fd_gen = 1;
 
   bool   initialized = false;
   bool   mounted = false;
@@ -1241,12 +1252,6 @@ private:
   interval_set<ino_t> free_faked_inos;
   ino_t last_used_faked_ino;
   ino_t last_used_faked_root;
-
-  // When an MDS has sent us a REJECT, remember that and don't
-  // contact it again.  Remember which inst rejected us, so that
-  // when we talk to another inst with the same rank we can
-  // try again.
-  std::map<mds_rank_t, entity_addrvec_t> rejected_by_mds;
 
   int local_osd = -ENXIO;
   epoch_t local_osd_epoch = 0;
@@ -1267,18 +1272,20 @@ private:
   ceph::unordered_map<inodeno_t,SnapRealm*> snap_realms;
   std::map<std::string, std::string> metadata;
 
+  utime_t last_auto_reconnect;
+
   // trace generation
   ofstream traceout;
 
-  Cond mount_cond, sync_cond;
+  ceph::condition_variable mount_cond, sync_cond;
 
   std::map<std::pair<int64_t,std::string>, int> pool_perms;
-  list<Cond*> waiting_for_pool_perm;
+  std::list<ceph::condition_variable*> waiting_for_pool_perm;
 
   uint64_t retries_on_invalidate = 0;
 
   // state reclaim
-  list<Cond*> waiting_for_reclaim;
+  std::list<ceph::condition_variable*> waiting_for_reclaim;
   int reclaim_errno = 0;
   epoch_t reclaim_osd_epoch = 0;
   entity_addrvec_t reclaim_target_addrs;

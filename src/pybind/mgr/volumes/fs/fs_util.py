@@ -2,6 +2,8 @@ import os
 import errno
 import logging
 
+from ceph.deployment.service_spec import ServiceSpec, PlacementSpec
+
 import cephfs
 import orchestrator
 
@@ -9,9 +11,9 @@ from .exception import VolumeException
 
 log = logging.getLogger(__name__)
 
-def create_pool(mgr, pool_name, pg_num):
+def create_pool(mgr, pool_name):
     # create the given pool
-    command = {'prefix': 'osd pool create', 'pool': pool_name, 'pg_num': pg_num}
+    command = {'prefix': 'osd pool create', 'pool': pool_name}
     return mgr.mon_command(command)
 
 def remove_pool(mgr, pool_name):
@@ -33,11 +35,12 @@ def remove_filesystem(mgr, fs_name):
     command = {'prefix': 'fs rm', 'fs_name': fs_name, 'yes_i_really_mean_it': True}
     return mgr.mon_command(command)
 
-def create_mds(mgr, fs_name):
-    spec = orchestrator.StatelessServiceSpec()
-    spec.name = fs_name
+def create_mds(mgr, fs_name, placement):
+    spec = ServiceSpec(service_type='mds',
+                                    service_id=fs_name,
+                                    placement=PlacementSpec.from_string(placement))
     try:
-        completion = mgr.add_stateless_service("mds", spec)
+        completion = mgr.apply_mds(spec)
         mgr._orchestrator_wait([completion])
         orchestrator.raise_if_exception(completion)
     except (ImportError, orchestrator.OrchestratorError):
@@ -71,6 +74,34 @@ def listdir(fs, dirpath):
     except cephfs.Error as e:
         raise VolumeException(-e.args[0], e.args[1])
     return dirs
+
+def is_inherited_snap(snapname):
+    """
+    Returns True if the snapname is inherited else False
+    """
+    return snapname.startswith("_")
+
+def listsnaps(fs, volspec, snapdirpath, filter_inherited_snaps=False):
+    """
+    Get the snap names from a given snap directory path
+    """
+    if os.path.basename(snapdirpath) != volspec.snapshot_prefix.encode('utf-8'):
+        raise VolumeException(-errno.EINVAL, "Not a snap directory: {0}".format(snapdirpath))
+    snaps = []
+    try:
+        with fs.opendir(snapdirpath) as dir_handle:
+            d = fs.readdir(dir_handle)
+            while d:
+                if (d.d_name not in (b".", b"..")) and d.is_dir():
+                    d_name = d.d_name.decode('utf-8')
+                    if not is_inherited_snap(d_name):
+                        snaps.append(d.d_name)
+                    elif is_inherited_snap(d_name) and not filter_inherited_snaps:
+                        snaps.append(d.d_name)
+                d = fs.readdir(dir_handle)
+    except cephfs.Error as e:
+        raise VolumeException(-e.args[0], e.args[1])
+    return snaps
 
 def list_one_entry_at_a_time(fs, dirpath):
     """

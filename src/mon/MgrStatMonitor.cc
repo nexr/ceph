@@ -3,6 +3,7 @@
 
 #include "MgrStatMonitor.h"
 #include "mon/OSDMonitor.h"
+#include "mon/MgrMonitor.h"
 #include "mon/PGMap.h"
 #include "messages/MGetPoolStats.h"
 #include "messages/MGetPoolStatsReply.h"
@@ -34,6 +35,7 @@ void MgrStatMonitor::create_initial()
   dout(10) << __func__ << dendl;
   version = 0;
   service_map.epoch = 1;
+  service_map.modified = ceph_clock_now();
   pending_service_map_bl.clear();
   encode(service_map, pending_service_map_bl, CEPH_FEATURES_ALL);
 }
@@ -153,7 +155,7 @@ void MgrStatMonitor::tick()
 
 bool MgrStatMonitor::preprocess_query(MonOpRequestRef op)
 {
-  auto m = static_cast<PaxosServiceMessage*>(op->get_req());
+  auto m = op->get_req<PaxosServiceMessage>();
   switch (m->get_type()) {
   case CEPH_MSG_STATFS:
     return preprocess_statfs(op);
@@ -170,7 +172,7 @@ bool MgrStatMonitor::preprocess_query(MonOpRequestRef op)
 
 bool MgrStatMonitor::prepare_update(MonOpRequestRef op)
 {
-  auto m = static_cast<PaxosServiceMessage*>(op->get_req());
+  auto m = op->get_req<PaxosServiceMessage>();
   switch (m->get_type()) {
   case MSG_MON_MGR_REPORT:
     return prepare_report(op);
@@ -183,13 +185,20 @@ bool MgrStatMonitor::prepare_update(MonOpRequestRef op)
 
 bool MgrStatMonitor::preprocess_report(MonOpRequestRef op)
 {
+  auto m = op->get_req<MMonMgrReport>();
   mon->no_reply(op);
+  if (m->gid &&
+      m->gid != mon->mgrmon()->get_map().get_active_gid()) {
+    dout(10) << "ignoring report from non-active mgr " << m->gid
+	     << dendl;
+    return true;
+  }
   return false;
 }
 
 bool MgrStatMonitor::prepare_report(MonOpRequestRef op)
 {
-  auto m = static_cast<MMonMgrReport*>(op->get_req());
+  auto m = op->get_req<MMonMgrReport>();
   bufferlist bl = m->get_data();
   auto p = bl.cbegin();
   decode(pending_digest, p);
@@ -230,7 +239,7 @@ bool MgrStatMonitor::prepare_report(MonOpRequestRef op)
 bool MgrStatMonitor::preprocess_getpoolstats(MonOpRequestRef op)
 {
   op->mark_pgmon_event(__func__);
-  auto m = static_cast<MGetPoolStats*>(op->get_req());
+  auto m = op->get_req<MGetPoolStats>();
   auto session = op->get_session();
   if (!session)
     return true;
@@ -263,7 +272,7 @@ bool MgrStatMonitor::preprocess_getpoolstats(MonOpRequestRef op)
 bool MgrStatMonitor::preprocess_statfs(MonOpRequestRef op)
 {
   op->mark_pgmon_event(__func__);
-  auto statfs = static_cast<MStatfs*>(op->get_req());
+  auto statfs = op->get_req<MStatfs>();
   auto session = op->get_session();
 
   if (!session)
@@ -278,21 +287,27 @@ bool MgrStatMonitor::preprocess_statfs(MonOpRequestRef op)
             << " != " << mon->monmap->fsid << dendl;
     return true;
   }
+  const auto& pool = statfs->data_pool;
+  if (pool && !mon->osdmon()->osdmap.have_pg_pool(*pool)) {
+    // There's no error field for MStatfsReply so just ignore the request.
+    // This is known to happen when a client is still accessing a removed fs.
+    dout(1) << __func__ << " on removed pool " << *pool << dendl;
+    return true;
+  }
   dout(10) << __func__ << " " << *statfs
            << " from " << statfs->get_orig_source() << dendl;
   epoch_t ver = get_last_committed();
   auto reply = new MStatfsReply(statfs->fsid, statfs->get_tid(), ver);
-  reply->h.st = get_statfs(mon->osdmon()->osdmap, statfs->data_pool);
+  reply->h.st = get_statfs(mon->osdmon()->osdmap, pool);
   mon->send_reply(op, reply);
   return true;
 }
 
 void MgrStatMonitor::check_sub(Subscription *sub)
 {
-  const auto epoch = mon->monmap->get_epoch();
   dout(10) << __func__
 	   << " next " << sub->next
-	   << " have " << epoch << dendl;
+	   << " vs service_map.epoch " << service_map.epoch << dendl;
   if (sub->next <= service_map.epoch) {
     auto m = new MServiceMap(service_map);
     sub->session->con->send_message(m);
@@ -301,7 +316,7 @@ void MgrStatMonitor::check_sub(Subscription *sub)
 	  session_map.remove_sub(sub);
 	});
     } else {
-      sub->next = epoch + 1;
+      sub->next = service_map.epoch + 1;
     }
   }
 }

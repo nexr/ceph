@@ -1,5 +1,5 @@
 // -*- mode:C++; tab-width:8; c-basic-offset:2; indent-tabs-mode:t -*-
-// vim: ts=8 sw=2 smarttab
+// vim: ts=8 sw=2 smarttab ft=cpp
 
 #ifndef CEPH_RGW_AUTH_FILTERS_H
 #define CEPH_RGW_AUTH_FILTERS_H
@@ -76,6 +76,10 @@ public:
     return get_decoratee().is_owner_of(uid);
   }
 
+  bool is_anonymous() const override {
+    return get_decoratee().is_anonymous();
+  }
+
   uint32_t get_perm_mask() const override {
     return get_decoratee().get_perm_mask();
   }
@@ -86,6 +90,10 @@ public:
 
   string get_acct_name() const override {
     return get_decoratee().get_acct_name();
+  }
+
+  string get_subuser() const override {
+    return get_decoratee().get_subuser();
   }
 
   bool is_identity(
@@ -109,7 +117,7 @@ public:
 
 template <typename T>
 class ThirdPartyAccountApplier : public DecoratedApplier<T> {
-  /* const */RGWRados* const store;
+  /* const */RGWCtl* const ctl;
   const rgw_user acct_user_override;
 
 public:
@@ -119,11 +127,11 @@ public:
   static const rgw_user UNKNOWN_ACCT;
 
   template <typename U>
-  ThirdPartyAccountApplier(RGWRados* const store,
+  ThirdPartyAccountApplier(RGWCtl* const ctl,
                            const rgw_user &acct_user_override,
                            U&& decoratee)
     : DecoratedApplier<T>(std::move(decoratee)),
-      store(store),
+      ctl(ctl),
       acct_user_override(acct_user_override) {
   }
 
@@ -155,19 +163,26 @@ void ThirdPartyAccountApplier<T>::load_acct_info(const DoutPrefixProvider* dpp, 
     /* The override has been specified but the account belongs to the authenticated
      * identity. We may safely forward the call to a next stage. */
     DecoratedApplier<T>::load_acct_info(dpp, user_info);
+  } else if (this->is_anonymous()) {
+    /* If the user was authed by the anonymous engine then scope the ANON user
+     * to the correct tenant */
+    if (acct_user_override.tenant.empty())
+      user_info.user_id = rgw_user(acct_user_override.id, RGW_USER_ANON_ID);
+    else
+      user_info.user_id = rgw_user(acct_user_override.tenant, RGW_USER_ANON_ID);
   } else {
     /* Compatibility mechanism for multi-tenancy. For more details refer to
      * load_acct_info method of rgw::auth::RemoteApplier. */
     if (acct_user_override.tenant.empty()) {
       const rgw_user tenanted_uid(acct_user_override.id, acct_user_override.id);
 
-      if (rgw_get_user_info_by_uid(store, tenanted_uid, user_info) >= 0) {
+      if (ctl->user->get_info_by_uid(tenanted_uid, &user_info, null_yield) >= 0) {
         /* Succeeded. */
         return;
       }
     }
 
-    const int ret = rgw_get_user_info_by_uid(store, acct_user_override, user_info);
+    const int ret = ctl->user->get_info_by_uid(acct_user_override, &user_info, null_yield);
     if (ret < 0) {
       /* We aren't trying to recover from ENOENT here. It's supposed that creating
        * someone else's account isn't a thing we want to support in this filter. */
@@ -182,10 +197,10 @@ void ThirdPartyAccountApplier<T>::load_acct_info(const DoutPrefixProvider* dpp, 
 }
 
 template <typename T> static inline
-ThirdPartyAccountApplier<T> add_3rdparty(RGWRados* const store,
+ThirdPartyAccountApplier<T> add_3rdparty(RGWCtl* const ctl,
                                          const rgw_user &acct_user_override,
                                          T&& t) {
-  return ThirdPartyAccountApplier<T>(store, acct_user_override,
+  return ThirdPartyAccountApplier<T>(ctl, acct_user_override,
                                      std::forward<T>(t));
 }
 
@@ -193,19 +208,19 @@ ThirdPartyAccountApplier<T> add_3rdparty(RGWRados* const store,
 template <typename T>
 class SysReqApplier : public DecoratedApplier<T> {
   CephContext* const cct;
-  /*const*/ RGWRados* const store;
+  /*const*/ RGWCtl* const ctl;
   const RGWHTTPArgs& args;
   mutable boost::tribool is_system;
 
 public:
   template <typename U>
   SysReqApplier(CephContext* const cct,
-                /*const*/ RGWRados* const store,
+                /*const*/ RGWCtl* const ctl,
                 const req_state* const s,
                 U&& decoratee)
     : DecoratedApplier<T>(std::forward<T>(decoratee)),
       cct(cct),
-      store(store),
+      ctl(ctl),
       args(s->info.args),
       is_system(boost::logic::indeterminate) {
   }
@@ -237,7 +252,7 @@ void SysReqApplier<T>::load_acct_info(const DoutPrefixProvider* dpp, RGWUserInfo
        * reasons. rgw_get_user_info_by_uid doesn't trigger the operator=() but
        * calls ::decode instead. */
       RGWUserInfo euser_info;
-      if (rgw_get_user_info_by_uid(store, effective_uid, euser_info) < 0) {
+      if (ctl->user->get_info_by_uid(effective_uid, &euser_info, null_yield) < 0) {
         //ldpp_dout(dpp, 0) << "User lookup failed!" << dendl;
         throw -EACCES;
       }
@@ -263,10 +278,10 @@ void SysReqApplier<T>::modify_request_state(const DoutPrefixProvider* dpp, req_s
 
 template <typename T> static inline
 SysReqApplier<T> add_sysreq(CephContext* const cct,
-                            /* const */ RGWRados* const store,
+                            /* const */ RGWCtl* const ctl,
                             const req_state* const s,
                             T&& t) {
-  return SysReqApplier<T>(cct, store, s, std::forward<T>(t));
+  return SysReqApplier<T>(cct, ctl, s, std::forward<T>(t));
 }
 
 } /* namespace auth */

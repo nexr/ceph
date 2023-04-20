@@ -51,10 +51,13 @@ def task(ctx, config):
     # set versions for cloning the repo
     apache_maven = 'apache-maven-{maven_version}-bin.tar.gz'.format(
         maven_version=maven_version)
-    maven_link = 'http://apache.mirrors.lucidnetworks.net/maven/' + \
+    maven_link = 'http://www-us.apache.org/dist/maven/' + \
         '{maven_major}/{maven_version}/binaries/'.format(maven_major=maven_major, maven_version=maven_version) + apache_maven
     hadoop_git = 'https://github.com/apache/hadoop'
     hadoop_rel = 'hadoop-{ver} rel/release-{ver}'.format(ver=hadoop_ver)
+    if hadoop_ver == 'trunk':
+        # just checkout a new branch out of trunk
+        hadoop_rel = 'hadoop-ceph-trunk'
     install_prereq(remote)
     remote.run(
         args=[
@@ -133,7 +136,7 @@ def setup_user_bucket(client, dns_name, access_key, secret_key, bucket_name, tes
             'create',
             run.Raw('--uid'),
             's3a',
-            run.Raw('--display-name=s3a cephtests'),
+            run.Raw('--display-name="s3a cephtests"'),
             run.Raw('--access-key={access_key}'.format(access_key=access_key)),
             run.Raw('--secret-key={secret_key}'.format(secret_key=secret_key)),
             run.Raw('--email=s3a@ceph.com'),

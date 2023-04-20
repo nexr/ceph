@@ -9,7 +9,6 @@ import operator
 import rados
 from threading import Event
 from datetime import datetime, timedelta, date, time
-import _strptime
 from six import iteritems
 
 TIME_FORMAT = '%Y%m%d-%H%M%S'
@@ -19,7 +18,7 @@ DEVICE_HEALTH_IN_USE = 'DEVICE_HEALTH_IN_USE'
 DEVICE_HEALTH_TOOMANY = 'DEVICE_HEALTH_TOOMANY'
 HEALTH_MESSAGES = {
     DEVICE_HEALTH: '%d device(s) expected to fail soon',
-    DEVICE_HEALTH_IN_USE: '%d daemons(s) expected to fail soon and still contain data',
+    DEVICE_HEALTH_IN_USE: '%d daemon(s) expected to fail soon and still contain data',
     DEVICE_HEALTH_TOOMANY: 'Too many daemons are expected to fail soon',
 }
 
@@ -30,7 +29,7 @@ class Module(MgrModule):
     MODULE_OPTIONS = [
         {
             'name': 'enable_monitoring',
-            'default': False,
+            'default': True,
             'type': 'bool',
             'desc': 'monitor device health metrics',
             'runtime': True,
@@ -146,6 +145,7 @@ class Module(MgrModule):
         # other
         self.run = True
         self.event = Event()
+        self.has_device_pool = False
 
     def is_valid_daemon_name(self, who):
         l = who.split('.')
@@ -222,6 +222,37 @@ class Module(MgrModule):
                     self.get_module_option(opt['name']))
             self.log.debug(' %s = %s', opt['name'], getattr(self, opt['name']))
 
+    def notify(self, notify_type, notify_id):
+       # create device_health_metrics pool if it doesn't exist
+       if notify_type == "osd_map" and self.enable_monitoring:
+            if not self.has_device_pool:
+                self.create_device_pool()
+                self.has_device_pool = True
+
+    def create_device_pool(self):
+        self.log.debug('create %s pool' % self.pool_name)
+        # create pool
+        result = CommandResult('')
+        self.send_command(result, 'mon', '', json.dumps({
+            'prefix': 'osd pool create',
+            'format': 'json',
+            'pool': self.pool_name,
+            'pg_num': 1,
+            'pg_num_min': 1,
+        }), '')
+        r, outb, outs = result.wait()
+        assert r == 0
+        # set pool application
+        result = CommandResult('')
+        self.send_command(result, 'mon', '', json.dumps({
+            'prefix': 'osd pool application enable',
+            'format': 'json',
+            'pool': self.pool_name,
+            'app': 'mgr_devicehealth',
+        }), '')
+        r, outb, outs = result.wait()
+        assert r == 0
+
     def serve(self):
         self.log.info("Starting")
         self.config_notify()
@@ -275,46 +306,23 @@ class Module(MgrModule):
         self.event.set()
 
     def open_connection(self, create_if_missing=True):
-        pools = self.rados.list_pools()
-        is_pool = False
-        for pool in pools:
-            if pool == self.pool_name:
-                is_pool = True
-                break
-        if not is_pool:
+        osdmap = self.get("osd_map")
+        assert osdmap is not None
+        if len(osdmap['osds']) == 0:
+            return None
+        if not self.has_device_pool:
             if not create_if_missing:
                 return None
-            self.log.debug('create %s pool' % self.pool_name)
-            # create pool
-            result = CommandResult('')
-            self.send_command(result, 'mon', '', json.dumps({
-                'prefix': 'osd pool create',
-                'format': 'json',
-                'pool': self.pool_name,
-                'pg_num': 1,
-                'pg_num_min': 1,
-            }), '')
-            r, outb, outs = result.wait()
-            assert r == 0
-
-            # set pool application
-            result = CommandResult('')
-            self.send_command(result, 'mon', '', json.dumps({
-                'prefix': 'osd pool application enable',
-                'format': 'json',
-                'pool': self.pool_name,
-                'app': 'mgr_devicehealth',
-            }), '')
-            r, outb, outs = result.wait()
-            assert r == 0
-
+            if self.enable_monitoring:
+                self.create_device_pool()
+                self.has_device_pool = True
         ioctx = self.rados.open_ioctx(self.pool_name)
         return ioctx
 
     def scrape_daemon(self, daemon_type, daemon_id):
         ioctx = self.open_connection()
-        if daemon_type != 'osd':
-            return -errno.EINVAL, '', 'scraping non-OSDs not currently supported'
+        if not ioctx:
+            return 0, "", ""
         raw_smart_data = self.do_scrape_daemon(daemon_type, daemon_id)
         if raw_smart_data:
             for device, raw_data in raw_smart_data.items():
@@ -328,10 +336,15 @@ class Module(MgrModule):
         osdmap = self.get("osd_map")
         assert osdmap is not None
         ioctx = self.open_connection()
+        if not ioctx:
+            return 0, "", ""
         did_device = {}
         ids = []
         for osd in osdmap['osds']:
             ids.append(('osd', str(osd['osd'])))
+        monmap = self.get("mon_map")
+        for mon in monmap['mons']:
+            ids.append(('mon', mon['name']))
         for daemon_type, daemon_id in ids:
             raw_smart_data = self.do_scrape_daemon(daemon_type, daemon_id)
             if not raw_smart_data:
@@ -348,15 +361,17 @@ class Module(MgrModule):
         return 0, "", ""
 
     def scrape_device(self, devid):
-        r = self.get("device " + devid)
+        r = self.get("device " + str(devid))
         if not r or 'device' not in r.keys():
-            return -errno.ENOENT, '', 'device ' + devid + ' not found'
-        daemons = [d for d in r['device'].get('daemons', []) if not d.startswith('osd.')]
+            return -errno.ENOENT, '', 'device ' + str(devid) + ' not found'
+        daemons = r['device'].get('daemons', [])
         if not daemons:
             return (-errno.EAGAIN, '',
-                    'device ' + devid + ' not claimed by any active OSD daemons')
+                    'device ' + str(devid) + ' not claimed by any active daemons')
         (daemon_type, daemon_id) = daemons[0].split('.')
         ioctx = self.open_connection()
+        if not ioctx:
+            return 0, "", ""
         raw_smart_data = self.do_scrape_daemon(daemon_type, daemon_id,
                                                devid=devid)
         if raw_smart_data:
@@ -455,9 +470,9 @@ class Module(MgrModule):
 
     def show_device_metrics(self, devid, sample):
         # verify device exists
-        r = self.get("device " + devid)
+        r = self.get("device " + str(devid))
         if not r or 'device' not in r.keys():
-            return -errno.ENOENT, '', 'device ' + devid + ' not found'
+            return -errno.ENOENT, '', 'device ' + str(devid) + ' not found'
         # fetch metrics
         res = self._get_device_metrics(devid, sample=sample)
         return 0, json.dumps(res, indent=4, sort_keys=True), ''
@@ -490,11 +505,11 @@ class Module(MgrModule):
                dev['life_expectancy_max'] == '0.000000':
                 continue
             # life_expectancy_(min/max) is in the format of:
-            # '%Y-%m-%d %H:%M:%S.%f', e.g.:
-            # '2019-01-20 21:12:12.000000'
+            # '%Y-%m-%dT%H:%M:%S.%f%z', e.g.:
+            # '2019-01-20T21:12:12.000000Z'
             life_expectancy_max = datetime.strptime(
                 dev['life_expectancy_max'],
-                '%Y-%m-%d %H:%M:%S.%f')
+                '%Y-%m-%dT%H:%M:%S.%f%z')
             self.log.debug('device %s expectancy max %s', dev,
                            life_expectancy_max)
 
@@ -514,7 +529,7 @@ class Module(MgrModule):
             if life_expectancy_max - now <= warn_threshold_td:
                 # device can appear in more than one location in case
                 # of SCSI multipath
-                device_locations = map(lambda x: x['host'] + ':' + x['dev'],
+                device_locations = map(lambda x: x['host'] + ':' + str(x['dev']),
                                        dev['location'])
                 health_warnings[DEVICE_HEALTH].append(
                     '%s (%s); daemons %s; life expectancy between %s and %s'
@@ -565,6 +580,7 @@ class Module(MgrModule):
                 checks[warning] = {
                     'severity': 'warning',
                     'summary': HEALTH_MESSAGES[warning] % n,
+                    'count': len(ls),
                     'detail': ls,
                 }
         self.set_health_checks(checks)
@@ -594,7 +610,7 @@ class Module(MgrModule):
         }), '')
         r, outb, outs = result.wait()
         if r != 0:
-            self.log.warn('Could not mark OSD %s out. r: [%s], outb: [%s], outs: [%s]' % (osd_ids, r, outb, outs))
+            self.log.warning('Could not mark OSD %s out. r: [%s], outb: [%s], outs: [%s]' % (osd_ids, r, outb, outs))
         for osd_id in osd_ids:
             result = CommandResult('')
             self.send_command(result, 'mon', '', json.dumps({
@@ -605,7 +621,7 @@ class Module(MgrModule):
             }), '')
             r, outb, outs = result.wait()
             if r != 0:
-                self.log.warn('Could not set osd.%s primary-affinity, r: [%s], outs: [%s]' % (osd_id, r, outb, outs))
+                self.log.warning('Could not set osd.%s primary-affinity, r: [%s], outs: [%s]' % (osd_id, r, outb, outs))
 
     def extract_smart_features(self, raw):
         # FIXME: extract and normalize raw smartctl --json output and

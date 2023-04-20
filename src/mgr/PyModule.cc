@@ -15,7 +15,9 @@
 #include "BaseMgrStandbyModule.h"
 #include "PyOSDMap.h"
 #include "MgrContext.h"
+#include "PyUtil.h"
 
+#include "PythonCompat.h"
 #include "PyModule.h"
 
 #include "common/debug.h"
@@ -131,7 +133,7 @@ namespace {
 #endif
 }
 
-PyModuleConfig::PyModuleConfig() = default;  
+PyModuleConfig::PyModuleConfig() = default;
 
 PyModuleConfig::PyModuleConfig(PyModuleConfig &mconfig)
   : config(mconfig.config)
@@ -147,16 +149,6 @@ void PyModuleConfig::set_config(
 {
   const std::string global_key = PyModule::config_prefix
                                    + module_name + "/" + key;
-  {
-    std::lock_guard l(lock);
-
-    if (val) {
-      config[global_key] = *val;
-    } else {
-      config.erase(global_key);
-    }
-  }
-
   Command set_cmd;
   {
     std::ostringstream cmd_json;
@@ -164,23 +156,33 @@ void PyModuleConfig::set_config(
     jf.open_object_section("cmd");
     if (val) {
       jf.dump_string("prefix", "config set");
-      jf.dump_string("who", "mgr");
-      jf.dump_string("name", global_key);
       jf.dump_string("value", *val);
     } else {
       jf.dump_string("prefix", "config rm");
-      jf.dump_string("name", "mgr");
-      jf.dump_string("key", global_key);
     }
+    jf.dump_string("who", "mgr");
+    jf.dump_string("name", global_key);
     jf.close_section();
     jf.flush(cmd_json);
     set_cmd.run(monc, cmd_json.str());
   }
   set_cmd.wait();
 
-  if (set_cmd.r != 0) {
-    dout(0) << "`config set mgr" << global_key << " " << val << "` failed: "
-      << cpp_strerror(set_cmd.r) << dendl;
+  if (set_cmd.r == 0) {
+    std::lock_guard l(lock);
+    if (val) {
+      config[global_key] = *val;
+    } else {
+      config.erase(global_key);
+    }
+  } else {
+    if (val) {
+      dout(0) << "`config set mgr " << global_key << " " << val << "` failed: "
+        << cpp_strerror(set_cmd.r) << dendl;
+    } else {
+      dout(0) << "`config rm mgr " << global_key << "` failed: "
+        << cpp_strerror(set_cmd.r) << dendl;
+    }
     dout(0) << "mon returned " << set_cmd.r << ": " << set_cmd.outs << dendl;
   }
 }
@@ -340,15 +342,15 @@ int PyModule::load(PyThreadState *pMainThreadState)
       PySys_SetArgv(1, (char**)argv);
 #endif
       // Configure sys.path to include mgr_module_path
-      string paths = (":" + g_conf().get_val<std::string>("mgr_module_path") +
-		      ":" + get_site_packages());
+      string paths = (g_conf().get_val<std::string>("mgr_module_path") + ':' +
+                      get_site_packages() + ':');
 #if PY_MAJOR_VERSION >= 3
-      wstring sys_path(Py_GetPath() + wstring(begin(paths), end(paths)));
+      wstring sys_path(wstring(begin(paths), end(paths)) + Py_GetPath());
       PySys_SetPath(const_cast<wchar_t*>(sys_path.c_str()));
       dout(10) << "Computed sys.path '"
 	       << string(begin(sys_path), end(sys_path)) << "'" << dendl;
 #else
-      string sys_path(Py_GetPath() + paths);
+      string sys_path(paths + Py_GetPath());
       PySys_SetPath(const_cast<char*>(sys_path.c_str()));
       dout(10) << "Computed sys.path '" << sys_path << "'" << dendl;
 #endif
@@ -373,6 +375,7 @@ int PyModule::load(PyThreadState *pMainThreadState)
       return r;
     }
 
+    register_options(pClass);
     r = load_options();
     if (r != 0) {
       derr << "Missing or invalid MODULE_OPTIONS attribute in module '"
@@ -390,6 +393,7 @@ int PyModule::load(PyThreadState *pMainThreadState)
     if (!r) {
       dout(4) << "Standby mode available in module '" << module_name
               << "'" << dendl;
+      register_options(pStandbyClass);
     } else {
       dout(4) << "Standby mode not provided by module '" << module_name
               << "'" << dendl;
@@ -475,10 +479,27 @@ int PyModule::walk_dict_list(
   return r;
 }
 
+int PyModule::register_options(PyObject *cls)
+{
+  PyObject *pRegCmd = PyObject_CallMethod(
+    cls,
+    const_cast<char*>("_register_options"), const_cast<char*>("(s)"),
+      module_name.c_str());
+  if (pRegCmd != nullptr) {
+    Py_DECREF(pRegCmd);
+  } else {
+    derr << "Exception calling _register_options on " << get_name()
+         << dendl;
+    derr << handle_pyerror() << dendl;
+  }
+  return 0;
+}
+
 int PyModule::load_commands()
 {
   PyObject *pRegCmd = PyObject_CallMethod(pClass,
-  const_cast<char*>("_register_commands"), const_cast<char*>("()"));
+      const_cast<char*>("_register_commands"), const_cast<char*>("(s)"),
+      module_name.c_str());
   if (pRegCmd != nullptr) {
     Py_DECREF(pRegCmd);
   } else {
@@ -535,7 +556,7 @@ int PyModule::load_options()
     option.name = PyString_AsString(p);
     option.type = Option::TYPE_STR;
     p = PyDict_GetItemString(pOption, "type");
-    if (p && PyObject_TypeCheck(p, &PyString_Type)) {
+    if (p && PyObject_TypeCheck(p, &PyUnicode_Type)) {
       std::string s = PyString_AsString(p);
       int t = Option::str_to_type(s);
       if (t >= 0) {
@@ -543,11 +564,11 @@ int PyModule::load_options()
       }
     }
     p = PyDict_GetItemString(pOption, "desc");
-    if (p && PyObject_TypeCheck(p, &PyString_Type)) {
+    if (p && PyObject_TypeCheck(p, &PyUnicode_Type)) {
       option.desc = PyString_AsString(p);
     }
     p = PyDict_GetItemString(pOption, "long_desc");
-    if (p && PyObject_TypeCheck(p, &PyString_Type)) {
+    if (p && PyObject_TypeCheck(p, &PyUnicode_Type)) {
       option.long_desc = PyString_AsString(p);
     }
     p = PyDict_GetItemString(pOption, "default");
@@ -583,7 +604,7 @@ int PyModule::load_options()
     if (p && PyObject_TypeCheck(p, &PyList_Type)) {
       for (unsigned i = 0; i < PyList_Size(p); ++i) {
 	auto q = PyList_GetItem(p, i);
-	if (q && PyObject_TypeCheck(q, &PyString_Type)) {
+	if (q && PyObject_TypeCheck(q, &PyUnicode_Type)) {
 	  option.see_also.insert(PyString_AsString(q));
 	}
       }
@@ -592,7 +613,7 @@ int PyModule::load_options()
     if (p && PyObject_TypeCheck(p, &PyList_Type)) {
       for (unsigned i = 0; i < PyList_Size(p); ++i) {
 	auto q = PyList_GetItem(p, i);
-	if (q && PyObject_TypeCheck(q, &PyString_Type)) {
+	if (q && PyObject_TypeCheck(q, &PyUnicode_Type)) {
 	  option.tags.insert(PyString_AsString(q));
 	}
       }
@@ -629,31 +650,9 @@ PyObject *PyModule::get_typed_option_value(const std::string& name,
   // are set up exactly once during startup.
   auto p = options.find(name);
   if (p != options.end()) {
-    switch (p->second.type) {
-    case Option::TYPE_INT:
-    case Option::TYPE_UINT:
-    case Option::TYPE_SIZE:
-      return PyInt_FromString((char *)value.c_str(), nullptr, 0);
-    case Option::TYPE_SECS:
-    case Option::TYPE_FLOAT:
-      {
-	PyObject *s = PyString_FromString(value.c_str());
-	PyObject *f = PyFloat_FromString(s, nullptr);
-	Py_DECREF(s);
-	return f;
-      }
-    case Option::TYPE_BOOL:
-      if (value == "1" || value == "true" || value == "True" ||
-	  value == "on" || value == "yes") {
-	Py_INCREF(Py_True);
-	return Py_True;
-      } else {
-	Py_INCREF(Py_False);
-	return Py_False;
-      }
-    }
+    return get_python_typed_option_value((Option::type_t)p->second.type, value);
   }
-  return PyString_FromString(value.c_str());
+  return PyUnicode_FromString(value.c_str());
 }
 
 int PyModule::load_subclass_of(const char* base_class, PyObject** py_class)

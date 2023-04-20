@@ -109,6 +109,14 @@ int obtain_monmap(MonitorDBStore &store, bufferlist &bl)
     }
   }
 
+  if (store.exists("mon_sync", "temp_newer_monmap")) {
+    dout(10) << __func__ << " found temp_newer_monmap" << dendl;
+    int err = store.get("mon_sync", "temp_newer_monmap", bl);
+    ceph_assert(err == 0);
+    ceph_assert(bl.length() > 0);
+    return 0;
+  }
+
   if (store.exists("mkfs", "monmap")) {
     dout(10) << __func__ << " found mkfs monmap" << dendl;
     int err = store.get("mkfs", "monmap", bl);
@@ -374,7 +382,8 @@ int main(int argc, const char **argv)
     pick_addresses(g_ceph_context, CEPH_PICK_ADDRESS_PUBLIC);
 
     dout(10) << "public_network " << g_conf()->public_network << dendl;
-    dout(10) << "public_addr " << g_conf()->public_network << dendl;
+    dout(10) << "public_addr " << g_conf()->public_addr << dendl;
+    dout(10) << "public_addrv " << g_conf()->public_addrv << dendl;
 
     common_init_finish(g_ceph_context);
 
@@ -421,6 +430,14 @@ int main(int argc, const char **argv)
       if (monmap.contains(g_conf()->name.get_id())) {
 	// hmm, make sure the ip listed exists on the current host?
 	// maybe later.
+      } else if (!g_conf()->public_addrv.empty()) {
+	entity_addrvec_t av = g_conf()->public_addrv;
+	string name;
+	if (monmap.contains(av, &name)) {
+	  monmap.rename(name, g_conf()->name.get_id());
+	  dout(0) << argv[0] << ": renaming mon." << name << " " << av
+		  << " to mon." << g_conf()->name.get_id() << dendl;
+	}
       } else if (!g_conf()->public_addr.is_blank_ip()) {
 	entity_addrvec_t av = make_mon_addrs(g_conf()->public_addr);
 	string name;
@@ -592,17 +609,10 @@ int main(int argc, const char **argv)
     string val;
     int r = store->read_meta("min_mon_release", &val);
     if (r >= 0 && val.size()) {
-      int min = atoi(val.c_str());
-      if (min &&
-	  min + 2 < (int)ceph_release()) {
-	derr << "recorded min_mon_release is " << min
-	     << " (" << ceph_release_name(min)
-	     << ") which is >2 releases older than installed "
-	     << ceph_release() << " (" << ceph_release_name(ceph_release())
-	     << "); you can only upgrade 2 releases at a time" << dendl;
-	derr << "you should first upgrade to "
-	     << (min + 1) << " (" << ceph_release_name(min + 1) << ") or "
-	     << (min + 2) << " (" << ceph_release_name(min + 2) << ")" << dendl;
+      ceph_release_t from_release = ceph_release_from_name(val);
+      ostringstream err;
+      if (!can_upgrade_from(from_release, "min_mon_release", err)) {
+	derr << err.str() << dendl;
 	prefork.exit(1);
       }
     }
@@ -743,7 +753,10 @@ int main(int argc, const char **argv)
     dout(0) << g_conf()->name << " does not exist in monmap, will attempt to join an existing cluster" << dendl;
 
     pick_addresses(g_ceph_context, CEPH_PICK_ADDRESS_PUBLIC);
-    if (!g_conf()->public_addr.is_blank_ip()) {
+    if (!g_conf()->public_addrv.empty()) {
+      ipaddrs = g_conf()->public_addrv;
+      dout(0) << "using public_addrv " << ipaddrs << dendl;
+    } else if (!g_conf()->public_addr.is_blank_ip()) {
       ipaddrs = make_mon_addrs(g_conf()->public_addr);
       dout(0) << "using public_addr " << g_conf()->public_addr << " -> "
 	      << ipaddrs << dendl;
@@ -773,7 +786,8 @@ int main(int argc, const char **argv)
   std::string public_msgr_type = g_conf()->ms_public_type.empty() ? g_conf().get_val<std::string>("ms_type") : g_conf()->ms_public_type;
   Messenger *msgr = Messenger::create(g_ceph_context, public_msgr_type,
 				      entity_name_t::MON(rank), "mon",
-				      0, Messenger::HAS_MANY_CONNECTIONS);
+				      0,  // zero nonce
+				      Messenger::HAS_MANY_CONNECTIONS);
   if (!msgr)
     exit(1);
   msgr->set_cluster_protocol(CEPH_MON_PROTOCOL);
@@ -824,7 +838,8 @@ int main(int argc, const char **argv)
 
   Messenger *mgr_msgr = Messenger::create(g_ceph_context, public_msgr_type,
 					  entity_name_t::MON(rank), "mon-mgrc",
-					  getpid(), 0);
+					  Messenger::get_pid_nonce(),
+					  0);
   if (!mgr_msgr) {
     derr << "unable to create mgr_msgr" << dendl;
     prefork.exit(1);
@@ -839,9 +854,11 @@ int main(int argc, const char **argv)
   if (force_sync) {
     derr << "flagging a forced sync ..." << dendl;
     ostringstream oss;
-    mon->sync_force(NULL, oss);
-    if (oss.tellp())
-      derr << oss.str() << dendl;
+    JSONFormatter jf(true);
+    mon->sync_force(&jf);
+    derr << "out:\n";
+    jf.flush(*_dout);
+    *_dout << dendl;
   }
 
   err = mon->preinit();

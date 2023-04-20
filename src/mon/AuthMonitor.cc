@@ -40,6 +40,7 @@
 #define dout_subsys ceph_subsys_mon
 #undef dout_prefix
 #define dout_prefix _prefix(_dout, mon, get_last_committed())
+using namespace TOPNSPC::common;
 static ostream& _prefix(std::ostream *_dout, Monitor *mon, version_t v) {
   return *_dout << "mon." << mon->name << "@" << mon->rank
 		<< "(" << mon->get_state_name()
@@ -419,7 +420,8 @@ void AuthMonitor::encode_pending(MonitorDBStore::TransactionRef t)
   if (bad_detail.size()) {
     ostringstream ss;
     ss << bad_detail.size() << " auth entities have invalid capabilities";
-    health_check_t *check = &next.add("AUTH_BAD_CAPS", HEALTH_ERR, ss.str());
+    health_check_t *check = &next.add("AUTH_BAD_CAPS", HEALTH_ERR, ss.str(),
+				      bad_detail.size());
     for (auto& i : bad_detail) {
       for (auto& j : i.second) {
 	check->detail.push_back(j);
@@ -464,7 +466,7 @@ version_t AuthMonitor::get_trim_to() const
 
 bool AuthMonitor::preprocess_query(MonOpRequestRef op)
 {
-  PaxosServiceMessage *m = static_cast<PaxosServiceMessage*>(op->get_req());
+  auto m = op->get_req<PaxosServiceMessage>();
   dout(10) << "preprocess_query " << *m << " from " << m->get_orig_source_inst() << dendl;
   switch (m->get_type()) {
   case MSG_MON_COMMAND:
@@ -490,7 +492,7 @@ bool AuthMonitor::preprocess_query(MonOpRequestRef op)
 
 bool AuthMonitor::prepare_update(MonOpRequestRef op)
 {
-  PaxosServiceMessage *m = static_cast<PaxosServiceMessage*>(op->get_req());
+  auto m = op->get_req<PaxosServiceMessage>();
   dout(10) << "prepare_update " << *m << " from " << m->get_orig_source_inst() << dendl;
   switch (m->get_type()) {
   case MSG_MON_COMMAND:
@@ -569,7 +571,7 @@ uint64_t AuthMonitor::assign_global_id(bool should_increase_max)
 
 bool AuthMonitor::prep_auth(MonOpRequestRef op, bool paxos_writable)
 {
-  MAuth *m = static_cast<MAuth*>(op->get_req());
+  auto m = op->get_req<MAuth>();
   dout(10) << "prep_auth() blob_size=" << m->get_auth_payload().length() << dendl;
 
   MonSession *s = op->get_session();
@@ -586,6 +588,7 @@ bool AuthMonitor::prep_auth(MonOpRequestRef op, bool paxos_writable)
   bool start = false;
   bool finished = false;
   EntityName entity_name;
+  bool is_new_global_id = false;
 
   // set up handler?
   if (m->protocol == 0 && !s->auth_handler) {
@@ -705,23 +708,23 @@ bool AuthMonitor::prep_auth(MonOpRequestRef op, bool paxos_writable)
       ceph_assert(!paxos_writable);
       return false;
     }
+    is_new_global_id = true;
   }
 
   try {
     if (start) {
       // new session
       ret = s->auth_handler->start_session(entity_name,
-					   0, // no connection_secret needed
+					   s->con->peer_global_id,
+					   is_new_global_id,
 					   &response_bl,
-					   &s->con->peer_caps_info,
-					   nullptr, nullptr);
+					   &s->con->peer_caps_info);
     } else {
       // request
       ret = s->auth_handler->handle_request(
 	indata,
 	0, // no connection_secret needed
 	&response_bl,
-	&s->con->peer_global_id,
 	&s->con->peer_caps_info,
 	nullptr, nullptr);
     }
@@ -757,7 +760,7 @@ done:
 
 bool AuthMonitor::preprocess_command(MonOpRequestRef op)
 {
-  MMonCommand *m = static_cast<MMonCommand*>(op->get_req());
+  auto m = op->get_req<MMonCommand>();
   int r = -1;
   bufferlist rdata;
   stringstream ss, ds;
@@ -771,7 +774,7 @@ bool AuthMonitor::preprocess_command(MonOpRequestRef op)
   }
 
   string prefix;
-  cmd_getval(g_ceph_context, cmdmap, "prefix", prefix);
+  cmd_getval(cmdmap, "prefix", prefix);
   if (prefix == "auth add" ||
       prefix == "auth del" ||
       prefix == "auth rm" ||
@@ -791,7 +794,7 @@ bool AuthMonitor::preprocess_command(MonOpRequestRef op)
 
   // entity might not be supplied, but if it is, it should be valid
   string entity_name;
-  cmd_getval(g_ceph_context, cmdmap, "entity", entity_name);
+  cmd_getval(cmdmap, "entity", entity_name);
   EntityName entity;
   if (!entity_name.empty() && !entity.from_str(entity_name)) {
     ss << "invalid entity_auth " << entity_name;
@@ -800,7 +803,7 @@ bool AuthMonitor::preprocess_command(MonOpRequestRef op)
   }
 
   string format;
-  cmd_getval(g_ceph_context, cmdmap, "format", format, string("plain"));
+  cmd_getval(cmdmap, "format", format, string("plain"));
   boost::scoped_ptr<Formatter> f(Formatter::create(format));
 
   if (prefix == "auth export") {
@@ -1287,7 +1290,7 @@ bool AuthMonitor::valid_caps(const vector<string>& caps, ostream *out)
 
 bool AuthMonitor::prepare_command(MonOpRequestRef op)
 {
-  MMonCommand *m = static_cast<MMonCommand*>(op->get_req());
+  auto m = op->get_req<MMonCommand>();
   stringstream ss, ds;
   bufferlist rdata;
   string rs;
@@ -1306,10 +1309,10 @@ bool AuthMonitor::prepare_command(MonOpRequestRef op)
   string entity_name;
   EntityName entity;
 
-  cmd_getval(g_ceph_context, cmdmap, "prefix", prefix);
+  cmd_getval(cmdmap, "prefix", prefix);
 
   string format;
-  cmd_getval(g_ceph_context, cmdmap, "format", format, string("plain"));
+  cmd_getval(cmdmap, "format", format, string("plain"));
   boost::scoped_ptr<Formatter> f(Formatter::create(format));
 
   MonSession *session = op->get_session();
@@ -1318,14 +1321,14 @@ bool AuthMonitor::prepare_command(MonOpRequestRef op)
     return true;
   }
 
-  cmd_getval(g_ceph_context, cmdmap, "caps", caps_vec);
+  cmd_getval(cmdmap, "caps", caps_vec);
   if ((caps_vec.size() % 2) != 0) {
     ss << "bad capabilities request; odd number of arguments";
     err = -EINVAL;
     goto done;
   }
 
-  cmd_getval(g_ceph_context, cmdmap, "entity", entity_name);
+  cmd_getval(cmdmap, "entity", entity_name);
   if (!entity_name.empty() && !entity.from_str(entity_name)) {
     ss << "bad entity name";
     err = -EINVAL;
@@ -1562,7 +1565,7 @@ bool AuthMonitor::prepare_command(MonOpRequestRef op)
     return true;
   } else if (prefix == "fs authorize") {
     string filesystem;
-    cmd_getval(g_ceph_context, cmdmap, "filesystem", filesystem);
+    cmd_getval(cmdmap, "filesystem", filesystem);
     string mds_cap_string, osd_cap_string;
     string osd_cap_wanted = "r";
 

@@ -1,7 +1,5 @@
 tasks:
-- ceph:
-    mon_bind_addrvec: false
-    mon_bind_msgr2: false
+- cephadm:
     conf:
-      global:
-        ms bind msgr2: false
+      mon:
+        auth allow insecure global id reclaim: true

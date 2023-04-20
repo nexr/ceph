@@ -37,7 +37,8 @@ list(APPEND man_srcs
   ${osd_srcs}
   ${mon_srcs}
   ceph-mds.rst
-  librados-config.rst)
+  librados-config.rst
+  cephadm.rst)
 
 if(HAVE_LIBFUSE)
   list(APPEND man_srcs
@@ -48,7 +49,9 @@ endif()
 if(WITH_RADOSGW)
   list(APPEND man_srcs
 	radosgw.rst
-	radosgw-admin.rst)
+	radosgw-admin.rst
+	rgw-orphan-list.rst
+	ceph-diff-sorted.rst)
 endif()
 
 if(WITH_RBD)
@@ -68,6 +71,7 @@ if(WITH_RBD)
   endif()
 endif()
 
+list(APPEND man_srcs ceph-immutable-object-cache.rst)
 foreach(man ${man_srcs})
   list(APPEND sphinx_input ${CMAKE_CURRENT_SOURCE_DIR}/${man})
   # mount.ceph.rst => mount if we use

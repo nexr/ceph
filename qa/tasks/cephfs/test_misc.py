@@ -1,5 +1,4 @@
 
-from unittest import SkipTest
 from tasks.cephfs.fuse_mount import FuseMount
 from tasks.cephfs.cephfs_test_case import CephFSTestCase
 from teuthology.orchestra.run import CommandFailedError, ConnectionLostError
@@ -13,6 +12,22 @@ log = logging.getLogger(__name__)
 class TestMisc(CephFSTestCase):
     CLIENTS_REQUIRED = 2
 
+    def test_statfs_on_deleted_fs(self):
+        """
+        That statfs does not cause monitors to SIGSEGV after fs deletion.
+        """
+
+        self.mount_b.umount_wait()
+        self.mount_a.run_shell_payload("stat -f .")
+        self.fs.delete_all_filesystems()
+        # This will hang either way, run in background.
+        p = self.mount_a.run_shell_payload("stat -f .", wait=False, timeout=60, check_status=False)
+        time.sleep(30)
+        self.assertFalse(p.finished)
+        # the process is stuck in uninterruptible sleep, just kill the mount
+        self.mount_a.umount_wait(force=True)
+        p.wait()
+
     def test_getattr_caps(self):
         """
         Check if MDS recognizes the 'mask' parameter of open request.
@@ -20,14 +35,13 @@ class TestMisc(CephFSTestCase):
         """
 
         if not isinstance(self.mount_a, FuseMount):
-            raise SkipTest("Require FUSE client")
+            self.skipTest("Require FUSE client")
 
         # Enable debug. Client will requests CEPH_CAP_XATTR_SHARED
         # on lookup/open
         self.mount_b.umount_wait()
         self.set_conf('client', 'client debug getattr caps', 'true')
-        self.mount_b.mount()
-        self.mount_b.wait_until_mounted()
+        self.mount_b.mount_wait()
 
         # create a file and hold it open. MDS will issue CEPH_CAP_EXCL_*
         # to mount_a

@@ -88,7 +88,7 @@ Similarly, two options control whether IPv4 and IPv6 addresses are used:
   * ``ms_bind_ipv6`` [default: false] controls whether a daemon binds
     to an IPv6 address
 
-.. note: The ability to bind to multiple ports has paved the way for
+.. note:: The ability to bind to multiple ports has paved the way for
    dual-stack IPv4 and IPv6 support.  That said, dual-stack support is
    not yet tested as of Nautilus v14.2.0 and likely needs some
    additional code changes to work correctly.
@@ -175,6 +175,8 @@ port ``1112``,::
 Once the monitors bind to v2, each daemon will start advertising a v2
 address when it is next restarted.
 
+
+.. _msgr2_ceph_conf:
 
 Updating ceph.conf and mon_host
 -------------------------------

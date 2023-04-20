@@ -83,7 +83,7 @@ int RGWLineageAtlasRest::send_curl(const string tenant, const string method, con
 
   http_tx.set_post_data(data);
 
-  http_tx.process();
+  http_tx.process(null_yield);
 
   dout(15) << __func__ << "(): received response status=" << http_tx.get_http_status()
                        << ", body=" << ret_buffer->to_str() << dendl;

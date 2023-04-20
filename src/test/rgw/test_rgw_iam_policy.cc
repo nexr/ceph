@@ -53,6 +53,8 @@ using rgw::IAM::s3GetBucketLocation;
 using rgw::IAM::s3GetBucketLogging;
 using rgw::IAM::s3GetBucketNotification;
 using rgw::IAM::s3GetBucketPolicy;
+using rgw::IAM::s3GetBucketPolicyStatus;
+using rgw::IAM::s3GetBucketPublicAccessBlock;
 using rgw::IAM::s3GetBucketRequestPayment;
 using rgw::IAM::s3GetBucketTagging;
 using rgw::IAM::s3GetBucketVersioning;
@@ -66,6 +68,7 @@ using rgw::IAM::s3GetObjectTagging;
 using rgw::IAM::s3GetObjectVersion;
 using rgw::IAM::s3GetObjectVersionTagging;
 using rgw::IAM::s3GetObjectVersionTorrent;
+using rgw::IAM::s3GetPublicAccessBlock;
 using rgw::IAM::s3GetReplicationConfiguration;
 using rgw::IAM::s3ListAllMyBuckets;
 using rgw::IAM::s3ListBucket;
@@ -76,10 +79,10 @@ using rgw::IAM::s3ListMultipartUploadParts;
 using rgw::IAM::None;
 using rgw::IAM::s3PutBucketAcl;
 using rgw::IAM::s3PutBucketPolicy;
-using rgw::Service;
 using rgw::IAM::s3GetBucketObjectLockConfiguration;
 using rgw::IAM::s3GetObjectRetention;
 using rgw::IAM::s3GetObjectLegalHold;
+using rgw::Service;
 using rgw::IAM::TokenID;
 using rgw::IAM::Version;
 using rgw::IAM::Action_t;
@@ -88,6 +91,7 @@ using rgw::IAM::iamCreateRole;
 using rgw::IAM::iamDeleteRole;
 using rgw::IAM::iamAll;
 using rgw::IAM::stsAll;
+using rgw::IAM::allCount;
 
 class FakeIdentity : public Identity {
   const Principal id;
@@ -120,6 +124,11 @@ public:
   }
 
   string get_acct_name() const override {
+    abort();
+    return 0;
+  }
+
+  string get_subuser() const override {
     abort();
     return 0;
   }
@@ -374,6 +383,9 @@ TEST_F(PolicyTest, Parse3) {
   act2[s3GetBucketObjectLockConfiguration] = 1;
   act2[s3GetObjectRetention] = 1;
   act2[s3GetObjectLegalHold] = 1;
+  act2[s3GetBucketPolicyStatus] = 1;
+  act2[s3GetBucketPublicAccessBlock] = 1;
+  act2[s3GetPublicAccessBlock] = 1;
 
   EXPECT_EQ(p->statements[2].action, act2);
   EXPECT_EQ(p->statements[2].notaction, None);
@@ -440,6 +452,9 @@ TEST_F(PolicyTest, Eval3) {
   s3allow[s3GetBucketObjectLockConfiguration] = 1;
   s3allow[s3GetObjectRetention] = 1;
   s3allow[s3GetObjectLegalHold] = 1;
+  s3allow[s3GetBucketPolicyStatus] = 1;
+  s3allow[s3GetBucketPublicAccessBlock] = 1;
+  s3allow[s3GetPublicAccessBlock] = 1;
 
   EXPECT_EQ(p.eval(em, none, s3PutBucketPolicy,
 		   ARN(Partition::aws, Service::s3,
@@ -894,12 +909,12 @@ TEST_F(IPPolicyTest, asNetworkInvalid) {
 TEST_F(IPPolicyTest, IPEnvironment) {
   // Unfortunately RGWCivetWeb is too tightly tied to civetweb to test RGWCivetWeb::init_env.
   RGWEnv rgw_env;
-  RGWUserInfo user;
-  RGWRados rgw_rados;
+  rgw::sal::RGWRadosStore store;
+  rgw::sal::RGWRadosUser user(&store);
   rgw_env.set("REMOTE_ADDR", "192.168.1.1");
   rgw_env.set("HTTP_HOST", "1.2.3.4");
   req_state rgw_req_state(cct.get(), &rgw_env, &user, 0);
-  rgw_build_iam_environment(&rgw_rados, &rgw_req_state);
+  rgw_build_iam_environment(&store, &rgw_req_state);
   auto ip = rgw_req_state.env.find("aws:SourceIp");
   ASSERT_NE(ip, rgw_req_state.env.end());
   EXPECT_EQ(ip->second, "192.168.1.1");
@@ -907,13 +922,13 @@ TEST_F(IPPolicyTest, IPEnvironment) {
   ASSERT_EQ(cct.get()->_conf.set_val("rgw_remote_addr_param", "SOME_VAR"), 0);
   EXPECT_EQ(cct.get()->_conf->rgw_remote_addr_param, "SOME_VAR");
   rgw_req_state.env.clear();
-  rgw_build_iam_environment(&rgw_rados, &rgw_req_state);
+  rgw_build_iam_environment(&store, &rgw_req_state);
   ip = rgw_req_state.env.find("aws:SourceIp");
   EXPECT_EQ(ip, rgw_req_state.env.end());
 
   rgw_env.set("SOME_VAR", "192.168.1.2");
   rgw_req_state.env.clear();
-  rgw_build_iam_environment(&rgw_rados, &rgw_req_state);
+  rgw_build_iam_environment(&store, &rgw_req_state);
   ip = rgw_req_state.env.find("aws:SourceIp");
   ASSERT_NE(ip, rgw_req_state.env.end());
   EXPECT_EQ(ip->second, "192.168.1.2");
@@ -921,14 +936,14 @@ TEST_F(IPPolicyTest, IPEnvironment) {
   ASSERT_EQ(cct.get()->_conf.set_val("rgw_remote_addr_param", "HTTP_X_FORWARDED_FOR"), 0);
   rgw_env.set("HTTP_X_FORWARDED_FOR", "192.168.1.3");
   rgw_req_state.env.clear();
-  rgw_build_iam_environment(&rgw_rados, &rgw_req_state);
+  rgw_build_iam_environment(&store, &rgw_req_state);
   ip = rgw_req_state.env.find("aws:SourceIp");
   ASSERT_NE(ip, rgw_req_state.env.end());
   EXPECT_EQ(ip->second, "192.168.1.3");
 
   rgw_env.set("HTTP_X_FORWARDED_FOR", "192.168.1.4, 4.3.2.1, 2001:db8:85a3:8d3:1319:8a2e:370:7348");
   rgw_req_state.env.clear();
-  rgw_build_iam_environment(&rgw_rados, &rgw_req_state);
+  rgw_build_iam_environment(&store, &rgw_req_state);
   ip = rgw_req_state.env.find("aws:SourceIp");
   ASSERT_NE(ip, rgw_req_state.env.end());
   EXPECT_EQ(ip->second, "192.168.1.4");
@@ -1276,4 +1291,25 @@ TEST(MatchPolicy, String)
   EXPECT_FALSE(match_policy("a:b:c", "A:B:C", flag)); // case sensitive
   EXPECT_TRUE(match_policy("a:*:e", "a:bcd:e", flag));
   EXPECT_TRUE(match_policy("a:*", "a:b:c", flag)); // can span segments
+}
+
+Action_t set_range_bits(std::uint64_t start, std::uint64_t end)
+{
+  Action_t result;
+  for (uint64_t i = start; i < end; i++) {
+    result.set(i);
+  }
+  return result;
+}
+
+using rgw::IAM::s3AllValue;
+using rgw::IAM::stsAllValue;
+using rgw::IAM::allValue;
+using rgw::IAM::iamAllValue;
+TEST(set_cont_bits, iamconsts)
+{
+  EXPECT_EQ(s3AllValue, set_range_bits(0, s3All));
+  EXPECT_EQ(iamAllValue, set_range_bits(s3All+1, iamAll));
+  EXPECT_EQ(stsAllValue, set_range_bits(iamAll+1, stsAll));
+  EXPECT_EQ(allValue , set_range_bits(0, allCount));
 }

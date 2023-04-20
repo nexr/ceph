@@ -2,15 +2,12 @@
 Automatically scale pg_num based on how much data is stored in each pool.
 """
 
-import errno
 import json
 import mgr_util
 import threading
 import uuid
 from six import itervalues, iteritems
-from collections import defaultdict
-from prettytable import PrettyTable, PLAIN_COLUMNS
-
+from prettytable import PrettyTable
 from mgr_module import MgrModule
 
 """
@@ -65,11 +62,22 @@ class PgAdjustmentProgress(object):
     """
     Keeps the initial and target pg_num values
     """
-    def __init__(self, pg_num, pg_num_target, ev_id, increase_decrease):
-        self._ev_id = ev_id
-        self._pg_num = pg_num
-        self._pg_num_target = pg_num_target
-        self._increase_decrease = increase_decrease
+    def __init__(self, pool_id, pg_num, pg_num_target):
+        self.ev_id = str(uuid.uuid4())
+        self.pool_id = pool_id
+        self.reset(pg_num, pg_num_target)
+
+    def reset(self, pg_num, pg_num_target):
+        self.pg_num = pg_num
+        self.pg_num_target = pg_num_target
+
+    def update(self, module, progress):
+        desc = 'increasing' if self.pg_num < self.pg_num_target else 'decreasing'
+        module.remote('progress', 'update', self.ev_id,
+                      ev_msg="PG autoscaler %s pool %d PGs from %d to %d" %
+                            (desc, self.pool_id, self.pg_num, self.pg_num_target),
+                      ev_progress=progress,
+                      refs=[("pool", self.pool_id)])
 
 
 class PgAutoscaler(MgrModule):
@@ -99,6 +107,7 @@ class PgAutoscaler(MgrModule):
     def __init__(self, *args, **kwargs):
         super(PgAutoscaler, self).__init__(*args, **kwargs)
         self._shutdown = threading.Event()
+        self._event = {}
 
         # So much of what we do peeks at the osdmap that it's easiest
         # to just keep a copy of the pythonized version.
@@ -131,7 +140,7 @@ class PgAutoscaler(MgrModule):
         ps, root_map, pool_root = self._get_pool_status(osdmap, pools)
 
         if cmd.get('format') == 'json' or cmd.get('format') == 'json-pretty':
-            return 0, json.dumps(ps, indent=2), ''
+            return 0, json.dumps(ps, indent=4, sort_keys=True), ''
         else:
             table = PrettyTable(['POOL', 'SIZE', 'TARGET SIZE',
                                  'RATE', 'RAW CAPACITY',
@@ -143,7 +152,7 @@ class PgAutoscaler(MgrModule):
                                  'NEW PG_NUM', 'AUTOSCALE'],
                                 border=False)
             table.left_padding_width = 0
-            table.right_padding_width = 1
+            table.right_padding_width = 2
             table.align['POOL'] = 'l'
             table.align['SIZE'] = 'r'
             table.align['TARGET SIZE'] = 'r'
@@ -195,6 +204,7 @@ class PgAutoscaler(MgrModule):
         self.config_notify()
         while not self._shutdown.is_set():
             self._maybe_adjust()
+            self._update_progress_events()
             self._shutdown.wait(timeout=int(self.sleep_interval))
 
     def shutdown(self):
@@ -244,7 +254,7 @@ class PgAutoscaler(MgrModule):
             result[root_id] = s
             s.root_ids.append(root_id)
             s.osds |= osds
-            s.pool_ids.append(int(pool_id))
+            s.pool_ids.append(pool_id)
             s.pool_names.append(pool['pool_name'])
             s.pg_current += pool['pg_num_target'] * pool['size']
             target_ratio = pool['options'].get('target_size_ratio', 0.0)
@@ -259,7 +269,7 @@ class PgAutoscaler(MgrModule):
         all_stats = self.get('osd_stats')
         for s in roots:
             s.osd_count = len(s.osds)
-            s.pg_target = s.osd_count * int(self.mon_target_pg_per_osd)
+            s.pg_target = s.osd_count * self.mon_target_pg_per_osd
 
             capacity = 0.0
             for osd_stats in all_stats['osd_stats']:
@@ -362,7 +372,7 @@ class PgAutoscaler(MgrModule):
 
             adjust = False
             if (final_pg_target > p['pg_num_target'] * threshold or \
-                final_pg_target <= p['pg_num_target'] / threshold) and \
+                final_pg_target < p['pg_num_target'] / threshold) and \
                 final_ratio >= 0.0 and \
                 final_ratio <= 1.0:
                 adjust = True
@@ -391,10 +401,24 @@ class PgAutoscaler(MgrModule):
 
         return (ret, root_map, pool_root)
 
+    def _update_progress_events(self):
+        osdmap = self.get_osdmap()
+        pools = osdmap.get_pools()
+        for pool_id in list(self._event):
+            ev = self._event[pool_id]
+            pool_data = pools.get(pool_id)
+            if pool_data is None or pool_data['pg_num'] == pool_data['pg_num_target'] or ev.pg_num == ev.pg_num_target:
+                # pool is gone or we've reached our target
+                self.remote('progress', 'complete', ev.ev_id)
+                del self._event[pool_id]
+                continue
+            ev.update(self, (ev.pg_num - pool_data['pg_num']) / (ev.pg_num - ev.pg_num_target))
 
     def _maybe_adjust(self):
         self.log.info('_maybe_adjust')
         osdmap = self.get_osdmap()
+        if osdmap.get_require_osd_release() < 'nautilus':
+            return
         pools = osdmap.get_pools_by_name()
         ps, root_map, pool_root = self._get_pool_status(osdmap, pools)
 
@@ -410,6 +434,7 @@ class PgAutoscaler(MgrModule):
         target_bytes_pools = dict([(r, []) for r in iter(root_map)])
 
         for p in ps:
+            pool_id = p['pool_id']
             pool_opts = pools[p['pool_name']]['options']
             if pool_opts.get('target_size_ratio', 0) > 0 and pool_opts.get('target_size_bytes', 0) > 0:
                     bytes_and_ratio.append('Pool %s has target_size_bytes and target_size_ratio set' % p['pool_name'])
@@ -441,6 +466,17 @@ class PgAutoscaler(MgrModule):
                     'val': str(p['pg_num_final'])
                 })
 
+                # create new event or update existing one to reflect
+                # progress from current state to the new pg_num_target
+                pool_data = pools[p['pool_name']]
+                pg_num = pool_data['pg_num']
+                new_target = p['pg_num_final']
+                if pool_id in self._event:
+                    self._event[pool_id].reset(pg_num, new_target)
+                else:
+                    self._event[pool_id] = PgAdjustmentProgress(pool_id, pg_num, new_target)
+                self._event[pool_id].update(self, 0.0)
+
                 if r[0] != 0:
                     # FIXME: this is a serious and unexpected thing,
                     # we should expose it as a cluster log error once
@@ -456,6 +492,7 @@ class PgAutoscaler(MgrModule):
             health_checks['POOL_TOO_FEW_PGS'] = {
                 'severity': 'warning',
                 'summary': summary,
+                'count': len(too_few),
                 'detail': too_few
             }
         if too_many:
@@ -464,6 +501,7 @@ class PgAutoscaler(MgrModule):
             health_checks['POOL_TOO_MANY_PGS'] = {
                 'severity': 'warning',
                 'summary': summary,
+                'count': len(too_many),
                 'detail': too_many
             }
 
@@ -493,6 +531,7 @@ class PgAutoscaler(MgrModule):
             health_checks['POOL_TARGET_SIZE_BYTES_OVERCOMMITTED'] = {
                 'severity': 'warning',
                 'summary': "%d subtrees have overcommitted pool target_size_bytes" % len(too_much_target_bytes),
+                'count': len(too_much_target_bytes),
                 'detail': too_much_target_bytes,
             }
 

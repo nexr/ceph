@@ -3,6 +3,7 @@
 
 #include "rgw_common.h"
 #include "rgw_op.h"
+#include "rgw_http_client.h"
 
 #include <jni.h>
 
@@ -54,7 +55,7 @@ protected:
     req.set_verify_ssl(endpoint.use_ssl);
 
     // send request
-    req.process();
+    req.process(null_yield);
 
     // if connection failed, http_status code is 0
     if (req.get_http_status() != 0) {
@@ -254,7 +255,7 @@ private:
   int thread_pool_size;
   RGWRangerJniThread** threads;
 
-  RGWRados* store;
+  rgw::sal::RGWRadosStore * store;
 
 protected:
   string app_id;
@@ -272,7 +273,7 @@ protected:
   time_t audit_conf_age;
 
 public:
-  RGWRangerJniManager(CephContext* const _cct, RGWRados* const _store, bool start_vm = false);
+  RGWRangerJniManager(CephContext* const _cct,  rgw::sal::RGWRadosStore* const store, bool start_vm = false);
   ~RGWRangerJniManager();
 
   void start_thread();
@@ -286,11 +287,10 @@ public:
 
 extern RGWRangerJniManager* rgw_rjm;
 
-void init_global_ranger_manager(CephContext* const cct, RGWRados* store);
+void init_global_ranger_manager(CephContext* const cct, rgw::sal::RGWRadosStore* store);
 void destroy_global_ranger_manager();
 
-/* authorize request using Ranger */
-int rgw_ranger_authorize(RGWRados* store, RGWOp*& op, req_state* s);
+int rgw_ranger_authorize(rgw::sal::RGWRadosStore* store, RGWOp*& op, req_state* s);
 
 void prepare_cache_dir(CephContext* const cct);
 

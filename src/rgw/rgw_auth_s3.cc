@@ -1,5 +1,5 @@
 // -*- mode:C++; tab-width:8; c-basic-offset:2; indent-tabs-mode:t -*-
-// vim: ts=8 sw=2 smarttab
+// vim: ts=8 sw=2 smarttab ft=cpp
 
 #include <algorithm>
 #include <map>
@@ -33,6 +33,8 @@ static const auto signed_subresources = {
   "notification",
   "partNumber",
   "policy",
+  "policyStatus",
+  "publicAccessBlock",
   "requestPayment",
   "response-cache-control",
   "response-content-disposition",
@@ -162,7 +164,10 @@ static inline void get_v2_qs_map(const req_info& info,
   for (const auto& elt : params) {
     std::string k = boost::algorithm::to_lower_copy(elt.first);
     if (k.find("x-amz-meta-") == /* offset */ 0) {
-      add_amz_meta_header(qs_map, k, elt.second);
+      rgw_add_amz_meta_header(qs_map, k, elt.second);
+    }
+    if (k == "x-amz-security-token") {
+      qs_map[k] = elt.second;
     }
   }
 }
@@ -238,9 +243,7 @@ bool rgw_create_s3_canonical_header(const req_info& info,
 }
 
 
-namespace rgw {
-namespace auth {
-namespace s3 {
+namespace rgw::auth::s3 {
 
 bool is_time_skew_ok(time_t t)
 {
@@ -497,7 +500,7 @@ std::string get_v4_canonical_qs(const req_info& info, const bool using_qs)
   }
   if (params->find_first_of('+') != std::string::npos) {
     copy_params = *params;
-    boost::replace_all(copy_params, "+", " ");
+    boost::replace_all(copy_params, "+", "%20");
     params = &copy_params;
   }
 
@@ -1130,6 +1133,4 @@ AWSv4ComplSingle::create(const req_state* const s,
   return std::make_shared<AWSv4ComplSingle>(s);
 }
 
-} /* namespace s3 */
-} /* namespace auth */
-} /* namespace rgw */
+} // namespace rgw::auth::s3

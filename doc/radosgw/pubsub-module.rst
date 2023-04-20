@@ -1,4 +1,4 @@
-================== 
+==================
 PubSub Sync Module
 ==================
 
@@ -9,15 +9,14 @@ PubSub Sync Module
 This sync module provides a publish and subscribe mechanism for the object store modification
 events. Events are published into predefined topics. Topics can be subscribed to, and events
 can be pulled from them. Events need to be acked. Also, events will expire and disappear
-after a period of time. 
+after a period of time.
 
 A push notification mechanism exists too, currently supporting HTTP,
 AMQP0.9.1 and Kafka endpoints. In this case, the events are pushed to an endpoint on top of storing them in Ceph. If events should only be pushed to an endpoint
-and do not need to be stored in Ceph, the `Bucket Notification`_ mechanism should be used instead of pubsub sync module. 
+and do not need to be stored in Ceph, the `Bucket Notification`_ mechanism should be used instead of pubsub sync module.
 
-A user can create different topics. A topic entity is defined by its user and its name. A
-user can only manage its own topics, and can only subscribe to events published by buckets
-it owns.
+A user can create different topics. A topic entity is defined by its name and is per tenant. A
+user can only associate its topics (via notification configuration) with buckets it owns.
 
 In order to publish events for specific bucket a notification entity needs to be created. A
 notification can be created on a subset of event types, or for all event types (default).
@@ -28,10 +27,10 @@ specific topic.
 
 REST API has been defined to provide configuration and control interfaces for the pubsub
 mechanisms. This API has two flavors, one is S3-compatible and one is not. The two flavors can be used
-together, although it is recommended to use the S3-compatible one. 
+together, although it is recommended to use the S3-compatible one.
 The S3-compatible API is similar to the one used in the bucket notification mechanism.
 
-Events are stored as RGW objects in a special bucket, under a special user. Events cannot
+Events are stored as RGW objects in a special bucket, under a special user (pubsub control user). Events cannot
 be accessed directly, but need to be pulled and acked using the new REST API.
 
 .. toctree::
@@ -42,8 +41,9 @@ be accessed directly, but need to be pulled and acked using the new REST API.
 PubSub Zone Configuration
 -------------------------
 
-The pubsub sync module requires the creation of a new zone in a `Multisite`_ environment.
-First, a master zone must exist, then a secondary zone should be created.
+The pubsub sync module requires the creation of a new zone in a :ref:`multisite` environment...
+First, a master zone must exist (see: :ref:`master-zone-label`),
+then a secondary zone should be created (see :ref:`secondary-zone-label`).
 In the creation of the secondary zone, its tier type must be set to ``pubsub``:
 
 ::
@@ -58,7 +58,7 @@ In the creation of the secondary zone, its tier type must be set to ``pubsub``:
 
 PubSub Zone Configuration Parameters
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-                                
+
 ::
 
    {
@@ -117,15 +117,15 @@ Same counters are shared between the pubsub sync module and the notification mec
 
 - ``pubsub_event_triggered``: running counter of events with at lease one topic associated with them
 - ``pubsub_event_lost``: running counter of events that had topics and subscriptions associated with them but that were not stored or pushed to any of the subscriptions
-- ``pubsub_store_ok``: running counter, for all subscriptions, of stored events 
+- ``pubsub_store_ok``: running counter, for all subscriptions, of stored events
 - ``pubsub_store_fail``: running counter, for all subscriptions, of events failed to be stored
 - ``pubsub_push_ok``: running counter, for all subscriptions, of events successfully pushed to their endpoint
 - ``pubsub_push_fail``: running counter, for all subscriptions, of events failed to be pushed to their endpoint
 - ``pubsub_push_pending``: gauge value of events pushed to an endpoint but not acked or nacked yet
 
-.. note:: 
+.. note::
 
-    ``pubsub_event_triggered`` and ``pubsub_event_lost`` are incremented per event, while: 
+    ``pubsub_event_triggered`` and ``pubsub_event_lost`` are incremented per event, while:
     ``pubsub_store_ok``, ``pubsub_store_fail``, ``pubsub_push_ok``, ``pubsub_push_fail``, are incremented per store/push action on each subscriptions.
 
 PubSub REST API
@@ -135,21 +135,21 @@ PubSub REST API
 
 Topics
 ~~~~~~
- 
+
 Create a Topic
 ``````````````
 
 This will create a new topic. Topic creation is needed both for both flavors of the API.
 Optionally the topic could be provided with push endpoint parameters that would be used later
 when an S3-compatible notification is created.
-Upon successful request, the response will include the topic ARN that could be later used to reference this topic in an S3-compatible notification request. 
+Upon successful request, the response will include the topic ARN that could be later used to reference this topic in an S3-compatible notification request.
 To update a topic, use the same command used for topic creation, with the topic name of an existing topic and different endpoint values.
 
-.. tip:: Any S3-compatible notification already associated with the topic needs to be re-created for the topic update to take effect 
+.. tip:: Any S3-compatible notification already associated with the topic needs to be re-created for the topic update to take effect
 
 ::
 
-   PUT /topics/<topic-name>[?OpaqueData=<opaque data>][&push-endpoint=<endpoint>[&amqp-exchange=<exchange>][&amqp-ack-level=none|broker][&verify-ssl=true|false][&kafka-ack-level=none|broker][&use-ssl=true|false][&ca-location=<file path>]]
+   PUT /topics/<topic-name>[?OpaqueData=<opaque data>][&push-endpoint=<endpoint>[&amqp-exchange=<exchange>][&amqp-ack-level=none|broker|routable][&verify-ssl=true|false][&kafka-ack-level=none|broker][&use-ssl=true|false][&ca-location=<file path>]]
 
 Request parameters:
 
@@ -158,7 +158,7 @@ Request parameters:
 
 The endpoint URI may include parameters depending with the type of endpoint:
 
-- HTTP endpoint 
+- HTTP endpoint
 
  - URI: ``http[s]://<fqdn>[:<port]``
  - port defaults to: 80/443 for HTTP/S accordingly
@@ -171,13 +171,16 @@ The endpoint URI may include parameters depending with the type of endpoint:
  - user/password may only be provided over HTTPS. Topic creation request will be rejected if not
  - port defaults to: 5672
  - vhost defaults to: "/"
- - amqp-exchange: the exchanges must exist and be able to route messages based on topics (mandatory parameter for AMQP0.9.1)
- - amqp-ack-level: no end2end acking is required, as messages may persist in the broker before delivered into their final destination. Two ack methods exist:
+ - amqp-exchange: the exchanges must exist and be able to route messages based on topics (mandatory parameter for AMQP0.9.1). Different topics pointing to the same endpoint must use the same exchange
+ - amqp-ack-level: no end2end acking is required, as messages may persist in the broker before delivered into their final destination. Three ack methods exist:
 
   - "none": message is considered "delivered" if sent to broker
   - "broker": message is considered "delivered" if acked by broker (default)
+  - "routable": message is considered "delivered" if broker can route to a consumer
 
-- Kafka endpoint 
+.. tip:: The topic-name is used for the AMQP topic ("routing key" for a topic exchange)
+
+- Kafka endpoint
 
  - URI: ``kafka://[<user>:<password>@]<fqdn>[:<port]``
  - if ``use-ssl`` is set to "true", secure connection will be used for connecting with the broker ("false" by default)
@@ -218,20 +221,21 @@ Response will have the following format (JSON):
                "oid_prefix":"",
                "push_endpoint":"",
                "push_endpoint_args":"",
-               "push_endpoint_topic":""
+               "push_endpoint_topic":"",
+               "stored_secret":"",
            },
            "arn":""
            "opaqueData":""
        },
        "subs":[]
-   }             
+   }
 
 - topic.user: name of the user that created the topic
 - name: name of the topic
 - dest.bucket_name: not used
 - dest.oid_prefix: not used
 - dest.push_endpoint: in case of S3-compliant notifications, this value will be used as the push-endpoint URL
-- if push-endpoint URL contain user/password information, request must be made over HTTPS. Topic get request will be rejected if not 
+- if push-endpoint URL contain user/password information, request must be made over HTTPS. Topic get request will be rejected if not
 - dest.push_endpoint_args: in case of S3-compliant notifications, this value will be used as the push-endpoint args
 - dest.push_endpoint_topic: in case of S3-compliant notifications, this value will hold the topic name as sent to the endpoint (may be different than the internal topic name)
 - topic.arn: topic ARN
@@ -249,25 +253,25 @@ Delete the specified topic.
 List Topics
 ```````````
 
-List all topics that user defined.
+List all topics associated with a tenant.
 
 ::
 
    GET /topics
- 
-- if push-endpoint URL contain user/password information, in any of the topic, request must be made over HTTPS. Topic list request will be rejected if not 
+
+- if push-endpoint URL contain user/password information, in any of the topic, request must be made over HTTPS. Topic list request will be rejected if not
 
 S3-Compliant Notifications
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Detailed under: `Bucket Operations`_.
 
-.. note:: 
+.. note::
 
     - Notification creation will also create a subscription for pushing/pulling events
     - The generated subscription's name will have the same as the notification Id, and could be used later to fetch and ack events with the subscription API.
     - Notification deletion will deletes all generated subscriptions
-    - In case that bucket deletion implicitly deletes the notification, 
+    - In case that bucket deletion implicitly deletes the notification,
       the associated subscription will not be deleted automatically (any events of the deleted bucket could still be access),
       and will have to be deleted explicitly with the subscription deletion API
     - Filtering based on metadata (which is an extension to S3) is not supported, and such rules will be ignored
@@ -290,7 +294,7 @@ Request parameters:
 
 - topic-name: name of topic
 - event: event type (string), one of: ``OBJECT_CREATE``, ``OBJECT_DELETE``, ``DELETE_MARKER_CREATE``
- 
+
 Delete Notification Information
 ```````````````````````````````
 
@@ -335,7 +339,7 @@ Response will have the following format (JSON):
          },
          "events":[]
       }
-    ]}            
+    ]}
 
 Subscriptions
 ~~~~~~~~~~~~~
@@ -347,7 +351,7 @@ Creates a new subscription.
 
 ::
 
-   PUT /subscriptions/<sub-name>?topic=<topic-name>[?push-endpoint=<endpoint>[&amqp-exchange=<exchange>][&amqp-ack-level=none|broker][&verify-ssl=true|false][&kafka-ack-level=none|broker][&ca-location=<file path>]]
+   PUT /subscriptions/<sub-name>?topic=<topic-name>[?push-endpoint=<endpoint>[&amqp-exchange=<exchange>][&amqp-ack-level=none|broker|routable][&verify-ssl=true|false][&kafka-ack-level=none|broker][&ca-location=<file path>]]
 
 Request parameters:
 
@@ -356,7 +360,7 @@ Request parameters:
 
 The endpoint URI may include parameters depending with the type of endpoint:
 
-- HTTP endpoint 
+- HTTP endpoint
 
  - URI: ``http[s]://<fqdn>[:<port]``
  - port defaults to: 80/443 for HTTP/S accordingly
@@ -369,12 +373,13 @@ The endpoint URI may include parameters depending with the type of endpoint:
  - port defaults to: 5672
  - vhost defaults to: "/"
  - amqp-exchange: the exchanges must exist and be able to route messages based on topics (mandatory parameter for AMQP0.9.1)
- - amqp-ack-level: no end2end acking is required, as messages may persist in the broker before delivered into their final destination. Two ack methods exist:
+ - amqp-ack-level: no end2end acking is required, as messages may persist in the broker before delivered into their final destination. Three ack methods exist:
 
   - "none": message is considered "delivered" if sent to broker
   - "broker": message is considered "delivered" if acked by broker (default)
+  - "routable": message is considered "delivered" if broker can route to a consumer
 
-- Kafka endpoint 
+- Kafka endpoint
 
  - URI: ``kafka://[<user>:<password>@]<fqdn>[:<port]``
  - if ``ca-location`` is provided, secure connection will be used for connection with the broker
@@ -412,7 +417,7 @@ Response will have the following format (JSON):
            "push_endpoint_topic":""
        }
        "s3_id":""
-   }             
+   }
 
 - user: name of the user that created the subscription
 - name: name of the subscription
@@ -420,7 +425,7 @@ Response will have the following format (JSON):
 - dest.bucket_name: name of the bucket storing the events
 - dest.oid_prefix: oid prefix for the events stored in the bucket
 - dest.push_endpoint: in case of S3-compliant notifications, this value will be used as the push-endpoint URL
-- if push-endpoint URL contain user/password information, request must be made over HTTPS. Topic get request will be rejected if not 
+- if push-endpoint URL contain user/password information, request must be made over HTTPS. Topic get request will be rejected if not
 - dest.push_endpoint_args: in case of S3-compliant notifications, this value will be used as the push-endpoint args
 - dest.push_endpoint_topic: in case of S3-compliant notifications, this value will hold the topic name as sent to the endpoint (may be different than the internal topic name)
 - s3_id: in case of S3-compliant notifications, this will hold the notification name that created the subscription
@@ -459,19 +464,19 @@ The response will hold information on the current marker and whether there are m
 
 
 The actual content of the response is depended with how the subscription was created.
-In case that the subscription was created via an S3-compatible notification, 
+In case that the subscription was created via an S3-compatible notification,
 the events will have an S3-compatible record format (JSON):
 
 ::
 
-   {"Records":[  
+   {"Records":[
        {
            "eventVersion":"2.1"
            "eventSource":"aws:s3",
            "awsRegion":"",
            "eventTime":"",
            "eventName":"",
-           "userIdentity":{  
+           "userIdentity":{
                "principalId":""
            },
            "requestParameters":{
@@ -510,7 +515,7 @@ the events will have an S3-compatible record format (JSON):
 - awsRegion: zonegroup
 - eventTime: timestamp indicating when the event was triggered
 - eventName: either ``s3:ObjectCreated:``, or ``s3:ObjectRemoved:``
-- userIdentity: not supported 
+- userIdentity: not supported
 - requestParameters: not supported
 - responseElements: not supported
 - s3.configurationId: notification ID that created the subscription for the event
@@ -528,7 +533,7 @@ the events will have an S3-compatible record format (JSON):
 - s3.eventId: unique ID of the event, that could be used for acking (an extension to the S3 notification API)
 - s3.opaqueData: opaque data is set in the topic configuration and added to all notifications triggered by the ropic (an extension to the S3 notification API)
 
-In case that the subscription was not created via a non S3-compatible notification, 
+In case that the subscription was not created via a non S3-compatible notification,
 the events will have the following event format (JSON):
 
 ::
@@ -578,6 +583,5 @@ Request parameters:
 
 - event-id: id of event to be acked
 
-.. _Multisite : ../multisite
 .. _Bucket Notification : ../notifications
 .. _Bucket Operations: ../s3/bucketops

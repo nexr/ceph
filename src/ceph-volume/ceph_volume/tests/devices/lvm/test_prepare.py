@@ -1,5 +1,6 @@
 import pytest
 from ceph_volume.devices import lvm
+from ceph_volume.api import lvm as api
 from mock.mock import patch, Mock
 
 
@@ -8,7 +9,7 @@ class TestLVM(object):
     def test_main_spits_help_with_no_arguments(self, capsys):
         lvm.main.LVM([]).main()
         stdout, stderr = capsys.readouterr()
-        assert 'Use LVM and LVM-based technologies like dmcache to deploy' in stdout
+        assert 'Use LVM and LVM-based technologies to deploy' in stdout
 
     def test_main_shows_activate_subcommands(self, capsys):
         lvm.main.LVM([]).main()
@@ -115,19 +116,51 @@ class TestPrepare(object):
             expected = 'skipping {}, it is already prepared'.format('/dev/sdfoo')
             assert expected in str(error.value)
 
-class TestGetJournalLV(object):
+    def test_setup_device_device_name_is_none(self):
+        result = lvm.prepare.Prepare([]).setup_device(device_type='data', device_name=None, tags={'ceph.type': 'data'}, size=0, slots=None)
+        assert result == ('', '', {'ceph.type': 'data'})
 
-    @pytest.mark.parametrize('arg', ['', '///', None, '/dev/sda1'])
-    def test_no_journal_on_invalid_path(self, monkeypatch, arg):
-        monkeypatch.setattr(lvm.prepare.api, 'get_lv', lambda **kw: False)
-        prepare = lvm.prepare.Prepare([])
-        assert prepare.get_lv(arg) is None
+    @patch('ceph_volume.api.lvm.Volume.set_tags')
+    @patch('ceph_volume.devices.lvm.prepare.api.get_single_lv')
+    def test_setup_device_lv_passed(self, m_get_single_lv, m_set_tags):
+        fake_volume = api.Volume(lv_name='lv_foo', lv_path='/fake-path', vg_name='vg_foo', lv_tags='', lv_uuid='fake-uuid')
+        m_get_single_lv.return_value = fake_volume
+        result = lvm.prepare.Prepare([]).setup_device(device_type='data', device_name='vg_foo/lv_foo', tags={'ceph.type': 'data'}, size=0, slots=None)
 
-    def test_no_journal_lv_found(self, monkeypatch):
-        # patch it with 0 so we know we are getting to get_lv
-        monkeypatch.setattr(lvm.prepare.api, 'get_lv', lambda **kw: 0)
-        prepare = lvm.prepare.Prepare([])
-        assert prepare.get_lv('vg/lv') == 0
+        assert result == ('/fake-path', 'fake-uuid', {'ceph.type': 'data',
+                                                    'ceph.vdo': '0',
+                                                    'ceph.data_uuid': 'fake-uuid',
+                                                    'ceph.data_device': '/fake-path'})
+
+    @patch('ceph_volume.devices.lvm.prepare.api.create_lv')
+    @patch('ceph_volume.api.lvm.Volume.set_tags')
+    @patch('ceph_volume.util.disk.is_device')
+    def test_setup_device_device_passed(self, m_is_device, m_set_tags, m_create_lv):
+        fake_volume = api.Volume(lv_name='lv_foo', lv_path='/fake-path', vg_name='vg_foo', lv_tags='', lv_uuid='fake-uuid')
+        m_is_device.return_value = True
+        m_create_lv.return_value = fake_volume
+        result = lvm.prepare.Prepare([]).setup_device(device_type='data', device_name='/dev/sdx', tags={'ceph.type': 'data'}, size=0, slots=None)
+
+        assert result == ('/fake-path', 'fake-uuid', {'ceph.type': 'data',
+                                                    'ceph.vdo': '0',
+                                                    'ceph.data_uuid': 'fake-uuid',
+                                                    'ceph.data_device': '/fake-path'})
+
+    @patch('ceph_volume.devices.lvm.prepare.Prepare.get_ptuuid')
+    @patch('ceph_volume.devices.lvm.prepare.api.get_single_lv')
+    def test_setup_device_partition_passed(self, m_get_single_lv, m_get_ptuuid):
+        m_get_single_lv.side_effect = ValueError()
+        m_get_ptuuid.return_value = 'fake-uuid'
+        result = lvm.prepare.Prepare([]).setup_device(device_type='data', device_name='/dev/sdx', tags={'ceph.type': 'data'}, size=0, slots=None)
+
+        assert result == ('/dev/sdx', 'fake-uuid', {'ceph.type': 'data',
+                                                    'ceph.vdo': '0',
+                                                    'ceph.data_uuid': 'fake-uuid',
+                                                    'ceph.data_device': '/dev/sdx'})
+
+    def test_invalid_osd_id_passed(self):
+        with pytest.raises(SystemExit):
+            lvm.prepare.Prepare(argv=['--osd-id', 'foo']).main()
 
 
 class TestActivate(object):
