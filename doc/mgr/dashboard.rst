@@ -488,6 +488,25 @@ To enable SSO::
 
   $ ceph dashboard sso enable saml2
 
+.. _dashboard-cors-support:
+
+Enabling Cross-Origin Resource Sharing (CORS)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The Ceph Dashboard supports CORS protocol.
+
+To configure CORS on Ceph Dashboard, you should use the following command::
+
+  $ ceph config set mgr mgr/dashboard/cross_origin_url "<allowed_origins>"
+
+Parameters:
+
+* **<allowed_origins>**: Origins to allow cross access to Ceph Dashboard resources. The comma separated string array. (e.g., `https://ceph.nexr.com,http://localhost:3000` or `*`)
+
+If disable CORS::
+
+  $ ceph config rm mgr mgr/dashboard/cross_origin_url
+
 Enabling Prometheus Alerting
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
