@@ -193,9 +193,11 @@ class CherryPyConfig(object):
         """
         cross_origin_url = mgr.get_localized_module_option('cross_origin_url', '')
         if cross_origin_url:
-            cherrypy.tools.CORS = cherrypy.Tool('before_handler', self.cors_tool)
+            cherrypy.tools.CORS     = cherrypy.Tool('before_handler', self.cors_tool)
+            cherrypy.tools.CORS_FIN = cherrypy.Tool('before_finalize', self.cors_tool)
             config = {
-                'tools.CORS.on': True,
+                'tools.CORS.on':     True,
+                'tools.CORS_FIN.on': True,
             }
             self.update_cherrypy_config(config)
 
