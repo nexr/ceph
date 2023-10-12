@@ -6020,7 +6020,7 @@ std::vector<Option> get_rgw_options() {
     .set_description("The directory path to jni class files."),
 
     Option("rgw_ranger_jni_engine_jar", Option::TYPE_STR, Option::LEVEL_ADVANCED)
-    .set_default("/usr/share/ceph/rgw/ranger/jni/nesRangerEngine.jar")
+    .set_default("/usr/share/ceph/rgw/ranger/engine/nesRangerEngine.jar")
     .set_description("The file path to jni engine jar."),
 
     Option("rgw_ranger_audit_url", Option::TYPE_STR, Option::LEVEL_ADVANCED)
