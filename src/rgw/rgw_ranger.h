@@ -117,6 +117,8 @@ protected:
 
   string policy_cache_dir;
   time_t cache_update_interval;
+  // cache_update
+  std::mutex cu_mutex;
 
 public:
   RGWRangerManager(CephContext* const _cct) : cct(_cct) {
@@ -215,6 +217,8 @@ protected:
   std::mutex r_mutex;
   std::condition_variable r_cond;
 
+  // audit_config
+  std::mutex ac_mutex;
 
 public:
   bool down_flag = false;

@@ -636,10 +636,7 @@ int RGWRangerNativeManager::get_related_policies_from_remote(vector<ranger_polic
   int offset = 0;
 
   string cached_policy_file = policy_cache_dir + "/" + service + ".json";
-  string policies_to_caching = "";
-
-  bool need_caching = ( !is_file_exist(cached_policy_file) \
-                     || is_file_age_older(cached_policy_file, cache_update_interval) );
+  string policies_to_cache = "";
 
   while (need_continue) {
     int ret;
@@ -708,14 +705,12 @@ int RGWRangerNativeManager::get_related_policies_from_remote(vector<ranger_polic
       return -EINVAL;
     }
 
-    if (need_caching) {
-      string policies_str;
-      policies_str = policies_obj->get_data();
-      policies_str = policies_str.substr(1, (policies_str.length() - 1) - 1); // truncate '[' and ']'
+    string policies_part_to_cache;
+    policies_part_to_cache = policies_obj->get_data();
+    policies_part_to_cache = policies_part_to_cache.substr(1, (policies_part_to_cache.length() - 1) - 1); // truncate '[' and ']'
 
-      policies_to_caching = (policies_to_caching.empty()) ? policies_str \
-                                                          : policies_to_caching + "," + policies_str;
-    }
+    policies_to_cache = (policies_to_cache.empty()) ? policies_part_to_cache
+                                                    : policies_to_cache + "," + policies_part_to_cache;
 
     vector<string> policies_str = policies_obj->get_array_elements();
 
@@ -736,17 +731,22 @@ int RGWRangerNativeManager::get_related_policies_from_remote(vector<ranger_polic
     }
   }
 
+  unique_lock<std::mutex> cu_lock(cu_mutex);
+
+  bool need_caching = ( !is_file_exist(cached_policy_file) \
+                     || is_file_age_older(cached_policy_file, cache_update_interval) );
+
   if (need_caching) {
     ldout(cct, 10) << __func__ << "(): Try to write cached policy (" << cached_policy_file << ")" << dendl;
 
-    policies_to_caching = "{\"policies\":[" + policies_to_caching + "]}";
+    policies_to_cache = "{\"policies\":[" + policies_to_cache + "]}";
 
     // write File
     ofstream write_stream;
     write_stream.open(cached_policy_file);
 
     if (write_stream.is_open()) {
-      write_stream << policies_to_caching;
+      write_stream << policies_to_cache;
       write_stream.close();
 
       if (use_cached_one) {
