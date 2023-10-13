@@ -2,7 +2,6 @@
 
 #include "include/ipaddr.h"
 
-#include <regex>
 #include <fstream>
 
 RGWRangerNativeManager* rgw_rnm = nullptr;
@@ -831,7 +830,7 @@ int RGWRangerNativeManager::is_access_allowed(RGWUserEndpoint endpoint, RGWOp *&
   const string bucket_owner = s->bucket_owner.get_id().to_str();
 
   vector<ranger_policy> related_policies;
-  int ret = get_related_policies(related_policies, endpoint, s, bucket_owner);
+  int ret = get_related_policies(related_policies, endpoint, s, change_owner_to_svc_name(bucket_owner));
   if (ret != 0) {
     ldpp_dout(op, 2) << __func__ << "(): Failed to get related policies" << dendl;
     return ret;

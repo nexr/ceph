@@ -162,7 +162,7 @@ int RGWRangerJniManager::is_access_allowed(RGWUserEndpoint endp, RGWOp *& op, re
 
   rgw_user bucket_owner = s->bucket_owner.get_id();
 
-  string service_name = bucket_owner.to_str();
+  string service_name = change_owner_to_svc_name(bucket_owner.to_str());
 
  if ( (use_cached_one && can_i_use_cached_policy(service_name)) \
    || (!is_connection_ok(endp)) )

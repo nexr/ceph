@@ -550,13 +550,17 @@ class ObjstoreUsersync(MgrModule):
             endp_key = user_name if user_name in self.endpoint_map['ranger'] else '_default'
             endpoint = self.endpoint_map['ranger'][endp_key]
 
-        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + str(user_name), endpoint)
+        service_name = user_name
+        service_name = re.sub("@", "_at_", service_name)
+        service_name = re.sub("\.", "_dot_", service_name)
+
+        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + str(service_name), endpoint)
         is_success = (scode == 200 or scode == 404)
         is_service_exist = (scode == 200)
         is_service_enabled = (is_service_exist and resp['isEnabled'] == True)
 
         if not is_success:
-            self.log.warning("Failed to get service of '%s'" % user_name)
+            self.log.warning("Failed to get service of '%s'" % service_name)
             return is_success
 
         service_endpoint = self.ranger_service_initial_endpoint
@@ -580,7 +584,7 @@ class ObjstoreUsersync(MgrModule):
 
         if not is_service_exist:
             service_define_data = {
-                'name': s3_key_info['user'],
+                'name': service_name,
                 'type': 's3',
                 'description': "created by nes. " \
                              + "If want to change initail endpoint, " \
@@ -602,7 +606,7 @@ class ObjstoreUsersync(MgrModule):
 
             owner_policy_data = {
                 'name': 'nes_default_policy',
-                'service': user_name,
+                'service': service_name,
                 'description': 'created by nes.',
                 'resources': {
                     'path': {
@@ -626,7 +630,7 @@ class ObjstoreUsersync(MgrModule):
             is_success  = (scode == 200)
 
             if not is_success:
-                self.log.warning("Failed to create default owner_policy of '%s'" % user_name)
+                self.log.warning("Failed to create default owner_policy of '%s'" % service_name)
                 return is_success
 
         elif not is_service_enabled:
@@ -666,13 +670,17 @@ class ObjstoreUsersync(MgrModule):
             endp_key = user_name if user_name in self.endpoint_map['ranger'] else '_default'
             endpoint = self.endpoint_map['ranger'][endp_key]
 
-        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + str(user_name), endpoint)
+        service_name = user_name
+        service_name = re.sub("@", "_at_", service_name)
+        service_name = re.sub("\.", "_dot_", service_name)
+
+        resp, scode = self._request_ranger_rest("get", "/service/plugins/services/name/" + str(service_name), endpoint)
         is_success = (scode == 200 or scode == 404)
         is_service_exist = (scode == 200)
         is_service_enabled = (is_service_exist and resp['isEnabled'] == True)
 
         if not is_success:
-            self.log.warning("Failed to get s3 service of '%s'" % user_name)
+            self.log.warning("Failed to get s3 service of '%s'" % service_name)
             return is_success
 
         if is_service_enabled:
@@ -682,7 +690,7 @@ class ObjstoreUsersync(MgrModule):
             is_success  = (scode == 200)
 
             if not is_success:
-                self.log.warning("Failed to disable s3 service of '%s'" % user_name)
+                self.log.warning("Failed to disable s3 service of '%s'" % service_name)
                 return is_success
 
         return is_success

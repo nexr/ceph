@@ -6,6 +6,7 @@
 #include "rgw_http_client.h"
 
 #include <jni.h>
+#include <regex>
 
 #define dout_context g_ceph_context
 #define dout_subsys ceph_subsys_rgw
@@ -117,6 +118,14 @@ protected:
 
   string policy_cache_dir;
   time_t cache_update_interval;
+
+  string change_owner_to_svc_name(string owner_name) {
+    string svc_name = owner_name;
+    svc_name = regex_replace(svc_name, regex("@"), "_at_");
+    svc_name = regex_replace(svc_name, regex("\\."), "_dot_");
+    ldout(cct, 15) << __func__ << "(): owner '" << owner_name << "' change to '" << svc_name << "'" << dendl;
+    return svc_name;
+  }
 
 public:
   RGWRangerManager(CephContext* const _cct) : cct(_cct) {
