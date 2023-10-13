@@ -20,7 +20,7 @@ RGWRangerJniManager::RGWRangerJniManager(CephContext* const _cct, rgw::sal::RGWR
 
   struct stat f_stat;
   if (stat(jni_config_dir.c_str(), &f_stat) != 0) {
-    if (mkdir(jni_config_dir.c_str(), 0755) == -1) {
+    if (mkdir(jni_config_dir.c_str(), 0755) != -1) {
       chown(jni_config_dir.c_str(), cct->get_set_uid(), cct->get_set_gid());
     }
     else {
