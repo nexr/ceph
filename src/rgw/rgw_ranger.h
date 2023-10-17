@@ -123,7 +123,7 @@ protected:
     string svc_name = owner_name;
     svc_name = regex_replace(svc_name, regex("@"), "_at_");
     svc_name = regex_replace(svc_name, regex("\\."), "_dot_");
-    ldout(cct, 15) << __func__ << "(): owner '" << owner_name << "' change to '" << svc_name << "'" << dendl;
+    ldout(cct, 20) << __func__ << "(): owner '" << owner_name << "' refers the '" << svc_name << "' ranger service" << dendl;
     return svc_name;
   }
 
