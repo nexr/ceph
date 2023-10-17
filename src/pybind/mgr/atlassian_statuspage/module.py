@@ -340,11 +340,11 @@ class AtlassianStatuspage(MgrModule):
             response = requests.put(request_url, headers=headers, json=data)
 
         self.log.debug("request url is '%s'" % request_url)
-        self.log.debug("response of rest: [%d] %s" % (response.status_code, response.text.encode('utf8')))
+        self.log.debug("response of rest: [%d] %s" % (response.status_code, response.text))
 
         if incident_id != '' \
           and response.status_code == 422 \
-          and "Too many incident updates" in response.text.encode('utf8'):
+          and "Too many incident updates" in response.text:
             data['incident']['status'] = "resolved"
             data['incident'][ 'body' ] = "Too many updates in incident. Relsolve this incident and continue in new incident."
             response = requests.put(request_url, headers=headers, json=data)
