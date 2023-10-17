@@ -118,6 +118,8 @@ protected:
 
   string policy_cache_dir;
   time_t cache_update_interval;
+  // cache_update
+  std::mutex cu_mutex;
 
   string change_owner_to_svc_name(string owner_name) {
     string svc_name = owner_name;
@@ -224,6 +226,8 @@ protected:
   std::mutex r_mutex;
   std::condition_variable r_cond;
 
+  // audit_config
+  std::mutex ac_mutex;
 
 public:
   bool down_flag = false;

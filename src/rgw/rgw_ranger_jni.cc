@@ -20,7 +20,7 @@ RGWRangerJniManager::RGWRangerJniManager(CephContext* const _cct, rgw::sal::RGWR
 
   struct stat f_stat;
   if (stat(jni_config_dir.c_str(), &f_stat) != 0) {
-    if (mkdir(jni_config_dir.c_str(), 0755) == -1) {
+    if (mkdir(jni_config_dir.c_str(), 0755) != -1) {
       chown(jni_config_dir.c_str(), cct->get_set_uid(), cct->get_set_gid());
     }
     else {
@@ -326,6 +326,8 @@ bool RGWRangerJniThread::config_audit()
 
   string target_audit_conf = (audit_service_specific) ? service_audit_conf : default_audit_conf;
 
+  unique_lock<std::mutex> ac_lock(ac_mutex);
+
   if (parent->is_file_age_younger(target_audit_conf, parent->audit_conf_age))
   {
     return true;
@@ -466,6 +468,8 @@ void RGWRangerJniThread::organize_cached_policy() {
   string dest_file = cache_dir + "/" + service + ".json";
 
   std::remove(cached_role.c_str());
+
+  unique_lock<std::mutex> cu_lock(parent->cu_mutex);
 
   if (parent->is_file_age_younger(dest_file, parent->cache_update_interval))
   {

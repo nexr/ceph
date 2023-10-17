@@ -110,7 +110,7 @@ void prepare_cache_dir(CephContext* const cct) {
 
   struct stat f_stat;
   if (stat(ranger_cache_dir.c_str(), &f_stat) != 0) {
-    if (mkdir(ranger_cache_dir.c_str(), 0755) == -1) {
+    if (mkdir(ranger_cache_dir.c_str(), 0755) != -1) {
       chown(ranger_cache_dir.c_str(), cct->get_set_uid(), cct->get_set_gid());
     }
     else {
