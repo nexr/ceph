@@ -2796,17 +2796,16 @@ PrimaryLogPG::cache_result_t PrimaryLogPG::maybe_handle_cache_detail(
       OSDOp& first_op = *(ops.begin());
       int first_opcode = first_op.op.op;
 
-      // Promote object if target object was not new one
-      if (first_opcode != CEPH_OSD_OP_SETALLOCHINT &&
-          first_opcode != CEPH_OSD_OP_WRITEFULL &&
-          first_opcode != CEPH_OSD_OP_SETXATTR &&
-          first_opcode != CEPH_OSD_OP_OMAPSETVALS &&
-          first_opcode != CEPH_OSD_OP_OMAPSETHEADER)
+      // Skip object promotion if target object is completely new
+      if (  first_opcode == CEPH_OSD_OP_WRITEFULL ||
+           (first_opcode == CEPH_OSD_OP_CREATE && (first_op.op.flags & CEPH_OSD_OP_FLAG_EXCL)) )
       {
-        promote_object(obc, missing_oid, oloc, op, promote_obc);
+        do_proxy_write(op, NULL, true); // self proxy write
       }
-
-      do_proxy_write(op, NULL, true); // self proxy write
+      else {
+        promote_object(obc, missing_oid, oloc, op, promote_obc);
+        do_proxy_write(op, NULL, true); // self proxy write
+      }
 
       return cache_result_t::HANDLED_PROXY;
     } else {
