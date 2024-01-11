@@ -2791,16 +2791,22 @@ PrimaryLogPG::cache_result_t PrimaryLogPG::maybe_handle_cache_detail(
     }
 
     if (op->may_write() || op->may_cache()) {
-      do_proxy_write(op);
+      // Prepare to check first osd operation
+      vector<OSDOp> ops = m->ops;
+      OSDOp& first_op = *(ops.begin());
+      int first_opcode = first_op.op.op;
 
-      // Promote too?
-      if (!op->need_skip_promote() && 
-          maybe_promote(obc, missing_oid, oloc, in_hit_set,
-	              pool.info.min_write_recency_for_promote,
-		      OpRequestRef(),
-		      promote_obc)) {
-	return cache_result_t::BLOCKED_PROMOTE;
+      // Skip object promotion if target object is completely new
+      if (  first_opcode == CEPH_OSD_OP_WRITEFULL ||
+           (first_opcode == CEPH_OSD_OP_CREATE && (first_op.op.flags & CEPH_OSD_OP_FLAG_EXCL)) )
+      {
+        do_proxy_write(op, NULL, true); // self proxy write
       }
+      else {
+        promote_object(obc, missing_oid, oloc, op, promote_obc);
+        do_proxy_write(op, NULL, true); // self proxy write
+      }
+
       return cache_result_t::HANDLED_PROXY;
     } else {
       do_proxy_read(op);
@@ -3037,7 +3043,7 @@ struct C_ProxyChunkRead : public Context {
   }
 };
 
-void PrimaryLogPG::do_proxy_read(OpRequestRef op, ObjectContextRef obc)
+void PrimaryLogPG::do_proxy_read(OpRequestRef op, ObjectContextRef obc, bool self)
 {
   // NOTE: non-const here because the ProxyReadOp needs mutable refs to
   // stash the result in the request's OSDOp vector
@@ -3058,7 +3064,12 @@ void PrimaryLogPG::do_proxy_read(OpRequestRef op, ObjectContextRef obc)
   /* proxy */
     soid = m->get_hobj();
     oloc = object_locator_t(m->get_object_locator());
-    oloc.pool = pool.info.tier_of;
+    if (self) {
+      oloc.hash = soid.get_hash();
+    }
+    else {
+      oloc.pool = pool.info.tier_of;
+    }
   }
   unsigned flags = CEPH_OSD_FLAG_IGNORE_CACHE | CEPH_OSD_FLAG_IGNORE_OVERLAY;
 
@@ -3249,7 +3260,7 @@ struct C_ProxyWrite_Commit : public Context {
   }
 };
 
-void PrimaryLogPG::do_proxy_write(OpRequestRef op, ObjectContextRef obc)
+void PrimaryLogPG::do_proxy_write(OpRequestRef op, ObjectContextRef obc, bool self)
 {
   // NOTE: non-const because ProxyWriteOp takes a mutable ref
   MOSDOp *m = static_cast<MOSDOp*>(op->get_nonconst_req());
@@ -3270,7 +3281,12 @@ void PrimaryLogPG::do_proxy_write(OpRequestRef op, ObjectContextRef obc)
   /* proxy */
     soid = m->get_hobj();
     oloc = object_locator_t(m->get_object_locator());
-    oloc.pool = pool.info.tier_of;
+    if (self) {
+      oloc.hash = soid.get_hash();
+    }
+    else {
+      oloc.pool = pool.info.tier_of;
+    }
   }
 
   unsigned flags = CEPH_OSD_FLAG_IGNORE_CACHE | CEPH_OSD_FLAG_IGNORE_OVERLAY;

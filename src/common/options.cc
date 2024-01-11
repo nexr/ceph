@@ -2494,7 +2494,7 @@ std::vector<Option> get_global_options() {
     .set_description("how frequently to retry recovery reservations after being denied (e.g., due to a full OSD)"),
 
     Option("osd_agent_max_ops", Option::TYPE_INT, Option::LEVEL_ADVANCED)
-    .set_default(4)
+    .set_default(8)
     .set_description("maximum concurrent tiering operations for tiering agent"),
 
     Option("osd_agent_max_low_ops", Option::TYPE_INT, Option::LEVEL_ADVANCED)
