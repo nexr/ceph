@@ -2797,9 +2797,11 @@ PrimaryLogPG::cache_result_t PrimaryLogPG::maybe_handle_cache_detail(
       int first_opcode = first_op.op.op;
 
       // Promote object if target object was not new one
-      if (first_opcode != CEPH_OSD_OP_CREATE &&
-          first_opcode != CEPH_OSD_OP_WRITE &&
-          first_opcode != CEPH_OSD_OP_WRITEFULL)
+      if (first_opcode != CEPH_OSD_OP_SETALLOCHINT &&
+          first_opcode != CEPH_OSD_OP_WRITEFULL &&
+          first_opcode != CEPH_OSD_OP_SETXATTR &&
+          first_opcode != CEPH_OSD_OP_OMAPSETVALS &&
+          first_opcode != CEPH_OSD_OP_OMAPSETHEADER)
       {
         promote_object(obc, missing_oid, oloc, op, promote_obc);
       }
