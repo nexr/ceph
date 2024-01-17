@@ -3082,42 +3082,54 @@ void PrimaryLogPG::do_proxy_read(OpRequestRef op, ObjectContextRef obc, bool sel
 			     CEPH_OSD_FLAG_ENFORCE_SNAPC |
 			     CEPH_OSD_FLAG_MAP_SNAP_CLONE);
 
-  dout(10) << __func__ << " Start proxy read for " << *m << dendl;
+  if (self) {
+    dout(10) << __func__ << " Start self read for " << *m << dendl;
 
-  ProxyReadOpRef prdop(std::make_shared<ProxyReadOp>(op, soid, m->ops));
+    unsigned old_flags = m->get_flags();
 
-  ObjectOperation obj_op;
-  obj_op.dup(prdop->ops);
+    m->set_flags(flags);
+    do_op(op);
 
-  if (pool.info.cache_mode == pg_pool_t::CACHEMODE_WRITEBACK &&
-      (agent_state && agent_state->evict_mode != TierAgentState::EVICT_MODE_FULL)) {
-    for (unsigned i = 0; i < obj_op.ops.size(); i++) {
-      ceph_osd_op op = obj_op.ops[i].op;
-      switch (op.op) {
-	case CEPH_OSD_OP_READ:
-	case CEPH_OSD_OP_SYNC_READ:
-	case CEPH_OSD_OP_SPARSE_READ:
-	case CEPH_OSD_OP_CHECKSUM:
-	case CEPH_OSD_OP_CMPEXT:
-	  op.flags = (op.flags | CEPH_OSD_OP_FLAG_FADVISE_SEQUENTIAL) &
-		       ~(CEPH_OSD_OP_FLAG_FADVISE_DONTNEED | CEPH_OSD_OP_FLAG_FADVISE_NOCACHE);
+    m->set_flags(old_flags);
+  }
+  else {
+    dout(10) << __func__ << " Start proxy read for " << *m << dendl;
+
+    ProxyReadOpRef prdop(std::make_shared<ProxyReadOp>(op, soid, m->ops));
+
+    ObjectOperation obj_op;
+    obj_op.dup(prdop->ops);
+
+    if (pool.info.cache_mode == pg_pool_t::CACHEMODE_WRITEBACK &&
+        (agent_state && agent_state->evict_mode != TierAgentState::EVICT_MODE_FULL)) {
+      for (unsigned i = 0; i < obj_op.ops.size(); i++) {
+        ceph_osd_op op = obj_op.ops[i].op;
+        switch (op.op) {
+        case CEPH_OSD_OP_READ:
+        case CEPH_OSD_OP_SYNC_READ:
+        case CEPH_OSD_OP_SPARSE_READ:
+        case CEPH_OSD_OP_CHECKSUM:
+        case CEPH_OSD_OP_CMPEXT:
+          op.flags = (op.flags | CEPH_OSD_OP_FLAG_FADVISE_SEQUENTIAL) &
+                 ~(CEPH_OSD_OP_FLAG_FADVISE_DONTNEED | CEPH_OSD_OP_FLAG_FADVISE_NOCACHE);
+            }
       }
     }
-  }
 
-  C_ProxyRead *fin = new C_ProxyRead(this, soid, get_last_peering_reset(),
-				     prdop);
-  ceph_tid_t tid = osd->objecter->read(
-    soid.oid, oloc, obj_op,
-    m->get_snapid(), NULL,
-    flags, new C_OnFinisher(fin, osd->get_objecter_finisher(get_pg_shard())),
-    &prdop->user_version,
-    &prdop->data_offset,
-    m->get_features());
-  fin->tid = tid;
-  prdop->objecter_tid = tid;
-  proxyread_ops[tid] = prdop;
-  in_progress_proxy_ops[soid].push_back(op);
+    C_ProxyRead *fin = new C_ProxyRead(this, soid, get_last_peering_reset(),
+               prdop);
+    ceph_tid_t tid = osd->objecter->read(
+      soid.oid, oloc, obj_op,
+      m->get_snapid(), NULL,
+      flags, new C_OnFinisher(fin, osd->get_objecter_finisher(get_pg_shard())),
+      &prdop->user_version,
+      &prdop->data_offset,
+      m->get_features());
+    fin->tid = tid;
+    prdop->objecter_tid = tid;
+    proxyread_ops[tid] = prdop;
+    in_progress_proxy_ops[soid].push_back(op);
+  }
 }
 
 void PrimaryLogPG::finish_proxy_read(hobject_t oid, ceph_tid_t tid, int r)
@@ -3297,26 +3309,38 @@ void PrimaryLogPG::do_proxy_write(OpRequestRef op, ObjectContextRef obc, bool se
     flags |= CEPH_OSD_FLAG_RETURNVEC;
   }
 
-  dout(10) << __func__ << " Start proxy write for " << *m << dendl;
+  if (self) {
+    dout(10) << __func__ << " Start self write for " << *m << dendl;
 
-  ProxyWriteOpRef pwop(std::make_shared<ProxyWriteOp>(op, soid, m->ops, m->get_reqid()));
-  pwop->ctx = new OpContext(op, m->get_reqid(), &pwop->ops, this);
-  pwop->mtime = m->get_mtime();
+    unsigned old_flags = m->get_flags();
 
-  ObjectOperation obj_op;
-  obj_op.dup(pwop->ops);
+    m->set_flags(flags);
+    do_op(op);
 
-  C_ProxyWrite_Commit *fin = new C_ProxyWrite_Commit(
-      this, soid, get_last_peering_reset(), pwop);
-  ceph_tid_t tid = osd->objecter->mutate(
-    soid.oid, oloc, obj_op, snapc,
-    ceph::real_clock::from_ceph_timespec(pwop->mtime),
-    flags, new C_OnFinisher(fin, osd->get_objecter_finisher(get_pg_shard())),
-    &pwop->user_version, pwop->reqid);
-  fin->tid = tid;
-  pwop->objecter_tid = tid;
-  proxywrite_ops[tid] = pwop;
-  in_progress_proxy_ops[soid].push_back(op);
+    m->set_flags(old_flags);
+  }
+  else {
+    dout(10) << __func__ << " Start proxy write for " << *m << dendl;
+
+    ProxyWriteOpRef pwop(std::make_shared<ProxyWriteOp>(op, soid, m->ops, m->get_reqid()));
+    pwop->ctx = new OpContext(op, m->get_reqid(), &pwop->ops, this);
+    pwop->mtime = m->get_mtime();
+
+    ObjectOperation obj_op;
+    obj_op.dup(pwop->ops);
+
+    C_ProxyWrite_Commit *fin = new C_ProxyWrite_Commit(
+        this, soid, get_last_peering_reset(), pwop);
+    ceph_tid_t tid = osd->objecter->mutate(
+      soid.oid, oloc, obj_op, snapc,
+      ceph::real_clock::from_ceph_timespec(pwop->mtime),
+      flags, new C_OnFinisher(fin, osd->get_objecter_finisher(get_pg_shard())),
+      &pwop->user_version, pwop->reqid);
+    fin->tid = tid;
+    pwop->objecter_tid = tid;
+    proxywrite_ops[tid] = pwop;
+    in_progress_proxy_ops[soid].push_back(op);
+  }
 }
 
 void PrimaryLogPG::do_proxy_chunked_op(OpRequestRef op, const hobject_t& missing_oid, 
