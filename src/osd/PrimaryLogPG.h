@@ -1466,6 +1466,7 @@ protected:
   map<ceph_tid_t, ProxyReadOpRef> proxyread_ops;
 
   void do_proxy_read(OpRequestRef op, ObjectContextRef obc = NULL, bool self = false);
+  void do_proxy_read(MOSDOp *m, OpRequestRef op, ObjectContextRef obc = NULL, bool self = false);
   void finish_proxy_read(hobject_t oid, ceph_tid_t tid, int r);
   void cancel_proxy_read(ProxyReadOpRef prdop, vector<ceph_tid_t> *tids);
 
@@ -1475,6 +1476,7 @@ protected:
   map<ceph_tid_t, ProxyWriteOpRef> proxywrite_ops;
 
   void do_proxy_write(OpRequestRef op, ObjectContextRef obc = NULL, bool self = false);
+  void do_proxy_write(MOSDOp *m, OpRequestRef op, ObjectContextRef obc = NULL, bool self = false, bool is_custom_op = true);
   void finish_proxy_write(hobject_t oid, ceph_tid_t tid, int r);
   void cancel_proxy_write(ProxyWriteOpRef pwop, vector<ceph_tid_t> *tids);
 
