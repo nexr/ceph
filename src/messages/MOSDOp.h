@@ -235,6 +235,8 @@ public:
   }
 
   bool has_flag(__u32 flag) const { return flags & flag; };
+  void add_flag(__u32 flag) { flags |= flag; };
+  void set_flags(__u32 flags) { this->flags = flags; };
 
   bool is_retry_attempt() const { return flags & CEPH_OSD_FLAG_RETRY; }
   void set_retry_attempt(unsigned a) { 
