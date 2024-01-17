@@ -3048,6 +3048,11 @@ void PrimaryLogPG::do_proxy_read(OpRequestRef op, ObjectContextRef obc, bool sel
   // NOTE: non-const here because the ProxyReadOp needs mutable refs to
   // stash the result in the request's OSDOp vector
   MOSDOp *m = static_cast<MOSDOp*>(op->get_nonconst_req());
+  do_proxy_read(m, op, obc, self);
+}
+
+void PrimaryLogPG::do_proxy_read(MOSDOp *m, OpRequestRef op, ObjectContextRef obc, bool self)
+{
   object_locator_t oloc;
   hobject_t soid;
   /* extensible tier */
@@ -3276,6 +3281,11 @@ void PrimaryLogPG::do_proxy_write(OpRequestRef op, ObjectContextRef obc, bool se
 {
   // NOTE: non-const because ProxyWriteOp takes a mutable ref
   MOSDOp *m = static_cast<MOSDOp*>(op->get_nonconst_req());
+  do_proxy_write(m, op, obc, self, false);
+}
+
+void PrimaryLogPG::do_proxy_write(MOSDOp *m, OpRequestRef op, ObjectContextRef obc, bool self, bool is_custom_op)
+{
   object_locator_t oloc;
   SnapContext snapc(m->get_snap_seq(), m->get_snaps());
   hobject_t soid;
@@ -3325,6 +3335,7 @@ void PrimaryLogPG::do_proxy_write(OpRequestRef op, ObjectContextRef obc, bool se
     ProxyWriteOpRef pwop(std::make_shared<ProxyWriteOp>(op, soid, m->ops, m->get_reqid()));
     pwop->ctx = new OpContext(op, m->get_reqid(), &pwop->ops, this);
     pwop->mtime = m->get_mtime();
+    pwop->sent_reply = is_custom_op;
 
     ObjectOperation obj_op;
     obj_op.dup(pwop->ops);
