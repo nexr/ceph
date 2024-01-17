@@ -2791,24 +2791,68 @@ PrimaryLogPG::cache_result_t PrimaryLogPG::maybe_handle_cache_detail(
     }
 
     if (op->may_write() || op->may_cache()) {
-      // Prepare to check first osd operation
-      vector<OSDOp> ops = m->ops;
-      OSDOp& first_op = *(ops.begin());
-      int first_opcode = first_op.op.op;
+      bool need_pre_promote = true;
+      bool need_post_index_creation = false;
 
-      // Skip object promotion if target object is completely new
-      if (  first_opcode == CEPH_OSD_OP_WRITEFULL ||
-           (first_opcode == CEPH_OSD_OP_CREATE && (first_op.op.flags & CEPH_OSD_OP_FLAG_EXCL)) )
-      {
-        do_proxy_write(op, NULL, true); // self proxy write
+      // Check if pre/post process would be needed
+      vector<OSDOp> ops = m->ops;
+      for (vector<OSDOp>::iterator p = ops.begin(); p != ops.end(); ++p) {
+        OSDOp& each_op = *p;
+        int each_opcode = each_op.op.op;
+        int each_flags  = each_op.op.flags;
+
+        if (each_opcode == CEPH_OSD_OP_WRITEFULL ||
+            each_opcode == CEPH_OSD_OP_WRITE ||
+            each_opcode == CEPH_OSD_OP_CREATE)
+        {
+          need_pre_promote = ( (each_opcode == CEPH_OSD_OP_CREATE && (each_flags & CEPH_OSD_OP_FLAG_EXCL)) ||
+                               (each_opcode == CEPH_OSD_OP_WRITE && each_op.op.extent.offset > 0) );
+
+          need_post_index_creation = !(each_opcode == CEPH_OSD_OP_WRITE && each_op.op.extent.offset > 0);
+
+          break;
+        }
+
+        if ( each_opcode == CEPH_OSD_OP_COPY_FROM ||
+             each_opcode == CEPH_OSD_OP_COPY_FROM2 )
+        {
+          need_pre_promote = false;
+          need_post_index_creation = true;
+
+          break;
+        }
       }
-      else {
+
+      dout(20) << __func__ << " writeback cache: do write operation ( "
+                           << (need_pre_promote ? "with pre-promote " : "")
+                           << (need_post_index_creation ? "with post-index-create " : "")
+                           << (!(need_pre_promote || need_post_index_creation) ? "no pre, post process " : "")
+                           << ")" << dendl;
+
+      // Promote object if target object would be exists
+      if (need_pre_promote) {
         promote_object(obc, missing_oid, oloc, op, promote_obc);
-        do_proxy_write(op, NULL, true); // self proxy write
+      }
+
+      do_proxy_write(op, NULL, true); // self proxy write
+ 
+      // Create empty object in base pool if new object was written
+      if (need_post_index_creation) {
+        hobject_t index_obj = m->get_hobj();
+        spg_t spgid(m->get_pg());
+        int flags = m->get_flags() | CEPH_OSD_OP_FLAG_EXCL;
+
+        MOSDOp* idx_create_msg = new MOSDOp(0, 0, index_obj, spgid,
+                                            get_osdmap_epoch(), flags, m->get_features());
+
+        idx_create_msg->add_simple_op(CEPH_OSD_OP_CREATE, 0, 0);
+
+        do_proxy_write(idx_create_msg, op);
       }
 
       return cache_result_t::HANDLED_PROXY;
     } else {
+      dout(20) << __func__ << " writeback cache: do read operation" << dendl;
       do_proxy_read(op);
 
       // Avoid duplicate promotion
