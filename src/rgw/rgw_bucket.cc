@@ -374,13 +374,47 @@ static int rgw_remove_bucket(rgw::sal::RGWRadosStore *store, rgw_bucket& bucket,
       return -ENOTEMPTY;
     }
 
+    using ThreadObjDelete = ThreadLambda<int, rgw_obj_key>;
+    queue<ThreadObjDelete *> q_tods;
+
     for (const auto& obj : objs) {
-      rgw_obj_key key(obj.key);
-      ret = rgw_remove_object(store, info, bucket, key);
-      if (ret < 0 && ret != -ENOENT) {
-        return ret;
-      }
+      rgw_obj_key each_obj_key(obj.key);
+
+      ThreadObjDelete* each_tod = new ThreadObjDelete(
+        [&store, &info, &bucket](rgw_obj_key key) -> int {
+            return rgw_remove_object(store, info, bucket, key);
+        },
+        each_obj_key
+      );
+
+      each_tod->start();
+      q_tods.push(each_tod);
     }
+
+    int err_code = 0;
+    while (!q_tods.empty()) {
+      ThreadObjDelete* each_tod = q_tods.front();
+
+      string each_obj_key = std::get<0>(each_tod->get_param()).to_str();
+
+      dout(10) << "wait for deleting " << each_obj_key << dendl;
+      each_tod->wait_done();
+
+      int each_result = each_tod->get_result();
+      if (each_result < 0 && each_result != -ENOENT) {
+        err_code = each_result;
+        lderr(store->ctx()) << "ERROR: failed to delete " << each_obj_key << " (error code: " << err_code << ")" << dendl;
+      }
+      else {
+        dout(10) << each_obj_key << " is deleted" << dendl;
+      }
+
+      delete each_tod;
+      q_tods.pop();
+    }
+
+    if (err_code != 0) { return err_code; }
+
   } while(is_truncated);
 
   string prefix, delimiter;
