@@ -6740,6 +6740,7 @@ wrap_up:
 
     rgw_obj obj = each_obj_delete->target->get_obj();
 
+    // The send_partial_response() is placed outside threads because it can't be performed simultaneously.
     send_partial_response(obj.key, each_obj_delete->result.delete_marker, each_obj_delete->result.version_id, each_op_ret);
 
     delete each_obj_delete->target;
