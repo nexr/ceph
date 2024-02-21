@@ -23,6 +23,7 @@
 
 #include <pthread.h>
 #include <sys/types.h>
+#include <unistd.h>
 
 #include "include/compat.h"
 
@@ -80,4 +81,66 @@ std::thread make_named_thread(std::string_view n,
 				   std::forward<Args>(args)...);
 		     }, std::forward<Fun>(fun), std::forward<Args>(args)...);
 }
+
+// The "void" ReturnType is not implemented... Use "void*" instaed.
+template<typename ReturnType, typename ... Params>
+class ThreadLambda: public Thread {
+private:
+  const char* op_thread_name = "thread_op";
+
+  bool done = false;
+
+  using Lambda = std::function<ReturnType (Params ...)>;
+  Lambda lambda = NULL;
+
+  ReturnType result;
+
+  using ParamTuple = std::tuple<Params...>;
+  ParamTuple params;
+
+public:
+
+  ThreadLambda() {}
+  ThreadLambda(Lambda&& _lambda, Params... _params) : lambda(_lambda), params(make_tuple(_params...)) {}
+  ~ThreadLambda() { stop(); }
+
+  void set_lambda(Lambda&& _lambda) { lambda = _lambda; }
+  void set_param(Params... _params) { params = std::make_tuple(_params...); }
+
+  bool is_done() { return done; }
+  ParamTuple get_param() { return params; }
+  ReturnType get_result() { return result; }
+
+  void * entry() override
+  {
+    result = process(params);
+    done = true;
+    return NULL;
+  }
+
+  template <typename Tuple>
+  ReturnType process(Tuple const& tuple)
+  {
+    return process(tuple, std::make_index_sequence<std::tuple_size<Tuple>::value>());
+  }
+
+  template <typename Tuple, std::size_t... I>
+  ReturnType process(Tuple const& tuple, std::index_sequence<I...>)
+  {
+    return lambda(std::get<I>(tuple)...);
+  }
+
+  void start() { create(op_thread_name); }
+  void stop() { if (is_started()) { join(); } }
+
+  void wait_done()
+  {
+    if (!is_started()) { return; }
+
+    if (lambda == NULL) { return; }
+
+    while (!done) { usleep(100); }
+  }
+};
+
 #endif
