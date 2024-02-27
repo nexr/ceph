@@ -101,13 +101,24 @@ private:
 public:
 
   ThreadLambda() {}
+  ThreadLambda(Lambda&& _lambda) : lambda(_lambda) {}
   ThreadLambda(Lambda&& _lambda, Params... _params) : lambda(_lambda), params(make_tuple(_params...)) {}
-  ~ThreadLambda() { stop(); }
+  ~ThreadLambda() {
+    if (is_started()) {
+      stop();
+      detach();
+    }
+  }
 
   void set_lambda(Lambda&& _lambda) { lambda = _lambda; }
   void set_param(Params... _params) { params = std::make_tuple(_params...); }
 
   bool is_done() { return done; }
+  void reset_done() {
+    done = false;
+    detach();
+  }
+
   ParamTuple get_param() { return params; }
   ReturnType get_result() { return result; }
 
@@ -130,7 +141,11 @@ public:
     return lambda(std::get<I>(tuple)...);
   }
 
-  void start() { create(op_thread_name); }
+  void start() {
+    if (done) { reset_done(); }
+
+    create(op_thread_name);
+  }
   void stop() { if (is_started()) { join(); } }
 
   void wait_done()
