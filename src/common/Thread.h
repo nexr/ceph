@@ -116,7 +116,9 @@ public:
   bool is_done() { return done; }
   void reset_done() {
     done = false;
-    detach();
+    if (is_started()) {
+      detach();
+    }
   }
 
   ParamTuple get_param() { return params; }
@@ -142,19 +144,30 @@ public:
   }
 
   void start() {
-    if (done) { reset_done(); }
-
     create(op_thread_name);
   }
+
+  void restart() {
+    stop();
+    reset_done();
+    start();
+  }
+
   void stop() { if (is_started()) { join(); } }
 
-  void wait_done()
+  bool wait_done(int usec_wait = -1)
   {
-    if (!is_started()) { return; }
+    if (lambda == NULL) { return true; }
 
-    if (lambda == NULL) { return; }
+    if (!is_started()) { return true; }
 
-    while (!done) { usleep(100); }
+    int usec_taken = 0;
+    while (!done) {
+      if (usec_wait != -1 && usec_wait <= usec_taken++) { break; }
+      usleep(1);
+    }
+
+    return done;
   }
 };
 
