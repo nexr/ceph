@@ -759,6 +759,8 @@ class ThreadLambdaPool {
   size_t size = 1000;
   size_t next_tid = 0;
 
+  int wait_done_retries = 5;
+
   // run
   std::mutex r_mutex;
 
@@ -781,10 +783,22 @@ public:
 
   void run(Params... _params) {
     unique_lock<std::mutex> r_lock(r_mutex);
+    TLclass* allocated_thread;
 
-    TLclass* allocated_thread = threads[next_tid];
+    do {
+      int tries = 0;
+      for ( ; tries < wait_done_retries; tries++) {
+        allocated_thread = threads[next_tid];
+        if (allocated_thread->wait_done(1)) { break; }
+      }
 
-    allocated_thread->wait_done();
+      if (tries == wait_done_retries) {
+        next_tid = (next_tid + 1) % size;
+      }
+      else {
+        break;
+      }
+    } while (true);
 
     allocated_thread->reset_done();
     allocated_thread->set_param(_params ...);
