@@ -5489,7 +5489,7 @@ std::vector<Option> get_rgw_options() {
     .add_see_also({"rgw_delete_thread_num"}),
 
     Option("rgw_delete_thread_num", Option::TYPE_INT, Option::LEVEL_ADVANCED)
-    .set_default(256)
+    .set_default(1024)
     .set_description("The number of threads that process objects deletion")
     .set_flag(Option::FLAG_STARTUP),
 
