@@ -857,6 +857,7 @@ public:
       struct DeleteResult {
         bool delete_marker;
         string version_id;
+        int op_ret;
 
         DeleteResult() : delete_marker(false) {}
       } result;

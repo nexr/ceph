@@ -747,6 +747,68 @@ public:
 
 };
 
+// The "void" ReturnType is not implemented... Use "void*" instaed.
+template<typename ReturnType, typename ... Params>
+class ThreadLambdaPool {
+  using TLclass = ThreadLambda<ReturnType, Params ...>;
+  vector<TLclass *> threads;
+
+  using Lambda = std::function<ReturnType (Params ...)>;
+  Lambda lambda_template = NULL;
+
+  size_t size = 1000;
+  size_t next_tid = 0;
+
+  int wait_done_retries = 5;
+
+  // run
+  std::mutex r_mutex;
+
+public:
+  ThreadLambdaPool(Lambda&& _lambda_template, unsigned int _size = 1000) : lambda_template(_lambda_template), size(_size)
+  {
+    for (size_t create_count = 0; create_count < size; create_count++) {
+      TLclass* new_thread = new TLclass(std::move(lambda_template));
+      threads.push_back(new_thread);
+    }
+  }
+
+  ~ThreadLambdaPool()
+  {
+    for (TLclass* each_thread: threads) {
+      each_thread->wait_done();
+      delete each_thread;
+    }
+  }
+
+  void run(Params... _params) {
+    unique_lock<std::mutex> r_lock(r_mutex);
+    TLclass* allocated_thread;
+
+    do {
+      int tries = 0;
+      for ( ; tries < wait_done_retries; tries++) {
+        allocated_thread = threads[next_tid];
+        if (allocated_thread->wait_done(1)) { break; }
+      }
+
+      if (tries == wait_done_retries) {
+        next_tid = (next_tid + 1) % size;
+      }
+      else {
+        break;
+      }
+    } while (true);
+
+    allocated_thread->reset_done();
+    allocated_thread->set_param(_params ...);
+
+    allocated_thread->start();
+
+    next_tid = (next_tid + 1) % size;
+  }
+};
+
 #endif
 
 #endif

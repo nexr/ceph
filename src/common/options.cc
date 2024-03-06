@@ -5485,7 +5485,13 @@ std::vector<Option> get_rgw_options() {
 
     Option("rgw_delete_multi_obj_max_num", Option::TYPE_INT, Option::LEVEL_ADVANCED)
     .set_default(1000)
-    .set_description("Max number of objects in a single multi-object delete request"),
+    .set_description("Max number of objects in a single multi-object delete request")
+    .add_see_also({"rgw_delete_thread_num"}),
+
+    Option("rgw_delete_thread_num", Option::TYPE_INT, Option::LEVEL_ADVANCED)
+    .set_default(1024)
+    .set_description("The number of threads that process objects deletion")
+    .set_flag(Option::FLAG_STARTUP),
 
     Option("rgw_website_routing_rules_max_num", Option::TYPE_INT, Option::LEVEL_ADVANCED)
     .set_default(50)

@@ -101,13 +101,31 @@ private:
 public:
 
   ThreadLambda() {}
+  ThreadLambda(Lambda&& _lambda) : lambda(_lambda) {}
   ThreadLambda(Lambda&& _lambda, Params... _params) : lambda(_lambda), params(make_tuple(_params...)) {}
-  ~ThreadLambda() { stop(); }
+  ~ThreadLambda() {
+    if (is_started()) {
+      stop();
+    }
+  }
 
   void set_lambda(Lambda&& _lambda) { lambda = _lambda; }
   void set_param(Params... _params) { params = std::make_tuple(_params...); }
 
   bool is_done() { return done; }
+  bool reset_done() {
+    if (done) {
+      stop();
+
+      done = false;
+
+      return true;
+    }
+    else {
+      return false;
+    }
+  }
+
   ParamTuple get_param() { return params; }
   ReturnType get_result() { return result; }
 
@@ -130,16 +148,33 @@ public:
     return lambda(std::get<I>(tuple)...);
   }
 
-  void start() { create(op_thread_name); }
+  void start() {
+    create(op_thread_name);
+  }
+
+  void restart() {
+    stop();
+
+    done = false;
+
+    start();
+  }
+
   void stop() { if (is_started()) { join(); } }
 
-  void wait_done()
+  bool wait_done(int usec_wait = -1)
   {
-    if (!is_started()) { return; }
+    if (lambda == NULL) { return true; }
 
-    if (lambda == NULL) { return; }
+    if (!is_started()) { return true; }
 
-    while (!done) { usleep(100); }
+    int usec_taken = 0;
+    while (!done) {
+      if (usec_wait != -1 && usec_wait <= usec_taken++) { break; }
+      usleep(1);
+    }
+
+    return done;
   }
 };
 
