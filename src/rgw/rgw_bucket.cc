@@ -12,6 +12,7 @@
 
 #include "common/errno.h"
 #include "common/ceph_json.h"
+#include "common/WorkQueue.h"
 #include "include/scope_guard.h"
 
 #include "rgw_rados.h"
@@ -361,6 +362,30 @@ static int rgw_remove_bucket(rgw::sal::RGWRadosStore *store, rgw_bucket& bucket,
   list_op.params.allow_unordered = true;
 
   bool is_truncated = false;
+
+  using ThreadObjDelPool = ThreadLambdaPool<int, rgw_obj_key, map<string, int>*, std::mutex*>;
+  ThreadObjDelPool* tod_pool = new ThreadObjDelPool(
+    [&store, &info, &bucket](rgw_obj_key key, map<string, int>* result_map, std::mutex* mu_mutex) -> int {
+        int ret = rgw_remove_object(store, info, bucket, key);
+        if (ret < 0 && ret != -ENOENT) {
+          lderr(store->ctx()) << "ERROR: failed to delete " << key.name << " (error code: " << ret << ")" << dendl;
+        }
+        else {
+          ret = 0;
+
+          dout(10) << key.name << " is deleted" << dendl;
+        }
+
+        {
+          unique_lock<std::mutex> mu_lock(*mu_mutex);
+          result_map->insert(make_pair(key.name, ret));
+        }
+
+        return ret;
+    },
+    cct->_conf->rgw_delete_thread_num
+  );
+
   do {
     objs.clear();
 
@@ -374,44 +399,34 @@ static int rgw_remove_bucket(rgw::sal::RGWRadosStore *store, rgw_bucket& bucket,
       return -ENOTEMPTY;
     }
 
-    using ThreadObjDelete = ThreadLambda<int, rgw_obj_key>;
-    queue<ThreadObjDelete *> q_tods;
+    // map_update
+    std::mutex mu_mutex;
+    map<string, int> result_map;
 
     for (const auto& obj : objs) {
       rgw_obj_key each_obj_key(obj.key);
 
-      ThreadObjDelete* each_tod = new ThreadObjDelete(
-        [&store, &info, &bucket](rgw_obj_key key) -> int {
-            int ret = rgw_remove_object(store, info, bucket, key);
-            if (ret < 0 && ret != -ENOENT) {
-              lderr(store->ctx()) << "ERROR: failed to delete " << key.name << " (error code: " << ret << ")" << dendl;
-            }
-            else {
-              ret = 0;
-
-              dout(10) << key.name << " is deleted" << dendl;
-            }
-
-            return ret;
-        },
-        each_obj_key
-      );
-
-      each_tod->start();
-      q_tods.push(each_tod);
+      tod_pool->run(each_obj_key, &result_map, &mu_mutex);
     }
 
     int err_code = 0;
-    while (!q_tods.empty()) {
-      ThreadObjDelete* each_tod = q_tods.front();
 
-      each_tod->wait_done();
+    for (const auto& obj : objs) {
+      rgw_obj_key each_obj_key(obj.key);
 
-      int each_result = each_tod->get_result();
-      if (each_result == 0) { err_code = each_result; }
+      map<string, int>::iterator found;
+      do {
+        found = result_map.find(each_obj_key.name);
+        if (found == result_map.end()) {
+          usleep(100);
+        }
+        else {
+          break;
+        }
+      } while (true);
 
-      delete each_tod;
-      q_tods.pop();
+      int each_result = found->second;
+      if (each_result != 0) { err_code = each_result; }
     }
 
     if (err_code != 0) { return err_code; }
