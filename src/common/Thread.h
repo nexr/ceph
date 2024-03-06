@@ -106,7 +106,6 @@ public:
   ~ThreadLambda() {
     if (is_started()) {
       stop();
-      detach();
     }
   }
 
@@ -114,10 +113,16 @@ public:
   void set_param(Params... _params) { params = std::make_tuple(_params...); }
 
   bool is_done() { return done; }
-  void reset_done() {
-    done = false;
-    if (is_started()) {
-      detach();
+  bool reset_done() {
+    if (done) {
+      stop();
+
+      done = false;
+
+      return true;
+    }
+    else {
+      return false;
     }
   }
 
@@ -149,7 +154,9 @@ public:
 
   void restart() {
     stop();
-    reset_done();
+
+    done = false;
+
     start();
   }
 
