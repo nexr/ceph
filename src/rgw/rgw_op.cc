@@ -6609,6 +6609,7 @@ void RGWDeleteMultiObj::execute()
   RGWMultiDelXMLParser parser;
   RGWObjectCtx *obj_ctx = static_cast<RGWObjectCtx *>(s->obj_ctx);
 
+  std::vector<rgw_obj_key> run_objects;
   map<rgw_obj_key, RGWRados::Object::Delete*> result_map;
 
   char* buf;
@@ -6729,6 +6730,7 @@ void RGWDeleteMultiObj::execute()
     RGWRados::Object* del_target = new RGWRados::Object(store->getRados(), s->bucket_info, *obj_ctx, obj);
     RGWRados::Object::Delete* del_op = new RGWRados::Object::Delete(del_target);
 
+    run_objects.push_back(obj.key);
     tod_pool->run(s, store, del_op, &result_map, &mu_mutex);
   }
 
@@ -6737,7 +6739,7 @@ void RGWDeleteMultiObj::execute()
   op_ret = 0;
 
 wrap_up:
-  for (iter = multi_delete->objects.begin(); iter != multi_delete->objects.end(); ++iter) {
+  for (iter = run_objects.begin(); iter != run_objects.end(); ++iter) {
     rgw_obj_key each_obj_key = *iter;
 
     map<rgw_obj_key, RGWRados::Object::Delete*>::iterator found;
