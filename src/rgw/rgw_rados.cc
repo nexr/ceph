@@ -5988,7 +5988,22 @@ int RGWRados::Bucket::UpdateIndex::guard_reshard(BucketShard **pbs, std::functio
     int ret = get_bucket_shard(&bs);
     if (ret < 0) {
       ldout(store->ctx(), 5) << "failed to get BucketShard object: ret=" << ret << dendl;
-      return ret;
+
+      ret = store->try_refresh_bucket_info(target->bucket_info, nullptr);
+      if (ret < 0) {
+        ldout(store->ctx(), 1) << "ERROR: failed to refresh bucket info: " << ret << dendl;
+        return ret;
+      }
+
+      ldout(store->ctx(), 10) << "retry to get BucketShard object with new bucket id! "
+                              << "new_bucket_id=" << target->bucket_info.bucket.bucket_id << dendl;
+
+      invalidate_bs();
+      ret = get_bucket_shard(&bs);
+      if (ret < 0) {
+        ldout(store->ctx(), 5) << "failed to get BucketShard object with refreshed bucket id too: ret=" << ret << dendl;
+        return ret;
+      }
     }
     r = call(bs);
     if (r != -ERR_BUSY_RESHARDING) {
