@@ -6080,13 +6080,6 @@ int RGWRados::Bucket::UpdateIndex::complete(int64_t poolid, uint64_t epoch,
     return 0;
   }
   RGWRados *store = target->get_store();
-  BucketShard *bs;
-
-  int ret = get_bucket_shard(&bs);
-  if (ret < 0) {
-    ldout(store->ctx(), 5) << "failed to get BucketShard object: ret=" << ret << dendl;
-    return ret;
-  }
 
   rgw_bucket_dir_entry ent;
   obj.key.get_index_key(&ent.key);
@@ -6110,12 +6103,17 @@ int RGWRados::Bucket::UpdateIndex::complete(int64_t poolid, uint64_t epoch,
   ent.meta.content_type = content_type;
   ent.meta.appendable = appendable;
 
-  ret = store->cls_obj_complete_add(*bs, obj, optag, poolid, epoch, ent, category, remove_objs, bilog_flags, zones_trace);
+  // Follows up the bucket shards that may have changed during the data write.
+  // Wait for resharding that may be in progress.
+  int ret = guard_reshard(nullptr, [&](BucketShard *bs) -> int {
+           int comp_add_ret = store->cls_obj_complete_add(*bs, obj, optag, poolid, epoch, ent, category, remove_objs, bilog_flags, zones_trace);
 
-  int r = store->svc.datalog_rados->add_entry(target->bucket_info, bs->shard_id);
-  if (r < 0) {
-    lderr(store->ctx()) << "ERROR: failed writing data log" << dendl;
-  }
+           int log_add_ret = store->svc.datalog_rados->add_entry(target->bucket_info, bs->shard_id);
+           if (log_add_ret < 0) {
+             lderr(store->ctx()) << "ERROR: failed writing data log" << dendl;
+           }
+           return comp_add_ret;
+        });
 
   return ret;
 }
