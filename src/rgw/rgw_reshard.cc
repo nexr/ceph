@@ -737,6 +737,15 @@ int RGWBucketReshard::execute(int num_shards, int max_op_entries,
   // at this point we've done the main work; we'll make a best-effort
   // to clean-up but will not indicate any errors encountered
 
+  ret = store->ctl()->bucket->remove_bucket_instance_info(bucket_info.bucket,
+                                                       bucket_info, null_yield);
+  if (ret < 0) {
+    lderr(store->ctx()) << "Error: " << __func__ <<
+      " failed to clean old bucket info object \"" <<
+      bucket_info.bucket.get_key() <<
+      "\"created after successful resharding with error " << ret << dendl;
+  }
+
   reshard_lock.unlock();
 
   // resharding successful, so remove old bucket index shards; use
@@ -750,14 +759,6 @@ int RGWBucketReshard::execute(int num_shards, int max_op_entries,
       "RGWRados::clean_bucket_index returned " << ret << dendl;
   }
 
-  ret = store->ctl()->bucket->remove_bucket_instance_info(bucket_info.bucket,
-                                                       bucket_info, null_yield);
-  if (ret < 0) {
-    lderr(store->ctx()) << "Error: " << __func__ <<
-      " failed to clean old bucket info object \"" <<
-      bucket_info.bucket.get_key() <<
-      "\"created after successful resharding with error " << ret << dendl;
-  }
 
   ldout(store->ctx(), 1) << __func__ <<
     " INFO: reshard of bucket \"" << bucket_info.bucket.name << "\" from \"" <<
