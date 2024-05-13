@@ -834,6 +834,7 @@ public:
 
     struct Delete {
       RGWRados::Object *target;
+      bool delete_done = false;
 
       struct DeleteParams {
         rgw_user bucket_owner;
