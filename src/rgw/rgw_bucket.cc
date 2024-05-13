@@ -363,9 +363,9 @@ static int rgw_remove_bucket(rgw::sal::RGWRadosStore *store, rgw_bucket& bucket,
 
   bool is_truncated = false;
 
-  using ThreadObjDelPool = ThreadLambdaPool<int, rgw_obj_key, map<string, int>*, std::mutex*>;
+  using ThreadObjDelPool = ThreadLambdaPool<int, rgw_obj_key>;
   ThreadObjDelPool* tod_pool = new ThreadObjDelPool(
-    [&store, &info, &bucket](rgw_obj_key key, map<string, int>* result_map, std::mutex* mu_mutex) -> int {
+    [&store, &info, &bucket](rgw_obj_key key) -> int {
         int ret = rgw_remove_object(store, info, bucket, key);
         if (ret < 0 && ret != -ENOENT) {
           lderr(store->ctx()) << "ERROR: failed to delete " << key.name << " (error code: " << ret << ")" << dendl;
@@ -374,11 +374,6 @@ static int rgw_remove_bucket(rgw::sal::RGWRadosStore *store, rgw_bucket& bucket,
           ret = 0;
 
           dout(10) << key.name << " is deleted" << dendl;
-        }
-
-        {
-          unique_lock<std::mutex> mu_lock(*mu_mutex);
-          result_map->insert(make_pair(key.name, ret));
         }
 
         return ret;
@@ -400,13 +395,18 @@ static int rgw_remove_bucket(rgw::sal::RGWRadosStore *store, rgw_bucket& bucket,
     }
 
     // map_update
-    std::mutex mu_mutex;
     map<string, int> result_map;
 
     for (const auto& obj : objs) {
       rgw_obj_key each_obj_key(obj.key);
 
-      tod_pool->run(each_obj_key, &result_map, &mu_mutex);
+      std::pair<std::map<string, int>::iterator,bool> insert_ret;
+
+      insert_ret = result_map.insert(make_pair(each_obj_key.name, 9999));
+
+      if (insert_ret.second == true) {
+        tod_pool->run_with_result(&(insert_ret.first->second), each_obj_key);
+      }
     }
 
     int err_code = 0;
@@ -415,9 +415,14 @@ static int rgw_remove_bucket(rgw::sal::RGWRadosStore *store, rgw_bucket& bucket,
       rgw_obj_key each_obj_key(obj.key);
 
       map<string, int>::iterator found;
+      found = result_map.find(each_obj_key.name);
+
+      if (found == result_map.end()) { continue; }
+
+      int each_result;
       do {
-        found = result_map.find(each_obj_key.name);
-        if (found == result_map.end()) {
+        each_result = found->second;
+        if (each_result > 0) {
           usleep(100);
         }
         else {
@@ -425,7 +430,6 @@ static int rgw_remove_bucket(rgw::sal::RGWRadosStore *store, rgw_bucket& bucket,
         }
       } while (true);
 
-      int each_result = found->second;
       if (each_result != 0) { err_code = each_result; }
     }
 

@@ -6551,17 +6551,18 @@ void RGWDeleteMultiObj::pre_exec()
   rgw_bucket_object_pre_exec(s);
 }
 
-using ThreadObjDelPool = ThreadLambdaPool<int, req_state*, rgw::sal::RGWRadosStore*, RGWRados::Object::Delete*, map<rgw_obj_key, RGWRados::Object::Delete*>*, std::mutex*>;
+using ThreadObjDelPool = ThreadLambdaPool<int, RGWDeleteMultiObj*, RGWRados::Object::Delete*>;
 void RGWDeleteMultiObj::execute()
 {
-  // map_update
-  std::mutex mu_mutex;
-
   static ThreadObjDelPool* tod_pool;
   if (tod_pool == nullptr) {
     int tp_size = s->cct->_conf->rgw_delete_thread_num;
+
     tod_pool = new ThreadObjDelPool(
-      [](req_state* s, rgw::sal::RGWRadosStore* store, RGWRados::Object::Delete* del_op, map<rgw_obj_key, RGWRados::Object::Delete*>* result_map, std::mutex* mu_mutex) -> int {
+      [](RGWDeleteMultiObj* _this, RGWRados::Object::Delete* del_op) -> int {
+        req_state* s = _this->s;
+        rgw::sal::RGWRadosStore* store = _this->store;
+
         rgw_obj obj = del_op->target->get_obj();
 
         del_op->params.bucket_owner = s->bucket_owner.get_id();
@@ -6576,11 +6577,6 @@ void RGWDeleteMultiObj::execute()
         }
 
         del_op->result.op_ret = op_ret;
-
-        {
-          unique_lock<std::mutex> mu_lock(*mu_mutex);
-          result_map->insert(make_pair(obj.key, del_op));
-        }
 
         const auto obj_state = s->obj_ctx->get_state(obj);
 
@@ -6609,8 +6605,7 @@ void RGWDeleteMultiObj::execute()
   RGWMultiDelXMLParser parser;
   RGWObjectCtx *obj_ctx = static_cast<RGWObjectCtx *>(s->obj_ctx);
 
-  std::vector<rgw_obj_key> run_objects;
-  map<rgw_obj_key, RGWRados::Object::Delete*> result_map;
+  vector<RGWRados::Object::Delete*> dop_results;
 
   char* buf;
 
@@ -6730,8 +6725,8 @@ void RGWDeleteMultiObj::execute()
     RGWRados::Object* del_target = new RGWRados::Object(store->getRados(), s->bucket_info, *obj_ctx, obj);
     RGWRados::Object::Delete* del_op = new RGWRados::Object::Delete(del_target);
 
-    run_objects.push_back(obj.key);
-    tod_pool->run(s, store, del_op, &result_map, &mu_mutex);
+    dop_results.push_back(del_op);
+    tod_pool->tracked_run(&(del_op->delete_done), this, del_op);
   }
 
   /*  set the return code to zero, errors at this point will be
@@ -6739,21 +6734,12 @@ void RGWDeleteMultiObj::execute()
   op_ret = 0;
 
 wrap_up:
-  for (iter = run_objects.begin(); iter != run_objects.end(); ++iter) {
-    rgw_obj_key each_obj_key = *iter;
+  auto result_iter = dop_results.begin();
+  for (; result_iter != dop_results.end(); ++result_iter) {
+    RGWRados::Object::Delete* each_obj_delete = *result_iter;
 
-    map<rgw_obj_key, RGWRados::Object::Delete*>::iterator found;
-    do {
-      found = result_map.find(each_obj_key);
-      if (found == result_map.end()) {
-        usleep(10);
-      }
-      else {
-        break;
-      }
-    } while (true);
+    while (!(each_obj_delete->delete_done)) { usleep(1); };
 
-    RGWRados::Object::Delete* each_obj_delete = found->second;
     int each_op_ret = each_obj_delete->result.op_ret;
 
     rgw_obj obj = each_obj_delete->target->get_obj();
