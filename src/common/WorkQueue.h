@@ -764,6 +764,25 @@ class ThreadLambdaPool {
   // run
   std::mutex r_mutex;
 
+  TLclass* get_next_thread() {
+    TLclass* return_thread;
+
+    do {
+      int tries = 0;
+      for ( ; tries < wait_done_retries; tries++) {
+        return_thread = threads[next_tid];
+        if (return_thread->wait_done(1)) { break; }
+      }
+
+      next_tid = (next_tid + 1) % size;
+
+      if (tries < wait_done_retries) { break; }
+
+    } while (true);
+
+    return return_thread;
+  }
+
 public:
   ThreadLambdaPool(Lambda&& _lambda_template, unsigned int _size = 1000) : lambda_template(_lambda_template), size(_size)
   {
@@ -783,29 +802,50 @@ public:
 
   void run(Params... _params) {
     unique_lock<std::mutex> r_lock(r_mutex);
-    TLclass* allocated_thread;
 
-    do {
-      int tries = 0;
-      for ( ; tries < wait_done_retries; tries++) {
-        allocated_thread = threads[next_tid];
-        if (allocated_thread->wait_done(1)) { break; }
-      }
-
-      if (tries == wait_done_retries) {
-        next_tid = (next_tid + 1) % size;
-      }
-      else {
-        break;
-      }
-    } while (true);
+    TLclass* allocated_thread = get_next_thread();
 
     allocated_thread->reset_done();
     allocated_thread->set_param(_params ...);
 
     allocated_thread->start();
+  }
 
-    next_tid = (next_tid + 1) % size;
+  void tracked_run(bool* pdone, Params... _params) {
+    unique_lock<std::mutex> r_lock(r_mutex);
+
+    TLclass* allocated_thread = get_next_thread();
+
+    allocated_thread->reset_done();
+    allocated_thread->set_done_track(pdone);
+    allocated_thread->set_param(_params ...);
+
+    allocated_thread->start();
+  }
+
+  void run_with_result(ReturnType* presult, Params... _params) {
+    unique_lock<std::mutex> r_lock(r_mutex);
+
+    TLclass* allocated_thread = get_next_thread();
+
+    allocated_thread->reset_done();
+    allocated_thread->set_result_track(presult);
+    allocated_thread->set_param(_params ...);
+
+    allocated_thread->start();
+  }
+
+  void tracked_run_with_result(bool* pdone, ReturnType* presult, Params... _params) {
+    unique_lock<std::mutex> r_lock(r_mutex);
+
+    TLclass* allocated_thread = get_next_thread();
+
+    allocated_thread->reset_done();
+    allocated_thread->set_done_track(pdone);
+    allocated_thread->set_result_track(presult);
+    allocated_thread->set_param(_params ...);
+
+    allocated_thread->start();
   }
 };
 
