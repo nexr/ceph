@@ -88,12 +88,14 @@ class ThreadLambda: public Thread {
 private:
   const char* op_thread_name = "thread_op";
 
-  bool done = false;
+  bool  done = false;
+  bool* done_track = NULL;
 
   using Lambda = std::function<ReturnType (Params ...)>;
   Lambda lambda = NULL;
 
   ReturnType result;
+  ReturnType* result_track = NULL;
 
   using ParamTuple = std::tuple<Params...>;
   ParamTuple params;
@@ -111,6 +113,8 @@ public:
 
   void set_lambda(Lambda&& _lambda) { lambda = _lambda; }
   void set_param(Params... _params) { params = std::make_tuple(_params...); }
+  void set_done_track(bool* _done_track) { done_track = _done_track; }
+  void set_result_track(ReturnType* _result_track) { result_track = _result_track; }
 
   bool is_done() { return done; }
   bool reset_done() {
@@ -131,8 +135,23 @@ public:
 
   void * entry() override
   {
+    if (done_track != NULL) {
+      *done_track = false;
+    }
+
     result = process(params);
     done = true;
+
+    if (result_track != NULL) {
+      *result_track = result;
+      result_track = NULL;
+    }
+
+    if (done_track != NULL) {
+      *done_track = true;
+      done_track = NULL;
+    }
+
     return NULL;
   }
 
