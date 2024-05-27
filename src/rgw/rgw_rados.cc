@@ -8887,16 +8887,38 @@ int RGWRados::check_disk_state(librados::IoCtx io_ctx,
   if (!list_state.is_delete_marker() && !astate->exists) {
       /* object doesn't exist right now -- hopefully because it's
        * marked as !exists and got deleted */
+    ldout(cct, 10) << "INFO: " << __func__ << ": disk state exists" << dendl;
     if (list_state.exists) {
-      /* FIXME: what should happen now? Work out if there are any
-       * non-bad ways this could happen (there probably are, but annoying
-       * to handle!) */
+      ldout(cct, 10) << "INFO: "    << __func__ << ": index list state exists" << dendl;
+      ldout(cct, 5)  << "WARNING: " << __func__ << ": The daemon may have misunderstood. If it is recognized correctly, the index will be deleted on the next attempt." << dendl;
+
+      return -ENOENT;
     }
-    // encode a suggested removal of that key
-    list_state.ver.epoch = io_ctx.get_last_version();
-    list_state.ver.pool = io_ctx.get_id();
-    cls_rgw_encode_suggestion(CEPH_RGW_REMOVE, list_state, suggested_updates);
-    return -ENOENT;
+    else if (list_state.index_ver + list_state.flags + list_state.versioned_epoch == 0) {
+      ldout(cct, 10) << "INFO: " << __func__ << ": empty index list state have been read." <<
+                                                 " The index could be read successfully later." << dendl;
+
+      return -ENOENT;
+    }
+
+    // It may be a mistake in device level.
+    // So before suggest object removal, retry to get object state after a while.
+    usleep(100);
+    rctx.invalidate(obj);
+    r = get_obj_state(&rctx, bucket_info, obj, &astate, false, y);
+    if (r < 0)
+      return r;
+
+    if (!astate->exists) {
+      // encode a suggested removal of that key
+      list_state.ver.epoch = io_ctx.get_last_version();
+      list_state.ver.pool = io_ctx.get_id();
+
+      ldout(cct, 10) << "INFO: " << __func__ << ": encoding remove of " << list_state.key << " on suggested_updates" << dendl;
+      cls_rgw_encode_suggestion(CEPH_RGW_REMOVE, list_state, suggested_updates);
+
+      return -ENOENT;
+    }
   }
 
   string etag;
@@ -8961,6 +8983,9 @@ int RGWRados::check_disk_state(librados::IoCtx io_ctx,
   list_state.meta.owner_display_name = owner.get_display_name();
 
   list_state.exists = true;
+
+  ldout(cct, 10) << "INFO: " << __func__ <<
+                    ": encoding update of " << list_state.key << " on suggested_updates" << dendl;
   cls_rgw_encode_suggestion(CEPH_RGW_UPDATE | suggest_flag, list_state, suggested_updates);
   return 0;
 }
