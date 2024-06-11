@@ -932,6 +932,108 @@ static int read_key_entry(cls_method_context_t hctx, cls_rgw_obj_key& key,
   return 0;
 }
 
+template <class T>
+static int write_entry(cls_method_context_t hctx, T& entry, const string& key)
+{
+  bufferlist bl;
+  encode(entry, bl);
+  return cls_cxx_map_set_val(hctx, key, &bl);
+}
+
+static int read_olh(cls_method_context_t hctx,cls_rgw_obj_key& obj_key, rgw_bucket_olh_entry *olh_data_entry, string *index_key, bool *found)
+{
+  cls_rgw_obj_key olh_key;
+  olh_key.name = obj_key.name;
+
+  encode_olh_data_key(olh_key, index_key);
+  int ret = read_index_entry(hctx, *index_key, olh_data_entry);
+  if (ret < 0 && ret != -ENOENT) {
+    CLS_LOG(0, "ERROR: read_index_entry() olh_key=%s ret=%d", olh_key.name.c_str(), ret);
+    return ret;
+  }
+  if (found) {
+    *found = (ret != -ENOENT);
+  }
+  return 0;
+}
+
+static void update_olh_log(rgw_bucket_olh_entry& olh_data_entry, OLHLogOp op, const string& op_tag,
+                           cls_rgw_obj_key& key, bool delete_marker, uint64_t epoch)
+{
+  vector<rgw_bucket_olh_log_entry>& log = olh_data_entry.pending_log[olh_data_entry.epoch];
+  rgw_bucket_olh_log_entry log_entry;
+  log_entry.epoch = epoch;
+  log_entry.op = op;
+  log_entry.op_tag = op_tag;
+  log_entry.key = key;
+  log_entry.delete_marker = delete_marker;
+  log.push_back(log_entry);
+}
+
+static int write_obj_instance_entry(cls_method_context_t hctx, rgw_bucket_dir_entry& instance_entry, const string& instance_idx)
+{
+  CLS_LOG(20, "write_entry() instance=%s idx=%s flags=%d", escape_str(instance_entry.key.instance).c_str(), instance_idx.c_str(), instance_entry.flags);
+  /* write the instance entry */
+  int ret = write_entry(hctx, instance_entry, instance_idx);
+  if (ret < 0) {
+    CLS_LOG(0, "ERROR: write_entry() instance_key=%s ret=%d", escape_str(instance_idx).c_str(), ret);
+    return ret;
+  }
+  return 0;
+}
+
+/*
+ * write object instance entry, and if needed also the list entry
+ */
+static int write_obj_entries(cls_method_context_t hctx, rgw_bucket_dir_entry& instance_entry, const string& instance_idx, bool overwrite_list_index = true)
+{
+  int ret = write_obj_instance_entry(hctx, instance_entry, instance_idx);
+  if (ret < 0) {
+    return ret;
+  }
+  string instance_list_idx;
+  get_list_index_key(instance_entry, &instance_list_idx);
+
+  if (instance_idx != instance_list_idx) {
+    if (overwrite_list_index) {
+      /* write a new list entry for the object instance */
+      CLS_LOG(20, "write_entry() overwrite in idx=%s flags=%d", escape_str(instance_list_idx).c_str(), instance_entry.flags);
+      ret = write_entry(hctx, instance_entry, instance_list_idx);
+      if (ret < 0) {
+        CLS_LOG(0, "ERROR: write_entry() Failed to create instance=%s instance_list_idx=%s ret=%d", instance_entry.key.instance.c_str(), instance_list_idx.c_str(), ret);
+        return ret;
+      }
+    }
+    else {
+      rgw_bucket_dir_entry instance_list_entry;
+      ret = read_index_entry(hctx, instance_list_idx, &instance_list_entry);
+      if (ret != -ENOENT && ret < 0) {
+        return ret;
+      }
+
+      /* update a existing list entry for the object instance */
+      if (ret == -ENOENT) {
+        CLS_LOG(20, "write_entry() idx=%s flags=%d", escape_str(instance_list_idx).c_str(), instance_entry.flags);
+        ret = write_entry(hctx, instance_entry, instance_list_idx);
+      }
+      else {
+        instance_list_entry.ver  = instance_entry.ver;
+        instance_list_entry.meta = instance_entry.meta;
+        instance_list_entry.tag  = instance_entry.tag;
+
+        CLS_LOG(20, "write_entry() idx=%s flags=%d", escape_str(instance_list_idx).c_str(), instance_list_entry.flags);
+        ret = write_entry(hctx, instance_list_entry, instance_list_idx);
+      }
+
+      if (ret < 0) {
+        CLS_LOG(0, "ERROR: write_entry() Failed to update instance=%s instance_list_idx=%s ret=%d", instance_entry.key.instance.c_str(), instance_list_idx.c_str(), ret);
+        return ret;
+      }
+    }
+  }
+  return 0;
+}
+
 int rgw_bucket_complete_op(cls_method_context_t hctx, bufferlist *in, bufferlist *out)
 {
   // decode request
@@ -1043,9 +1145,13 @@ int rgw_bucket_complete_op(cls_method_context_t hctx, bufferlist *in, bufferlist
       stats.total_size += meta.accounted_size;
       stats.total_size_rounded += cls_rgw_get_rounded_size(meta.accounted_size);
       stats.actual_size += meta.size;
-      bufferlist new_key_bl;
-      encode(entry, new_key_bl);
-      int ret = cls_cxx_map_set_val(hctx, idx, &new_key_bl);
+      int ret;
+      if (entry.flags & rgw_bucket_dir_entry::FLAG_VER) {
+        ret = write_obj_entries(hctx, entry, idx, false);
+      }
+      else {
+        ret = write_obj_instance_entry(hctx, entry, idx);
+      }
       if (ret < 0)
 	return ret;
     }
@@ -1096,80 +1202,6 @@ int rgw_bucket_complete_op(cls_method_context_t hctx, bufferlist *in, bufferlist
   }
 
   return write_bucket_header(hctx, &header);
-}
-
-template <class T>
-static int write_entry(cls_method_context_t hctx, T& entry, const string& key)
-{
-  bufferlist bl;
-  encode(entry, bl);
-  return cls_cxx_map_set_val(hctx, key, &bl);
-}
-
-static int read_olh(cls_method_context_t hctx,cls_rgw_obj_key& obj_key, rgw_bucket_olh_entry *olh_data_entry, string *index_key, bool *found)
-{
-  cls_rgw_obj_key olh_key;
-  olh_key.name = obj_key.name;
-
-  encode_olh_data_key(olh_key, index_key);
-  int ret = read_index_entry(hctx, *index_key, olh_data_entry);
-  if (ret < 0 && ret != -ENOENT) {
-    CLS_LOG(0, "ERROR: read_index_entry() olh_key=%s ret=%d", olh_key.name.c_str(), ret);
-    return ret;
-  }
-  if (found) {
-    *found = (ret != -ENOENT);
-  }
-  return 0;
-}
-
-static void update_olh_log(rgw_bucket_olh_entry& olh_data_entry, OLHLogOp op, const string& op_tag,
-                           cls_rgw_obj_key& key, bool delete_marker, uint64_t epoch)
-{
-  vector<rgw_bucket_olh_log_entry>& log = olh_data_entry.pending_log[olh_data_entry.epoch];
-  rgw_bucket_olh_log_entry log_entry;
-  log_entry.epoch = epoch;
-  log_entry.op = op;
-  log_entry.op_tag = op_tag;
-  log_entry.key = key;
-  log_entry.delete_marker = delete_marker;
-  log.push_back(log_entry);
-}
-
-static int write_obj_instance_entry(cls_method_context_t hctx, rgw_bucket_dir_entry& instance_entry, const string& instance_idx)
-{
-  CLS_LOG(20, "write_entry() instance=%s idx=%s flags=%d", escape_str(instance_entry.key.instance).c_str(), instance_idx.c_str(), instance_entry.flags);
-  /* write the instance entry */
-  int ret = write_entry(hctx, instance_entry, instance_idx);
-  if (ret < 0) {
-    CLS_LOG(0, "ERROR: write_entry() instance_key=%s ret=%d", escape_str(instance_idx).c_str(), ret);
-    return ret;
-  }
-  return 0;
-}
-
-/*
- * write object instance entry, and if needed also the list entry
- */
-static int write_obj_entries(cls_method_context_t hctx, rgw_bucket_dir_entry& instance_entry, const string& instance_idx)
-{
-  int ret = write_obj_instance_entry(hctx, instance_entry, instance_idx);
-  if (ret < 0) {
-    return ret;
-  }
-  string instance_list_idx;
-  get_list_index_key(instance_entry, &instance_list_idx);
-
-  if (instance_idx != instance_list_idx) {
-    CLS_LOG(20, "write_entry() idx=%s flags=%d", escape_str(instance_list_idx).c_str(), instance_entry.flags);
-    /* write a new list entry for the object instance */
-    ret = write_entry(hctx, instance_entry, instance_list_idx);
-    if (ret < 0) {
-      CLS_LOG(0, "ERROR: write_entry() instance=%s instance_list_idx=%s ret=%d", instance_entry.key.instance.c_str(), instance_list_idx.c_str(), ret);
-      return ret;
-    }
-  }
-  return 0;
 }
 
 
